@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +56,8 @@ class AiResultServiceTest {
         ReflectionTestUtils.setField(post, "id", 10L);
         ReflectionTestUtils.setField(post, "user", owner);
     }
+
+    // ─── save() 테스트 ───────────────────────────────────────────────
 
     @Test
     @DisplayName("SUMMARY 타입 - 정상 저장")
@@ -153,5 +156,61 @@ class AiResultServiceTest {
         assertThatThrownBy(() -> aiResultService.save(request, owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    // ─── getResults() 테스트 ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("tilId 없이 조회 → 본인 전체 결과 반환")
+    void getResults_without_tilId_returns_all() {
+        AiResult result1 = AiResult.builder()
+                .post(post).user(owner).resultContent("요약1").toolType(ToolType.SUMMARY).build();
+        AiResult result2 = AiResult.builder()
+                .post(post).user(owner).resultContent("문제1").toolType(ToolType.QUIZ)
+                .difficulty(Difficulty.HIGH).count(3).build();
+        ReflectionTestUtils.setField(result1, "id", 1L);
+        ReflectionTestUtils.setField(result2, "id", 2L);
+
+        given(aiResultRepository.findAllByUser(owner)).willReturn(List.of(result1, result2));
+
+        List<AiResultResponse> responses = aiResultService.getResults(owner, null);
+
+        assertThat(responses).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("tilId로 필터링 → 해당 TIL 결과만 반환")
+    void getResults_with_tilId_returns_filtered() {
+        AiResult result = AiResult.builder()
+                .post(post).user(owner).resultContent("요약").toolType(ToolType.SUMMARY).build();
+        ReflectionTestUtils.setField(result, "id", 1L);
+
+        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        given(aiResultRepository.findAllByUserAndPost(owner, post)).willReturn(List.of(result));
+
+        List<AiResultResponse> responses = aiResultService.getResults(owner, 10L);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).type()).isEqualTo(ToolType.SUMMARY);
+    }
+
+    @Test
+    @DisplayName("타인 TIL로 조회 시도 → 403 예외")
+    void getResults_forbidden_when_not_owner_tilId() {
+        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> aiResultService.getResults(other, 10L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 tilId로 조회 → 404 예외")
+    void getResults_notFound_when_post_not_exists() {
+        given(postRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> aiResultService.getResults(owner, 999L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 }
