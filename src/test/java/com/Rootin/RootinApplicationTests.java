@@ -1,6 +1,6 @@
 package com.Rootin;
 
-import com.Rootin.annotation.IntegrationTest;
+import com.Rootin.global.annotation.IntegrationTest;
 import org.junit.jupiter.api.Test;
 
 @IntegrationTest
