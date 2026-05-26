@@ -20,7 +20,7 @@ public class AiResultController {
     /**
      * POST /ai/results
      *
-     * TODO [로그인 담당자]: @AuthenticationPrincipal로 User 엔티티가 주입되려면
+     * TODO : @AuthenticationPrincipal로 User 엔티티가 주입되려면
      * JwtAuthenticationFilter에서 SecurityContextHolder에 UsernamePasswordAuthenticationToken을 설정할 때
      * principal로 User 엔티티(또는 UserDetails 구현체)를 넣어줘야 합니다.
      * ex) new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities())
