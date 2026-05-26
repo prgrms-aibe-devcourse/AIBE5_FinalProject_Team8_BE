@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/ai/results")
 @RequiredArgsConstructor
@@ -31,5 +33,17 @@ public class AiResultController {
             @AuthenticationPrincipal User currentUser
     ) {
         return ResponseEntity.ok(aiResultService.save(request, currentUser));
+    }
+
+    /**
+     * GET /ai/results          → 본인 전체 AI 결과 목록
+     * GET /ai/results?tilId=1  → 특정 TIL 기준 필터링 (타인 TIL 시 403)
+     */
+    @GetMapping
+    public ResponseEntity<List<AiResultResponse>> getResults(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam(required = false) Long tilId
+    ) {
+        return ResponseEntity.ok(aiResultService.getResults(currentUser, tilId));
     }
 }
