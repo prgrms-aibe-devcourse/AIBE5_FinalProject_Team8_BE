@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class AiResultService {
@@ -51,5 +53,27 @@ public class AiResultService {
                 .build();
 
         return AiResultResponse.from(aiResultRepository.save(aiResult));
+    }
+
+    @Transactional(readOnly = true)
+    public List<AiResultResponse> getResults(User currentUser, Long tilId) {
+        // tilId 없으면 본인 전체 결과 반환
+        if (tilId == null) {
+            return aiResultRepository.findAllByUser(currentUser).stream()
+                    .map(AiResultResponse::from)
+                    .toList();
+        }
+
+        // tilId 있으면 해당 Post 조회 후 소유자 검증
+        Post post = postRepository.findById(tilId)
+                .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
+
+        if (!post.getUser().getId().equals(currentUser.getId())) {
+            throw CustomException.forbidden("본인의 TIL 결과만 조회할 수 있습니다.");
+        }
+
+        return aiResultRepository.findAllByUserAndPost(currentUser, post).stream()
+                .map(AiResultResponse::from)
+                .toList();
     }
 }
