@@ -42,10 +42,11 @@ jobs:
           # Push 이벤트 내용
           if [ "$EVENT_NAME" = "push" ]; then
             TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
-              "📌 **[PUSH] $BRANCH**" \
-              "👤 작성자: $ACTOR" \
-              "📅 날짜: $FORMATTED_DATE" \
-              "📝 **[ $COMMIT_TITLE ]**")
+              "📌 **[PUSH] **" \
+              "🌿 [브랜치] $BRANCH" \
+              "👤 [작성자] $ACTOR" \
+              "📅 [날짜] $FORMATTED_DATE" \
+              "📝 **[Commit 제목] $COMMIT_TITLE**")
             if [ -n "$COMMIT_BODY" ]; then
               TEXT=$(printf "%s\n%s" "$TEXT" "💬 Commit 내용: $COMMIT_BODY")
             fi
@@ -55,9 +56,10 @@ jobs:
           elif [ "$EVENT_NAME" = "pull_request" ]; then
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
               TEXT=$(printf "%s\n%s\n%s\n%s" \
-                "🔔 **[PR OPEN] $PR_HEAD → $PR_BASE**" \
-                "👤 작성자: $ACTOR" \
-                "📅 날짜: $FORMATTED_DATE" \
+                "🔔 **[PR OPEN] **" \
+                "🌿 [브랜치] $PR_HEAD → $PR_BASE" \
+                "👤 [작성자] $ACTOR" \
+                "📅 [날짜] $FORMATTED_DATE" \
                 "📝 **[ $PR_TITLE ]**")
 
               if [ -n "$PR_BODY" ]; then
@@ -74,16 +76,18 @@ jobs:
             elif [ "$PR_ACTION" = "closed" ]; then
               if [ "$PR_MERGED" = "true" ]; then
                 TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
-                  "✅ **[PR MERGE 완료!] $PR_HEAD → $PR_BASE**" \
-                  "👤 작성자: $ACTOR" \
-                  "📅 날짜: $FORMATTED_DATE" \
+                  "✅ **[PR MERGE 완료!] **" \
+                  "🌿 [브랜치] $PR_HEAD → $PR_BASE" \
+                  "👤 [작성자] $ACTOR" \
+                  "📅 [날짜] $FORMATTED_DATE" \
                   "📝 **[ $PR_TITLE ]**" \
                   "🔗 $PR_URL")
               else
                 TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
-                "❌ **[PR CLOSED] $PR_HEAD → $PR_BASE**" \
-                "👤 작성자: $ACTOR" \
-                "📅 날짜: $FORMATTED_DATE" \
+                "❌ **[PR CLOSED] **" \
+                "🌿 [브랜치] $PR_HEAD → $PR_BASE" \
+                "👤 [작성자] $ACTOR" \
+                "📅 [날짜] $FORMATTED_DATE" \
                 "📝 **[ $PR_TITLE ]**" \
                 "🔗 $PR_URL")
               fi

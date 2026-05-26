@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Send Issue Notification to Discord
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ISSUE_WEBHOOK }}
+          DISCORD_ISSUE_WEBHOOK: ${{ secrets.DISCORD_ISSUE_WEBHOOK }}
           ACTOR: ${{ github.actor }}
           REPO: ${{ github.repository }}
           ACTION: ${{ github.event.action }}
@@ -46,19 +46,21 @@ jobs:
           THREAD_NAME="$LABEL #$ISSUE_NUMBER $ISSUE_TITLE"
           
           # 포럼 본문 내용
-          CONTENT="$LABEL **$REPO**\n"
-          CONTENT+="👤 작성자: $ACTOR\n"
-          CONTENT+="📅 날짜: $FORMATTED_DATE\n"
-          CONTENT+="📝 제목: #$ISSUE_NUMBER $ISSUE_TITLE\n"
-          CONTENT+="🗂 Repository: $REPO\n"
+          TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+            "$LABEL **$REPO**" \
+            "👤 [작성자] $ACTOR" \
+            "📅 [날짜] $FORMATTED_DATE" \
+            "📝 [이슈] #$ISSUE_NUMBER $ISSUE_TITLE" \
+            "🗂 [Repository] $REPO")
+
           if [ -n "$BODY_TRIMMED" ]; then
-            CONTENT+="💬 내용: $BODY_TRIMMED\n"
+            TEXT=$(printf "%s\n%s" "$TEXT" "💬 [내용] $BODY_TRIMMED")
           fi
-          CONTENT+="🔗 $ISSUE_URL"
+          TEXT=$(printf "%s\n%s" "$TEXT" "🔗 $ISSUE_URL")
 
           # 포럼 채널용 JSON (thread_name 포함)
           jq -n \
             --arg thread "$THREAD_NAME" \
             --arg msg "$CONTENT" \
             '{thread_name: $thread, content: $msg}' | \
-          curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK"
+          curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_ISSUE_WEBHOOK"
