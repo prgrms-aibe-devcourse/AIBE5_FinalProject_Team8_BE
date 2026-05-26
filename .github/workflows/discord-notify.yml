@@ -1,0 +1,96 @@
+name: Discord Push/PR Notification
+
+on:
+  push:
+    branches-ignore:
+      - 'main'
+  pull_request:
+    types: [ opened, closed, reopened ]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Push/PR Notification to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          DATE: ${{ github.event.head_commit.timestamp }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+
+        run: |
+          # 날짜 포맷 변환 (UTC → KST)
+          FORMATTED_DATE=$(date -d "$DATE" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+
+          # COMMIT_MSG에서 제목/내용 분리
+          COMMIT_TITLE=$(echo "$COMMIT_MSG" | head -1)
+          COMMIT_BODY=$(echo "$COMMIT_MSG" | tail -n +3)
+
+          TEXT=""
+
+          # Push 이벤트 내용
+          if [ "$EVENT_NAME" = "push" ]; then
+            TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+              "📌 **[PUSH] $BRANCH**" \
+              "👤 작성자: $ACTOR" \
+              "📅 날짜: $FORMATTED_DATE" \
+              "📝 **[ $COMMIT_TITLE ]**")
+            if [ -n "$COMMIT_BODY" ]; then
+              TEXT=$(printf "%s\n%s" "$TEXT" "💬 Commit 내용: $COMMIT_BODY")
+            fi
+            TEXT=$(printf "%s\n%s" "$TEXT" "🔗 $COMMIT_URL")
+
+          # PR 이벤트 내용
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
+              TEXT=$(printf "%s\n%s\n%s\n%s" \
+                "🔔 **[PR OPEN] $PR_HEAD → $PR_BASE**" \
+                "👤 작성자: $ACTOR" \
+                "📅 날짜: $FORMATTED_DATE" \
+                "📝 **[ $PR_TITLE ]**")
+
+              if [ -n "$PR_BODY" ]; then
+                PR_BODY_TRIMMED=$(echo "$PR_BODY" | head -c 50)
+                ORIGINAL_LEN=$(echo -n "$PR_BODY" | wc -c)
+                if [ "$ORIGINAL_LEN" -gt 50 ]; then
+                  PR_BODY_TRIMMED="${PR_BODY_TRIMMED}..."
+                fi
+                TEXT=$(printf "%s\n%s" "$TEXT" "💬 PR 내용: $PR_BODY_TRIMMED")
+              fi
+                                           
+              TEXT=$(printf "%s\n%s" "$TEXT" "🔗 $PR_URL")
+                                           
+            elif [ "$PR_ACTION" = "closed" ]; then
+              if [ "$PR_MERGED" = "true" ]; then
+                TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+                  "✅ **[PR MERGE 완료!] $PR_HEAD → $PR_BASE**" \
+                  "👤 작성자: $ACTOR" \
+                  "📅 날짜: $FORMATTED_DATE" \
+                  "📝 **[ $PR_TITLE ]**" \
+                  "🔗 $PR_URL")
+              else
+                TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+                "❌ **[PR CLOSED] $PR_HEAD → $PR_BASE**" \
+                "👤 작성자: $ACTOR" \
+                "📅 날짜: $FORMATTED_DATE" \
+                "📝 **[ $PR_TITLE ]**" \
+                "🔗 $PR_URL")
+              fi
+            fi
+          fi
+                                           
+          if [ -n "$TEXT" ]; then
+            jq -n --arg msg "$TEXT" '{content: $msg}' | \
+            curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK"
+          fi
