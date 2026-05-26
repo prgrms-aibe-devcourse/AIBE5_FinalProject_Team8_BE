@@ -5,7 +5,7 @@ on:
     branches-ignore:
       - 'main'
   pull_request:
-    types: [opened, closed, reopened]
+    types: [ opened, closed, reopened ]
 
 jobs:
   notify:
@@ -39,49 +39,57 @@ jobs:
 
           TEXT=""
 
-          # Push 이벤트
+          # Push 이벤트 내용
           if [ "$EVENT_NAME" = "push" ]; then
-            TEXT="📌 **[PUSH] $REPO**\n"
-            TEXT+="🌿 브랜치: $BRANCH\n"
-            TEXT+="👤 작성자: $ACTOR\n"
-            TEXT+="📅 날짜: $FORMATTED_DATE\n"
-            TEXT+="📝 **[ $COMMIT_TITLE\n ]**"
+            TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+              "📌 **[PUSH] $BRANCH**" \
+              "👤 작성자: $ACTOR" \
+              "📅 날짜: $FORMATTED_DATE" \
+              "📝 **[ $COMMIT_TITLE ]**")
             if [ -n "$COMMIT_BODY" ]; then
-              TEXT+="💬 Commit 내용: $COMMIT_BODY\n"
+              TEXT=$(printf "%s\n%s" "$TEXT" "💬 Commit 내용: $COMMIT_BODY")
             fi
-            TEXT+="🔗 $COMMIT_URL"
+            TEXT=$(printf "%s\n%s" "$TEXT" "🔗 $COMMIT_URL")
 
-          # PR 이벤트
+          # PR 이벤트 내용
           elif [ "$EVENT_NAME" = "pull_request" ]; then
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
-              TEXT="🔔 **[PR OPEN] $REPO**\n"
-              TEXT+="👤 작성자: $ACTOR\n"
-              TEXT+="📅 날짜: $FORMATTED_DATE\n"
-              TEXT+="🌿 브랜치: $PR_HEAD → $PR_BASE\n"
-              TEXT+="📝 **[ $PR_TITLE\n ]**"
-              if [ -n "$PR_BODY" ]; then
-                TEXT+="💬 PR 내용: $PR_BODY\n"
-              fi
-              TEXT+="🔗 $PR_URL"
+              TEXT=$(printf "%s\n%s\n%s\n%s" \
+                "🔔 **[PR OPEN] $PR_HEAD → $PR_BASE**" \
+                "👤 작성자: $ACTOR" \
+                "📅 날짜: $FORMATTED_DATE" \
+                "📝 **[ $PR_TITLE ]**")
 
+              if [ -n "$PR_BODY" ]; then
+                PR_BODY_TRIMMED=$(echo "$PR_BODY" | head -c 50)
+                ORIGINAL_LEN=$(echo -n "$PR_BODY" | wc -c)
+                if [ "$ORIGINAL_LEN" -gt 50 ]; then
+                  PR_BODY_TRIMMED="${PR_BODY_TRIMMED}..."
+                fi
+                TEXT=$(printf "%s\n%s" "$TEXT" "💬 PR 내용: $PR_BODY_TRIMMED")
+              fi
+                                           
+              TEXT=$(printf "%s\n%s" "$TEXT" "🔗 $PR_URL")
+                                           
             elif [ "$PR_ACTION" = "closed" ]; then
               if [ "$PR_MERGED" = "true" ]; then
-                TEXT="✅ **[PR MERGE DONE!] $REPO**\n"
-                TEXT+="👤 작성자: $ACTOR\n"
-                TEXT+="📅 날짜: $FORMATTED_DATE\n"
-                TEXT+="🌿 브랜치: $PR_HEAD → $PR_BASE\n"
-                TEXT+="📝 **[ $PR_TITLE\n ]**"
-                TEXT+="🔗 $PR_URL"
+                TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+                  "✅ **[PR MERGE 완료!] $PR_HEAD → $PR_BASE**" \
+                  "👤 작성자: $ACTOR" \
+                  "📅 날짜: $FORMATTED_DATE" \
+                  "📝 **[ $PR_TITLE ]**" \
+                  "🔗 $PR_URL")
               else
-                TEXT="❌ **[PR CLOSED] $REPO**\n"
-                TEXT+="👤 작성자: $ACTOR\n"
-                TEXT+="📅 날짜: $FORMATTED_DATE\n"
-                TEXT+="📝 **[ $PR_TITLE\n ]**"
-                TEXT+="🔗 $PR_URL"
+                TEXT=$(printf "%s\n%s\n%s\n%s\n%s" \
+                "❌ **[PR CLOSED] $PR_HEAD → $PR_BASE**" \
+                "👤 작성자: $ACTOR" \
+                "📅 날짜: $FORMATTED_DATE" \
+                "📝 **[ $PR_TITLE ]**" \
+                "🔗 $PR_URL")
               fi
             fi
           fi
-
+                                           
           if [ -n "$TEXT" ]; then
             jq -n --arg msg "$TEXT" '{content: $msg}' | \
             curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK"
