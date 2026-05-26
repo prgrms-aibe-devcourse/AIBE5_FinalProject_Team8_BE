@@ -21,6 +21,7 @@ jobs:
           DATE: ${{ github.event.issue.created_at }}
 
         run: |
+          # 날짜 포맷 변환 (UTC → KST)
           FORMATTED_DATE=$(date -d "$DATE" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
 
           # 액션별 이모지/제목
@@ -39,7 +40,6 @@ jobs:
             if [ "$ORIGINAL_LEN" -gt 50 ]; then
               BODY_TRIMMED="${BODY_TRIMMED}..."
             fi
-            TEXT+="💬 내용: $BODY_TRIMMED\n"
           fi
           
           # 이슈포럼 게시글 제목
@@ -61,6 +61,6 @@ jobs:
           # 포럼 채널용 JSON (thread_name 포함)
           jq -n \
             --arg thread "$THREAD_NAME" \
-            --arg msg "$CONTENT" \
+            --arg msg "$TEXT" \
             '{thread_name: $thread, content: $msg}' | \
           curl -X POST -H "Content-Type: application/json" -d @- "$DISCORD_ISSUES_WEBHOOK"
