@@ -2,12 +2,16 @@ package com.Rootin.domain.til.entity;
 
 import com.Rootin.domain.user.entity.User;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 /**
- * TODO [TIL 담당자]: 아래 필드 추가 필요
- *  - title, content, tags, isPublic, createdAt 등 필드 추가
- *  - 시리즈(화분) 연관관계 추가
+ * TODO [로그인 담당자]: User 엔티티 완성 후 연관관계 확인 필요
  *
  * ※ AiResult와 연관관계(ManyToOne)로 연결되어 있으므로
  *   id, user 필드는 반드시 유지해 주세요.
@@ -15,7 +19,9 @@ import lombok.Getter;
  */
 @Getter
 @Entity
+@Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "posts")
+@NoArgsConstructor
 public class Post {
 
     @Id
@@ -25,4 +31,37 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(length = 50)
+    private String title;
+
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String content;
+
+    @Enumerated(EnumType.STRING)
+    private PostStatus status;
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
+    protected Post(User user, String title, String content, PostStatus status) {
+        this.user = user;
+        this.title = title;
+        this.content = content;
+        this.status = status;
+    }
+
+    public void update(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+
+    public void publish() {
+        this.status = PostStatus.PUBLISHED;
+    }
 }
