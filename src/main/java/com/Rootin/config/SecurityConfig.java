@@ -9,7 +9,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * TODO: 로그인 담당 팀원이 JWT 필터 추가 예정
+ * TODO: JWT 필터 추가 예정
  * - JwtAuthenticationFilter를 addFilterBefore()로 등록
  * - 공개 경로(회원가입, 로그인 등) permitAll() 추가
  */
