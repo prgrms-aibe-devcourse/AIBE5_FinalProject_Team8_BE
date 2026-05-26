@@ -25,7 +25,6 @@ public class AiResultService {
 
     @Transactional
     public AiResultResponse save(AiResultSaveRequest request, User currentUser) {
-        // QUIZ 타입 전용 필드 검증
         if (request.type() == ToolType.QUIZ) {
             if (request.difficulty() == null) {
                 throw new CustomException(HttpStatus.BAD_REQUEST, "QUIZ 타입은 difficulty가 필수입니다.");
@@ -38,7 +37,6 @@ public class AiResultService {
         Post post = postRepository.findById(request.tilId())
                 .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
 
-        // 본인 TIL인지 검증
         if (!post.getUser().getId().equals(currentUser.getId())) {
             throw CustomException.forbidden("본인의 TIL에만 AI 결과를 저장할 수 있습니다.");
         }
@@ -57,14 +55,12 @@ public class AiResultService {
 
     @Transactional(readOnly = true)
     public List<AiResultResponse> getResults(User currentUser, Long tilId) {
-        // tilId 없으면 본인 전체 결과 반환
         if (tilId == null) {
             return aiResultRepository.findAllByUser(currentUser).stream()
                     .map(AiResultResponse::from)
                     .toList();
         }
 
-        // tilId 있으면 해당 Post 조회 후 소유자 검증
         Post post = postRepository.findById(tilId)
                 .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
 
@@ -75,5 +71,17 @@ public class AiResultService {
         return aiResultRepository.findAllByUserAndPost(currentUser, post).stream()
                 .map(AiResultResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public void delete(Long resultId, User currentUser) {
+        AiResult aiResult = aiResultRepository.findById(resultId)
+                .orElseThrow(() -> CustomException.notFound("AI 결과를 찾을 수 없습니다."));
+
+        if (!aiResult.getUser().getId().equals(currentUser.getId())) {
+            throw CustomException.forbidden("본인의 AI 결과만 삭제할 수 있습니다.");
+        }
+
+        aiResultRepository.delete(aiResult);
     }
 }
