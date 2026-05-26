@@ -32,6 +32,8 @@ class AiResultRepositoryTest {
     void setUp() {
         // User, Post는 스텁 엔티티라 직접 persist
         user = new User();
+        // email은 not null 제약 → 더미값 주입
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "email", "test@test.com");
         em.persist(user);
 
         post = new Post();
