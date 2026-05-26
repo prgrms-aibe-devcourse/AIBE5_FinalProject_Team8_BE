@@ -1,28 +1,41 @@
 package com.Rootin.global.exception;
 
+import com.Rootin.global.common.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
-    public ResponseEntity<Map<String, String>> handleCustomException(CustomException e) {
+    public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e) {
+        log.warn("CustomException: {}", e.getMessage());
         return ResponseEntity
                 .status(e.getStatus())
-                .body(Map.of("message", e.getMessage()));
+                .body(ApiResponse.error(e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationException(MethodArgumentNotValidException e) {
+    public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                 .findFirst()
-                .orElse("입력값이 올바르지 않습니다.");
-        return ResponseEntity.badRequest().body(Map.of("message", message));
+                .orElse(ErrorCode.INVALID_INPUT.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(message));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
+        log.error("Unexpected error", e);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
     }
 }

@@ -24,6 +24,7 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/test", "/h2-console/**").permitAll()
                 .requestMatchers("/ai/results/**").authenticated()
                 .anyRequest().authenticated()
             );

@@ -2,10 +2,11 @@ package com.Rootin.domain.user.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * TODO [로그인 담당자]: 아래 필드/기능 추가 필요
- *  - nickname, password, profileImage, role 등 필드 추가
+ *  - password, role 등 필드 추가
  *  - UserDetails 구현 (implements UserDetails) → @AuthenticationPrincipal 주입 연동
  *  - 소셜 로그인(Google OAuth2) 처리 로직
  *
@@ -15,6 +16,7 @@ import lombok.Getter;
 @Getter
 @Entity
 @Table(name = "users")
+@NoArgsConstructor
 public class User {
 
     @Id
@@ -23,4 +25,10 @@ public class User {
 
     @Column(nullable = false, unique = true)
     private String email;
+
+    @Column(length = 50)
+    private String nickname;
+
+    @Column(length = 500)
+    private String profileImage;
 }
