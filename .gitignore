@@ -38,3 +38,6 @@ out/
 
 ### Important ###
 .env
+
+### docs ###
+.docs
