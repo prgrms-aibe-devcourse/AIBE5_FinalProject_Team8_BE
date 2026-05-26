@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: Rootin
+
+  # DB - MySQL (운영)
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:rootin}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# TODO: 로그인 담당 팀원이 JWT 설정 추가 예정
+# jwt:
+#   secret: ${JWT_SECRET}
+#   expiration: ${JWT_EXPIRATION:86400000}
+
+# OpenAI API 설정
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: ${OPENAI_MODEL:gpt-5.4-nano}
+  summary:
+    max-tokens: ${OPENAI_SUMMARY_MAX_TOKENS:500}
+  quiz:
+    max-tokens: ${OPENAI_QUIZ_MAX_TOKENS:1000}
