@@ -57,4 +57,15 @@ public class Pot extends BaseEntity {
         this.positionX = positionX;
         this.positionY = positionY;
     }
+
+    /**
+     * 화분에 물을 주어 획득한 경험치를 누적하고, 계산된 새 레벨로 업데이트합니다.
+     *
+     * @param gainedExp 획득한 경험치 양
+     * @param nextLevel 계산된 최신 레벨 수치
+     */
+    public void updateExperienceAndLevel(int gainedExp, int nextLevel) {
+        this.totalExp += gainedExp;
+        this.level = nextLevel;
+    }
 }

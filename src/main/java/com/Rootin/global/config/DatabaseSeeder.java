@@ -7,6 +7,7 @@ import com.Rootin.domain.plant.repository.PlantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Profile("!test")
 public class DatabaseSeeder {
 
     private static final String DEFAULT_PLANT_NAME = "기본 씨앗";

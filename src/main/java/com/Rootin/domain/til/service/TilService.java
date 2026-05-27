@@ -29,18 +29,24 @@ public class TilService {
     private final TagRepository tagRepository;
     private final UserRepository userRepository;
     private final PotRepository potRepository;
+    private final com.Rootin.domain.garden.service.ExperienceService experienceService;
 
     @Transactional
     public TilResponse create(Long userId, TilCreateRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
-        Pot pot = potRepository.findById(request.potId())
+        // 동시성 제어를 위해 비관적 락으로 화분을 안전하게 조회합니다.
+        Pot pot = potRepository.findByIdWithLock(request.potId())
                 .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
 
         Til til = Til.create(user, request.title(), request.content(), pot);
         tilRepository.save(til);
 
         syncTags(til, request.tags());
+
+        // TIL 저장 성공 직후, 글자 수 및 이력을 바탕으로 물주기 경험치/포인트/레벨업 비즈니스 로직을 구동합니다.
+        int contentLength = request.content() != null ? request.content().length() : 0;
+        experienceService.applyWatering(userId, pot, contentLength, til.getId());
 
         return TilResponse.from(til);
     }
