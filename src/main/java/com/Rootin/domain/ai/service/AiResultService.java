@@ -5,12 +5,14 @@ import com.Rootin.domain.ai.entity.enums.ToolType;
 import com.Rootin.domain.ai.dto.AiResultResponse;
 import com.Rootin.domain.ai.dto.AiResultSaveRequest;
 import com.Rootin.domain.ai.repository.AiResultRepository;
-import com.Rootin.domain.til.entity.Post;
-import com.Rootin.domain.til.repository.PostRepository;
+import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.entity.Til;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,55 +23,66 @@ import java.util.List;
 public class AiResultService {
 
     private final AiResultRepository aiResultRepository;
-    private final PostRepository postRepository;
+    private final PotRepository potRepository;
+    private final TilRepository tilRepository;
 
+    /**
+     * AI 결과 저장
+     * 1. 화분 조회 + 소유자 검증
+     * 2. 해당 화분의 TIL 목록 조회 (게시된 것만)
+     * 3. TIL이 없으면 404
+     * 4. AiResult 저장 후 AiResultTil 연결
+     */
     @Transactional
     public AiResultResponse save(AiResultSaveRequest request, User currentUser) {
-        if (request.type() == ToolType.QUIZ) {
-            if (request.difficulty() == null) {
-                throw new CustomException(HttpStatus.BAD_REQUEST, "QUIZ 타입은 difficulty가 필수입니다.");
-            }
-            if (request.count() == null || request.count() < 1) {
-                throw new CustomException(HttpStatus.BAD_REQUEST, "QUIZ 타입은 count가 1 이상이어야 합니다.");
-            }
+        Pot pot = potRepository.findById(request.potId())
+                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+
+        if (!pot.getUserId().equals(currentUser.getId())) {
+            throw CustomException.forbidden("본인의 화분에만 AI 결과를 저장할 수 있습니다.");
         }
 
-        Post post = postRepository.findById(request.tilId())
-                .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
+        List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
+                currentUser.getId(), request.potId(), PostStatus.PUBLISHED);
 
-        if (!post.getUser().getId().equals(currentUser.getId())) {
-            throw CustomException.forbidden("본인의 TIL에만 AI 결과를 저장할 수 있습니다.");
+        if (tils.isEmpty()) {
+            throw CustomException.notFound("화분에 저장된 TIL이 없습니다.");
         }
 
         AiResult aiResult = AiResult.builder()
-                .post(post)
                 .user(currentUser)
                 .resultContent(request.content())
                 .toolType(request.type())
-                .count(request.count())
-                .difficulty(request.difficulty())
                 .build();
 
-        return AiResultResponse.from(aiResultRepository.save(aiResult));
+        AiResult saved = aiResultRepository.save(aiResult);
+        tils.forEach(saved::addTil);
+
+        return AiResultResponse.of(saved, request.potId());
     }
 
+    /**
+     * AI 결과 목록 조회
+     * potId 없음 → 본인 전체 결과
+     * potId 있음 → 해당 화분 기준 필터링 (소유자 검증 포함)
+     */
     @Transactional(readOnly = true)
-    public List<AiResultResponse> getResults(User currentUser, Long tilId) {
-        if (tilId == null) {
+    public List<AiResultResponse> getResults(User currentUser, Long potId) {
+        if (potId == null) {
             return aiResultRepository.findAllByUser(currentUser).stream()
-                    .map(AiResultResponse::from)
+                    .map(ar -> AiResultResponse.of(ar, resolvePotId(ar)))
                     .toList();
         }
 
-        Post post = postRepository.findById(tilId)
-                .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
+        Pot pot = potRepository.findById(potId)
+                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
 
-        if (!post.getUser().getId().equals(currentUser.getId())) {
-            throw CustomException.forbidden("본인의 TIL 결과만 조회할 수 있습니다.");
+        if (!pot.getUserId().equals(currentUser.getId())) {
+            throw CustomException.forbidden("본인의 화분 결과만 조회할 수 있습니다.");
         }
 
-        return aiResultRepository.findAllByUserAndPost(currentUser, post).stream()
-                .map(AiResultResponse::from)
+        return aiResultRepository.findAllByUserAndPotId(currentUser, potId).stream()
+                .map(ar -> AiResultResponse.of(ar, potId))
                 .toList();
     }
 
@@ -83,5 +96,16 @@ public class AiResultService {
         }
 
         aiResultRepository.delete(aiResult);
+    }
+
+    /**
+     * 전체 조회 시 potId 복원
+     * 첫 번째 TIL의 pot.id 반환 (모든 TIL은 동일 화분 소속)
+     */
+    private Long resolvePotId(AiResult aiResult) {
+        return aiResult.getTils().stream()
+                .map(til -> til.getPot().getId())
+                .findFirst()
+                .orElse(null);
     }
 }

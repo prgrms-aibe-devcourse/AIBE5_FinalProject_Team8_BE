@@ -1,6 +1,6 @@
 package com.Rootin.domain.til.entity;
 
-import com.Rootin.domain.pot.entity.Pot;
+import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -32,8 +32,17 @@ public class Til extends Post {
         this.publishedAt = LocalDateTime.now();
     }
 
+    protected Til(User user, String title, String content, Pot pot, PostStatus status) {
+        super(user, title, content, status);
+        this.pot = pot;
+    }
+
     public static Til create(User user, String title, String content, Pot pot) {
         return new Til(user, title, content, pot);
+    }
+
+    public static Til createDraft(User user, String title, String content, Pot pot) {
+        return new Til(user, title, content, pot, PostStatus.DRAFT);
     }
 
 }

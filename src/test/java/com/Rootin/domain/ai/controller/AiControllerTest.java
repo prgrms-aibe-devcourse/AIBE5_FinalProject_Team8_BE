@@ -1,8 +1,11 @@
 package com.Rootin.domain.ai.controller;
 
+import com.Rootin.domain.ai.constant.AiPolicy;
+import com.Rootin.domain.ai.dto.AiQuizItem;
+import com.Rootin.domain.ai.dto.AiQuizRequest;
+import com.Rootin.domain.ai.dto.AiQuizResponse;
 import com.Rootin.domain.ai.dto.AiSummaryRequest;
 import com.Rootin.domain.ai.dto.AiSummaryResponse;
-import com.Rootin.domain.ai.constant.AiPolicy;
 import com.Rootin.domain.ai.service.AiService;
 import com.Rootin.global.exception.CustomException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,9 +69,9 @@ class AiControllerTest {
     }
 
     @Test
-    @DisplayName("tilId 누락 → 400")
+    @DisplayName("potId 누락 → 400")
     @WithMockUser
-    void summary_badRequest_when_tilId_missing() throws Exception {
+    void summary_badRequest_when_potId_missing() throws Exception {
         mockMvc.perform(post("/ai/summary").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -89,11 +92,11 @@ class AiControllerTest {
     }
 
     @Test
-    @DisplayName("타인 TIL → 403")
+    @DisplayName("타인 화분 → 403")
     @WithMockUser
     void summary_forbidden_when_not_owner() throws Exception {
         given(aiService.summarize(any(), any()))
-                .willThrow(new CustomException(HttpStatus.FORBIDDEN, "본인의 TIL만 요약할 수 있습니다."));
+                .willThrow(new CustomException(HttpStatus.FORBIDDEN, "본인의 화분만 요약할 수 있습니다."));
 
         mockMvc.perform(post("/ai/summary").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -107,6 +110,77 @@ class AiControllerTest {
         mockMvc.perform(post("/ai/summary").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ─── POST /ai/quiz ───────────────────────────────────────────────
+
+    @Test
+    @DisplayName("퀴즈 생성 성공 → 200 + 응답 본문 확인")
+    @WithMockUser
+    void quiz_success() throws Exception {
+        int count = 2;
+        int totalCost = count * AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
+        AiQuizResponse response = new AiQuizResponse(
+                List.of(
+                        new AiQuizItem("질문1", "정답1", "힌트1"),
+                        new AiQuizItem("질문2", "정답2", "힌트2")
+                ),
+                totalCost,
+                totalCost
+        );
+        given(aiService.generateQuiz(any(), any())).willReturn(response);
+
+        mockMvc.perform(post("/ai/quiz").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, count))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quizzes[0].question").value("질문1"))
+                .andExpect(jsonPath("$.quizzes[0].answer").value("정답1"))
+                .andExpect(jsonPath("$.quizzes[0].hint").value("힌트1"))
+                .andExpect(jsonPath("$.usedPoint").value(totalCost))
+                .andExpect(jsonPath("$.remainPoint").value(totalCost));
+    }
+
+    @Test
+    @DisplayName("count 누락 → 400")
+    @WithMockUser
+    void quiz_badRequest_when_count_missing() throws Exception {
+        mockMvc.perform(post("/ai/quiz").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"potId\":1}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("count 최대값 초과 → 400")
+    @WithMockUser
+    void quiz_badRequest_when_count_exceeds_max() throws Exception {
+        mockMvc.perform(post("/ai/quiz").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"potId\":1,\"count\":" + (AiPolicy.QUIZ_MAX_COUNT + 1) + "}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("퀴즈 포인트 부족 → 402")
+    @WithMockUser
+    void quiz_paymentRequired_when_insufficient_point() throws Exception {
+        given(aiService.generateQuiz(any(), any()))
+                .willThrow(new CustomException(HttpStatus.PAYMENT_REQUIRED, "포인트가 부족합니다."));
+
+        mockMvc.perform(post("/ai/quiz").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3))))
+                .andExpect(status().isPaymentRequired());
+    }
+
+    @Test
+    @DisplayName("퀴즈 미인증 → 401")
+    void quiz_unauthorized_when_no_auth() throws Exception {
+        mockMvc.perform(post("/ai/quiz").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3))))
                 .andExpect(status().isUnauthorized());
     }
 }

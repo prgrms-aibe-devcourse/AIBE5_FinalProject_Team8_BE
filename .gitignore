@@ -39,6 +39,12 @@ out/
 ### Important ###
 ../.env
 .env
+gradle.properties
+Todo.txt
+mywork.md
+planning.md
 
 ### docs ###
 .docs
+.docs/
+.docs/myFolder/

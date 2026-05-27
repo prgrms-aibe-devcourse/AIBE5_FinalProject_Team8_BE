@@ -20,3 +20,7 @@ spring:
 openai:
   api-key: test-dummy-key
   model: gpt-5.4-nano
+  summary:
+    max-tokens: 500
+  quiz:
+    max-tokens: 1000

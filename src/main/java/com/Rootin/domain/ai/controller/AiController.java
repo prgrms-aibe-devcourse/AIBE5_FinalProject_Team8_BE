@@ -1,5 +1,7 @@
 package com.Rootin.domain.ai.controller;
 
+import com.Rootin.domain.ai.dto.AiQuizRequest;
+import com.Rootin.domain.ai.dto.AiQuizResponse;
 import com.Rootin.domain.ai.dto.AiSummaryRequest;
 import com.Rootin.domain.ai.dto.AiSummaryResponse;
 import com.Rootin.domain.ai.service.AiService;
@@ -34,5 +36,21 @@ public class AiController {
             @AuthenticationPrincipal User currentUser
     ) {
         return ResponseEntity.ok(aiService.summarize(request, currentUser));
+    }
+
+    /**
+     * POST /ai/quiz
+     * 작성된 TIL을 기반으로 복습 문제 생성 — count × {@code QUIZ_POINT_COST_PER_QUESTION}점 차감
+     * <p>
+     * TODO : JWT 필터에서 @AuthenticationPrincipal로 User 엔티티 주입 필요
+     *
+     * @return 200 생성 성공 / 400 count 범위 초과 / 402 포인트 부족 / 403 타인 TIL / 404 TIL 미존재
+     */
+    @PostMapping("/quiz")
+    public ResponseEntity<AiQuizResponse> quiz(
+            @Valid @RequestBody AiQuizRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(aiService.generateQuiz(request, currentUser));
     }
 }

@@ -33,15 +33,28 @@ public class User {
     @Column(length = 500)
     private String profileImage;
 
-    /**
-     * TODO [포인트 정책]: 적립 로직은 로그인/게임화 담당자가 추가 예정
-     * AI 기능 사용 시 차감되는 포인트 잔액
-     */
     @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
     private int point;
+
+    @lombok.Builder
+    public User(String email, String nickname, String profileImage, int point) {
+        this.email = email;
+        this.nickname = nickname;
+        this.profileImage = profileImage;
+        this.point = point;
+    }
 
     /** AI 기능 사용 시 포인트 차감 */
     public void deductPoint(int amount) {
         this.point -= amount;
+    }
+
+    /**
+     * TIL 작성 등 다양한 학습 습관 활동 성공 시 포인트를 적립합니다.
+     *
+     * @param amount 적립할 포인트 양
+     */
+    public void addPoint(int amount) {
+        this.point += amount;
     }
 }
