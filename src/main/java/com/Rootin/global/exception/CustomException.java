@@ -20,4 +20,8 @@ public class CustomException extends RuntimeException {
     public static CustomException notFound(String message) {
         return new CustomException(HttpStatus.NOT_FOUND, message);
     }
+
+    public static CustomException paymentRequired(String message) {
+        return new CustomException(HttpStatus.PAYMENT_REQUIRED, message);
+    }
 }
