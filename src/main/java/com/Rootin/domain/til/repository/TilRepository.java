@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
+
 public interface TilRepository extends JpaRepository<Til, Long> {
 
     Page<Til> findByUserIdAndStatus(Long userId, PostStatus status, Pageable pageable);
@@ -17,4 +19,6 @@ public interface TilRepository extends JpaRepository<Til, Long> {
             @org.springframework.data.repository.query.Param("userId") Long userId,
             @org.springframework.data.repository.query.Param("status") PostStatus status
     );
+
+    Optional<Til> findFirstByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
 }
