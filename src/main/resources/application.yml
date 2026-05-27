@@ -57,7 +57,7 @@ spring:
       hibernate:
         format_sql: true
 
-# Actuator 추가
+# Actuator 추가 (Docker Health)
 management:
   endpoints:
     web:
