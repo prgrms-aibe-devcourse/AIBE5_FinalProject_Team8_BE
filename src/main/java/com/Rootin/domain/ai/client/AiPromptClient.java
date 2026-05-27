@@ -24,6 +24,9 @@ public class AiPromptClient {
     @Value("${openai.summary.max-tokens}")
     private int summaryMaxTokens;
 
+    @Value("${openai.quiz.max-tokens}")
+    private int quizMaxTokens;
+
     private static final String SUMMARY_SYSTEM_PROMPT = """
             당신은 학습 도우미입니다.
             주어진 TIL(Today I Learned) 내용을 분석하여 한국어로 응답하세요.
@@ -46,6 +49,43 @@ public class AiPromptClient {
                 .model(model)
                 .maxCompletionTokens((long) summaryMaxTokens)
                 .addSystemMessage(SUMMARY_SYSTEM_PROMPT)
+                .addUserMessage(tilContent)
+                .build();
+
+        ChatCompletion completion = openAIClient.chat().completions().create(params);
+
+        return completion.choices().get(0).message().content()
+                .orElseThrow(() -> new RuntimeException("OpenAI 응답이 비어있습니다."));
+    }
+
+    /**
+     * TIL 본문을 OpenAI API에 전달해 퀴즈 JSON 문자열을 반환한다.
+     *
+     * @param tilContent TIL 본문
+     * @param count      생성할 문항 수
+     * @return AI 응답 JSON 문자열 (quizzes 배열 포함)
+     */
+    public String generateQuiz(String tilContent, int count) {
+        String prompt = String.format("""
+                당신은 학습 도우미입니다.
+                주어진 TIL(Today I Learned) 내용을 분석하여 한국어로 복습 문제 %d개를 생성하세요.
+                반드시 아래 형식의 유효한 JSON만 반환하세요 (설명 없이 JSON만):
+                {
+                  "quizzes": [
+                    {
+                      "question": "문제",
+                      "answer": "정답",
+                      "hint": "힌트"
+                    }
+                  ]
+                }
+                quizzes 배열에 정확히 %d개의 항목을 포함하세요.
+                """, count, count);
+
+        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
+                .model(model)
+                .maxCompletionTokens((long) quizMaxTokens)
+                .addSystemMessage(prompt)
                 .addUserMessage(tilContent)
                 .build();
 
