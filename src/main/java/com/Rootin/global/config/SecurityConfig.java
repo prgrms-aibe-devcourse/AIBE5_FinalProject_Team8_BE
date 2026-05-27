@@ -7,7 +7,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * TODO [로그인 담당자]: JWT 필터 추가 예정
@@ -25,8 +24,8 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/auth/**").permitAll() // 로그인, 회원가입
-                    .requestMatchers("/ai/results/**").authenticated()
+                .requestMatchers("/test", "/h2-console/**").permitAll()
+                .requestMatchers("/ai/results/**").authenticated()
                 .anyRequest().authenticated()
 
             );
