@@ -7,8 +7,8 @@ import jakarta.validation.constraints.NotNull;
 
 public record AiQuizRequest(
 
-        @NotNull(message = "tilId는 필수입니다.")
-        Long tilId,
+        @NotNull(message = "potId는 필수입니다.")
+        Long potId,
 
         @NotNull(message = "count는 필수입니다.")
         @Min(value = 1, message = "문항 수는 최소 1개입니다.")
