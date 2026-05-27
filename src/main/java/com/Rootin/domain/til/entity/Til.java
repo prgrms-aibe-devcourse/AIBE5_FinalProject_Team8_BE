@@ -1,6 +1,6 @@
 package com.Rootin.domain.til.entity;
 
-import com.Rootin.domain.pot.entity.Pot;
+import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;

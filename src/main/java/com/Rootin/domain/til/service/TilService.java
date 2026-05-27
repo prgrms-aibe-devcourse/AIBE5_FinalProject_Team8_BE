@@ -1,7 +1,7 @@
 package com.Rootin.domain.til.service;
 
-import com.Rootin.domain.pot.entity.Pot;
-import com.Rootin.domain.pot.repository.PotRepository;
+import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.til.dto.request.TilCreateRequest;
 import com.Rootin.domain.til.dto.request.TilUpdateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
