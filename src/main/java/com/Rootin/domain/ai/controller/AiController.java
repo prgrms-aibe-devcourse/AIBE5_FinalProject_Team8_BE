@@ -1,0 +1,38 @@
+package com.Rootin.domain.ai.controller;
+
+import com.Rootin.domain.ai.dto.AiSummaryRequest;
+import com.Rootin.domain.ai.dto.AiSummaryResponse;
+import com.Rootin.domain.ai.service.AiService;
+import com.Rootin.domain.user.entity.User;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/ai")
+@RequiredArgsConstructor
+public class AiController {
+
+    private final AiService aiService;
+
+    /**
+     * POST /ai/summary
+     * 작성된 TIL을 OpenAI로 요약 — 포인트 {@code SUMMARY_POINT_COST}점 차감
+     * <p>
+     * TODO : JWT 필터에서 @AuthenticationPrincipal로 User 엔티티 주입 필요
+     *
+     * @return 200 요약 성공 / 402 포인트 부족 / 403 타인 TIL / 404 TIL 미존재
+     */
+    @PostMapping("/summary")
+    public ResponseEntity<AiSummaryResponse> summary(
+            @Valid @RequestBody AiSummaryRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(aiService.summarize(request, currentUser));
+    }
+}
