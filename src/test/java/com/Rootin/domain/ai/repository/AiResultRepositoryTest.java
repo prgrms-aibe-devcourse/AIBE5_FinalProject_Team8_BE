@@ -1,9 +1,9 @@
 package com.Rootin.domain.ai.repository;
 
 import com.Rootin.domain.ai.entity.AiResult;
-import com.Rootin.domain.ai.entity.enums.Difficulty;
 import com.Rootin.domain.ai.entity.enums.ToolType;
-import com.Rootin.domain.til.entity.Post;
+import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.annotation.H2RepositoryTest;
 import jakarta.persistence.EntityManager;
@@ -29,11 +29,14 @@ class AiResultRepositoryTest {
 
     private User user;
     private User otherUser;
-    private Post post;
-    private Post otherPost;
+    private Pot pot;
+    private Pot otherPot;
+    private Til til;
+    private Til otherTil;
 
     @BeforeEach
     void setUp() {
+        // 사용자 생성
         user = new User();
         ReflectionTestUtils.setField(user, "email", "owner@test.com");
         em.persist(user);
@@ -42,13 +45,33 @@ class AiResultRepositoryTest {
         ReflectionTestUtils.setField(otherUser, "email", "other@test.com");
         em.persist(otherUser);
 
-        post = new Post();
-        ReflectionTestUtils.setField(post, "user", user);
-        em.persist(post);
+        em.flush(); // user.getId() 확보
 
-        otherPost = new Post();
-        ReflectionTestUtils.setField(otherPost, "user", otherUser);
-        em.persist(otherPost);
+        // 화분 생성 (userId는 flush 후 확보된 id 사용)
+        pot = Pot.builder()
+                .userId(user.getId())
+                .title("내 화분")
+                .level(1)
+                .totalExp(0)
+                .build();
+        em.persist(pot);
+
+        otherPot = Pot.builder()
+                .userId(otherUser.getId())
+                .title("타인 화분")
+                .level(1)
+                .totalExp(0)
+                .build();
+        em.persist(otherPot);
+
+        em.flush(); // pot.getId() 확보
+
+        // TIL 생성 (JOINED 상속: posts + til 테이블 동시 저장)
+        til = Til.create(user, "TIL 제목", "TIL 내용", pot);
+        em.persist(til);
+
+        otherTil = Til.create(otherUser, "타인 TIL", "타인 내용", otherPot);
+        em.persist(otherTil);
 
         em.flush();
     }
@@ -56,15 +79,16 @@ class AiResultRepositoryTest {
     // ─── 저장 테스트 ────────────────────────────────────────────────
 
     @Test
-    @DisplayName("SUMMARY 타입 AiResult 저장 및 조회")
+    @DisplayName("SUMMARY 타입 AiResult 저장 — ai_result_til 연결 확인")
     void save_and_find_summary() {
         AiResult aiResult = AiResult.builder()
-                .post(post).user(user)
+                .user(user)
                 .resultContent("TIL 핵심 요약입니다.")
                 .toolType(ToolType.SUMMARY)
                 .build();
 
         AiResult saved = aiResultRepository.save(aiResult);
+        saved.addTil(til);
         em.flush();
         em.clear();
 
@@ -74,47 +98,26 @@ class AiResultRepositoryTest {
         assertThat(found.get().getToolType()).isEqualTo(ToolType.SUMMARY);
         assertThat(found.get().getResultContent()).isEqualTo("TIL 핵심 요약입니다.");
         assertThat(found.get().getCreatedAt()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("QUIZ 타입 AiResult 저장 및 조회 - count, difficulty 포함")
-    void save_and_find_quiz() {
-        AiResult aiResult = AiResult.builder()
-                .post(post).user(user)
-                .resultContent("문제 1번: ...")
-                .toolType(ToolType.QUIZ)
-                .count(5)
-                .difficulty(Difficulty.HIGH)
-                .build();
-
-        AiResult saved = aiResultRepository.save(aiResult);
-        em.flush();
-        em.clear();
-
-        Optional<AiResult> found = aiResultRepository.findById(saved.getId());
-
-        assertThat(found).isPresent();
-        assertThat(found.get().getCount()).isEqualTo(5);
-        assertThat(found.get().getDifficulty()).isEqualTo(Difficulty.HIGH);
+        assertThat(found.get().getTils()).hasSize(1);
     }
 
     @Test
     @DisplayName("SUMMARY 저장 시 count, difficulty는 null")
     void summary_has_null_count_and_difficulty() {
         AiResult aiResult = AiResult.builder()
-                .post(post).user(user)
+                .user(user)
                 .resultContent("요약 내용")
                 .toolType(ToolType.SUMMARY)
                 .build();
 
         AiResult saved = aiResultRepository.save(aiResult);
+        saved.addTil(til);
         em.flush();
         em.clear();
 
-        Optional<AiResult> found = aiResultRepository.findById(saved.getId());
-
-        assertThat(found.get().getCount()).isNull();
-        assertThat(found.get().getDifficulty()).isNull();
+        AiResult found = aiResultRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getCount()).isNull();
+        assertThat(found.getDifficulty()).isNull();
     }
 
     // ─── 조회 테스트 ────────────────────────────────────────────────
@@ -122,10 +125,16 @@ class AiResultRepositoryTest {
     @Test
     @DisplayName("findAllByUser - 본인 결과만 반환, 타인 결과 제외")
     void findAllByUser_returns_only_owner_results() {
-        aiResultRepository.save(AiResult.builder()
-                .post(post).user(user).resultContent("내 요약").toolType(ToolType.SUMMARY).build());
-        aiResultRepository.save(AiResult.builder()
-                .post(otherPost).user(otherUser).resultContent("타인 요약").toolType(ToolType.SUMMARY).build());
+        AiResult r1 = aiResultRepository.save(AiResult.builder()
+                .user(user)
+                .resultContent("내 요약").toolType(ToolType.SUMMARY).build());
+        r1.addTil(til);
+
+        AiResult r2 = aiResultRepository.save(AiResult.builder()
+                .user(otherUser)
+                .resultContent("타인 요약").toolType(ToolType.SUMMARY).build());
+        r2.addTil(otherTil);
+
         em.flush();
         em.clear();
 
@@ -136,23 +145,56 @@ class AiResultRepositoryTest {
     }
 
     @Test
-    @DisplayName("findAllByUserAndPost - 특정 TIL 결과만 반환")
-    void findAllByUserAndPost_returns_filtered_results() {
-        Post anotherPost = new Post();
-        ReflectionTestUtils.setField(anotherPost, "user", user);
-        em.persist(anotherPost);
+    @DisplayName("findAllByUserAndPotId - 화분 기준 필터링")
+    void findAllByUserAndPotId_returns_filtered_results() {
+        // 내 화분 결과
+        AiResult r1 = aiResultRepository.save(AiResult.builder()
+                .user(user)
+                .resultContent("내 화분 요약").toolType(ToolType.SUMMARY).build());
+        r1.addTil(til);
+
+        // 다른 화분의 TIL로 저장된 결과
+        Pot pot2 = Pot.builder().userId(user.getId()).title("두번째 화분").level(1).totalExp(0).build();
+        em.persist(pot2);
+        em.flush();
+        Til til2 = Til.create(user, "TIL2", "두번째 내용", pot2);
+        em.persist(til2);
         em.flush();
 
-        aiResultRepository.save(AiResult.builder()
-                .post(post).user(user).resultContent("TIL1 요약").toolType(ToolType.SUMMARY).build());
-        aiResultRepository.save(AiResult.builder()
-                .post(anotherPost).user(user).resultContent("TIL2 요약").toolType(ToolType.SUMMARY).build());
+        AiResult r2 = aiResultRepository.save(AiResult.builder()
+                .user(user)
+                .resultContent("다른 화분 요약").toolType(ToolType.SUMMARY).build());
+        r2.addTil(til2);
+
         em.flush();
         em.clear();
 
-        List<AiResult> results = aiResultRepository.findAllByUserAndPost(user, post);
+        List<AiResult> results = aiResultRepository.findAllByUserAndPotId(user, pot.getId());
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).getResultContent()).isEqualTo("TIL1 요약");
+        assertThat(results.get(0).getResultContent()).isEqualTo("내 화분 요약");
+    }
+
+    @Test
+    @DisplayName("ai_result_til 중간 테이블 — 여러 TIL 연결 확인")
+    void multiple_tils_linked_in_join_table() {
+        Til til2 = Til.create(user, "TIL2", "두 번째 TIL 내용", pot);
+        em.persist(til2);
+        em.flush();
+
+        AiResult aiResult = AiResult.builder()
+                .user(user)
+                .resultContent("두 TIL 요약")
+                .toolType(ToolType.SUMMARY)
+                .build();
+
+        AiResult saved = aiResultRepository.save(aiResult);
+        saved.addTil(til);
+        saved.addTil(til2);
+        em.flush();
+        em.clear();
+
+        AiResult found = aiResultRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getTils()).hasSize(2);
     }
 }

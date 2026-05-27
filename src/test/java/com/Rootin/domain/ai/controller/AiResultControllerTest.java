@@ -36,12 +36,12 @@ class AiResultControllerTest {
     @Test @DisplayName("type 누락 → 400") @WithMockUser
     void save_badRequest_when_type_missing() throws Exception {
         mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"tilId\":1,\"content\":\"요약\"}"))
+                        .content("{\"potId\":1,\"content\":\"요약\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
     }
 
-    @Test @DisplayName("tilId 누락 → 400") @WithMockUser
-    void save_badRequest_when_tilId_missing() throws Exception {
+    @Test @DisplayName("potId 누락 → 400") @WithMockUser
+    void save_badRequest_when_potId_missing() throws Exception {
         mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"SUMMARY\",\"content\":\"요약\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
@@ -50,14 +50,14 @@ class AiResultControllerTest {
     @Test @DisplayName("content 누락 → 400") @WithMockUser
     void save_badRequest_when_content_missing() throws Exception {
         mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"SUMMARY\",\"tilId\":1}"))
+                        .content("{\"type\":\"SUMMARY\",\"potId\":1}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
     }
 
     @Test @DisplayName("POST 미인증 → 401")
     void save_unauthorized_when_no_auth() throws Exception {
         mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"SUMMARY\",\"tilId\":1,\"content\":\"요약\"}"))
+                        .content("{\"type\":\"SUMMARY\",\"potId\":1,\"content\":\"요약\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -69,10 +69,10 @@ class AiResultControllerTest {
         mockMvc.perform(get("/ai/results").with(csrf())).andExpect(status().isOk());
     }
 
-    @Test @DisplayName("GET /ai/results?tilId=1 → 200") @WithMockUser
-    void getResults_with_tilId_success() throws Exception {
+    @Test @DisplayName("GET /ai/results?potId=1 → 200") @WithMockUser
+    void getResults_with_potId_success() throws Exception {
         given(aiResultService.getResults(any(), any())).willReturn(List.of());
-        mockMvc.perform(get("/ai/results").param("tilId", "1").with(csrf()))
+        mockMvc.perform(get("/ai/results").param("potId", "1").with(csrf()))
                 .andExpect(status().isOk());
     }
 

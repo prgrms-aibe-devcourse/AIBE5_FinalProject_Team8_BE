@@ -9,8 +9,11 @@ import com.Rootin.domain.ai.dto.AiSummaryRequest;
 import com.Rootin.domain.ai.dto.AiSummaryResponse;
 import com.Rootin.domain.gamification.entity.PointLog;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
-import com.Rootin.domain.til.entity.Post;
-import com.Rootin.domain.til.repository.PostRepository;
+import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.entity.Til;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
@@ -26,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,7 +51,10 @@ class AiServiceTest {
     private AiPromptClient aiPromptClient;
 
     @Mock
-    private PostRepository postRepository;
+    private PotRepository potRepository;
+
+    @Mock
+    private TilRepository tilRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -60,7 +67,8 @@ class AiServiceTest {
 
     private User owner;
     private User other;
-    private Post post;
+    private Pot pot;
+    private Til til;
 
     private static final String MOCK_SUMMARY_JSON =
             "{\"summary\":\"핵심 요약 내용\",\"keyPoints\":[\"포인트1\",\"포인트2\",\"포인트3\"]}";
@@ -74,17 +82,25 @@ class AiServiceTest {
         owner = new User();
         ReflectionTestUtils.setField(owner, "id", 1L);
         ReflectionTestUtils.setField(owner, "email", "owner@test.com");
-        ReflectionTestUtils.setField(owner, "point", AiPolicy.SUMMARY_POINT_COST * 2); // 잔액 충분한 상태
+        ReflectionTestUtils.setField(owner, "point", AiPolicy.SUMMARY_POINT_COST * 2);
 
         other = new User();
         ReflectionTestUtils.setField(other, "id", 2L);
         ReflectionTestUtils.setField(other, "email", "other@test.com");
         ReflectionTestUtils.setField(other, "point", AiPolicy.SUMMARY_POINT_COST * 2);
 
-        post = new Post();
-        ReflectionTestUtils.setField(post, "id", 10L);
-        ReflectionTestUtils.setField(post, "user", owner);
-        ReflectionTestUtils.setField(post, "content", "TIL 본문 내용");
+        pot = Pot.builder()
+                .userId(1L)
+                .title("테스트 화분")
+                .level(1)
+                .totalExp(0)
+                .build();
+        ReflectionTestUtils.setField(pot, "id", 10L);
+
+        til = new Til();
+        ReflectionTestUtils.setField(til, "id", 100L);
+        ReflectionTestUtils.setField(til, "user", owner);
+        ReflectionTestUtils.setField(til, "content", "TIL 본문 내용");
     }
 
     // ─── summarize() ─────────────────────────────────────────────────
@@ -92,15 +108,14 @@ class AiServiceTest {
     @Test
     @DisplayName("요약 성공 → 포인트 차감, PointLog 저장, 응답 반환")
     void summarize_success() {
-        // given
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of(til));
         given(aiPromptClient.summarizeTil(any())).willReturn(MOCK_SUMMARY_JSON);
 
-        // when
         AiSummaryResponse response = aiService.summarize(new AiSummaryRequest(10L), owner);
 
-        // then
         assertThat(response.summary()).isEqualTo("핵심 요약 내용");
         assertThat(response.keyPoints()).containsExactly("포인트1", "포인트2", "포인트3");
         assertThat(response.usedPoint()).isEqualTo(AiPolicy.SUMMARY_POINT_COST);
@@ -111,11 +126,9 @@ class AiServiceTest {
     @Test
     @DisplayName("포인트 부족 시 402 — OpenAI 미호출")
     void summarize_insufficientPoint() {
-        // given: 잔액이 비용보다 1 부족한 상태
         ReflectionTestUtils.setField(owner, "point", AiPolicy.SUMMARY_POINT_COST - 1);
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
 
-        // when & then
         assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED));
@@ -125,26 +138,31 @@ class AiServiceTest {
     }
 
     @Test
-    @DisplayName("TIL 미존재 시 404")
-    void summarize_tilNotFound() {
-        // given
+    @DisplayName("화분 미존재 시 404")
+    void summarize_potNotFound() {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(postRepository.findById(999L)).willReturn(Optional.empty());
+        given(potRepository.findById(999L)).willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(999L), owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test
-    @DisplayName("타인 TIL 요약 시도 → 403")
+    @DisplayName("타인 화분 요약 시도 → 403")
     void summarize_forbidden_when_not_owner() {
-        // given: post의 소유자는 owner, 요청자는 other
-        given(userRepository.findById(2L)).willReturn(Optional.of(other));
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        Pot otherPot = Pot.builder().userId(2L).title("타인 화분").level(1).totalExp(0).build();
+        ReflectionTestUtils.setField(otherPot, "id", 10L);
 
-        // when & then
+        given(userRepository.findById(2L)).willReturn(Optional.of(other));
+        given(potRepository.findById(10L)).willReturn(Optional.of(otherPot));
+
+        // otherPot.userId=2, other.id=2 → 통과, 하지만 other가 요청
+        // 403 시나리오: pot.userId=1(owner 것), 요청자는 other
+        Pot ownerPot = Pot.builder().userId(1L).title("오너 화분").level(1).totalExp(0).build();
+        ReflectionTestUtils.setField(ownerPot, "id", 10L);
+        given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
+
         assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), other))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
@@ -153,12 +171,23 @@ class AiServiceTest {
     }
 
     @Test
+    @DisplayName("화분에 TIL 없음 → 404")
+    void summarize_emptyTils() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of());
+
+        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), owner))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
     @DisplayName("사용자 미존재 시 404")
     void summarize_userNotFound() {
-        // given
         given(userRepository.findById(1L)).willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
@@ -169,19 +198,18 @@ class AiServiceTest {
     @Test
     @DisplayName("퀴즈 생성 성공 → 포인트 count×10 차감, PointLog 저장, 응답 반환")
     void generateQuiz_success() {
-        // given: count=2, 총 비용 = 2 × 10 = 20
         int count = 2;
         int totalCost = count * AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
         ReflectionTestUtils.setField(owner, "point", totalCost * 2);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of(til));
         given(aiPromptClient.generateQuiz(any(), eq(count))).willReturn(MOCK_QUIZ_JSON);
 
-        // when
         AiQuizResponse response = aiService.generateQuiz(new AiQuizRequest(10L, count), owner);
 
-        // then
         assertThat(response.quizzes()).hasSize(count);
         assertThat(response.quizzes().get(0).question()).isEqualTo("질문1");
         assertThat(response.quizzes().get(0).answer()).isEqualTo("정답1");
@@ -194,13 +222,11 @@ class AiServiceTest {
     @Test
     @DisplayName("퀴즈 포인트 부족 시 402 — OpenAI 미호출")
     void generateQuiz_insufficientPoint() {
-        // given: count=5, 총 비용 50P, 잔액 49P
         int count = 5;
         int totalCost = count * AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
         ReflectionTestUtils.setField(owner, "point", totalCost - 1);
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
 
-        // when & then
         assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, count), owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED));
@@ -210,14 +236,15 @@ class AiServiceTest {
     }
 
     @Test
-    @DisplayName("타인 TIL로 퀴즈 생성 시도 → 403")
+    @DisplayName("타인 화분으로 퀴즈 생성 시도 → 403")
     void generateQuiz_forbidden_when_not_owner() {
-        // given
         ReflectionTestUtils.setField(other, "point", 100);
-        given(userRepository.findById(2L)).willReturn(Optional.of(other));
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        Pot ownerPot = Pot.builder().userId(1L).title("오너 화분").level(1).totalExp(0).build();
+        ReflectionTestUtils.setField(ownerPot, "id", 10L);
 
-        // when & then
+        given(userRepository.findById(2L)).willReturn(Optional.of(other));
+        given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
+
         assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, 3), other))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
@@ -226,14 +253,29 @@ class AiServiceTest {
     }
 
     @Test
-    @DisplayName("퀴즈 TIL 미존재 시 404")
-    void generateQuiz_tilNotFound() {
-        // given
+    @DisplayName("퀴즈 화분 미존재 시 404")
+    void generateQuiz_potNotFound() {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(postRepository.findById(999L)).willReturn(Optional.empty());
+        given(potRepository.findById(999L)).willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(999L, 3), owner))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("화분에 TIL 없음 → 404")
+    void generateQuiz_emptyTils() {
+        int count = 3;
+        int totalCost = count * AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
+        ReflectionTestUtils.setField(owner, "point", totalCost * 2);
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of());
+
+        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, count), owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
