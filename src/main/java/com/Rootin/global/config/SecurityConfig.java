@@ -25,6 +25,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/test", "/h2-console/**").permitAll()
+                .requestMatchers("/api/v1/tils/**").permitAll()
                 .requestMatchers("/ai/results/**").authenticated()
                 .anyRequest().authenticated()
 
