@@ -26,6 +26,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/test", "/h2-console/**").permitAll()
                 .requestMatchers("/api/v1/tils/**").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/ai/results/**").authenticated()
                 .anyRequest().authenticated()
 
