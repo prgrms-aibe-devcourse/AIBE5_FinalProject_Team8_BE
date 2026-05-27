@@ -28,6 +28,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/tils/**").permitAll()
                 .requestMatchers("/ai/results/**").authenticated()
                 .anyRequest().authenticated()
+
             );
 
         return http.build();

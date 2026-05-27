@@ -1,15 +1,13 @@
-name: CI - Run Tests on PR
+name: CD - Docker Hub Push on Main
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-      - feature
-    types: [opened, synchronize, reopened]
 
 jobs:
-  test:
-    name: Build & Test
+  build-and-push:
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
 
     steps:
@@ -35,17 +33,18 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-        # 테스트X (빌드 실패)
-      - name: Build
-        run: ./gradlew build -x test
-
-        # 테스트O (테스트 실패)
-      - name: Run tests
-        run: ./gradlew test
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          name: test-results
-          path: build/reports/tests/test/
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push BE image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/rootin-be:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/rootin-be:${{ github.sha }}

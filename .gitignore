@@ -37,6 +37,7 @@ out/
 .vscode/
 
 ### Important ###
+../.env
 .env
 
 ### docs ###
