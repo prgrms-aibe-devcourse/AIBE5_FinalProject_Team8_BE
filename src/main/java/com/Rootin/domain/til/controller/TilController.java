@@ -1,5 +1,6 @@
 package com.Rootin.domain.til.controller;
 
+import com.Rootin.domain.til.dto.request.DraftSaveRequest;
 import com.Rootin.domain.til.dto.request.TilCreateRequest;
 import com.Rootin.domain.til.dto.request.TilUpdateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
@@ -62,6 +63,31 @@ public class TilController {
             @RequestHeader("X-User-Id") Long userId
     ) {
         tilService.delete(tilId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/draft")
+    public ResponseEntity<ApiResponse<TilResponse>> saveDraft(
+            @RequestHeader("X-User-Id") Long userId,
+            @Valid @RequestBody DraftSaveRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(tilService.saveDraft(userId, request)));
+    }
+
+    @GetMapping("/draft")
+    public ResponseEntity<ApiResponse<TilResponse>> getDraft(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestParam Long potId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(tilService.getDraft(userId, potId)));
+    }
+
+    @DeleteMapping("/draft")
+    public ResponseEntity<Void> deleteDraft(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestParam Long potId
+    ) {
+        tilService.deleteDraft(userId, potId);
         return ResponseEntity.noContent().build();
     }
 }
