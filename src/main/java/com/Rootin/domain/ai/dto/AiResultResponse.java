@@ -9,15 +9,18 @@ public record AiResultResponse(
         Long resultId,
         ToolType type,
         String content,
-        Long tilId,
+        Long potId,
         LocalDateTime createdAt
 ) {
-    public static AiResultResponse from(AiResult aiResult) {
+    /**
+     * potId는 ai_results 테이블에 저장되지 않으므로 서비스 레이어에서 계산 후 전달
+     */
+    public static AiResultResponse of(AiResult aiResult, Long potId) {
         return new AiResultResponse(
                 aiResult.getId(),
                 aiResult.getToolType(),
                 aiResult.getResultContent(),
-                aiResult.getPost().getId(),
+                potId,
                 aiResult.getCreatedAt()
         );
     }

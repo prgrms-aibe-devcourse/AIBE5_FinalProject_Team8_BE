@@ -13,9 +13,9 @@ import java.time.LocalDateTime;
 /**
  * TODO [로그인 담당자]: User 엔티티 완성 후 연관관계 확인 필요
  *
- * ※ AiResult와 연관관계(ManyToOne)로 연결되어 있으므로
+ * ※ Til(자식)이 AiResult와 @ManyToMany로 연결되어 있으므로
  *   id, user 필드는 반드시 유지해 주세요.
- *   (AiResultService에서 post.getUser().getId()로 소유자 검증 중)
+ *   (ai_result_til 중간 테이블의 post_id = til.post_id = posts.id)
  */
 @Getter
 @Entity

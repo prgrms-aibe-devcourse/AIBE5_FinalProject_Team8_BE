@@ -69,9 +69,9 @@ class AiControllerTest {
     }
 
     @Test
-    @DisplayName("tilId 누락 → 400")
+    @DisplayName("potId 누락 → 400")
     @WithMockUser
-    void summary_badRequest_when_tilId_missing() throws Exception {
+    void summary_badRequest_when_potId_missing() throws Exception {
         mockMvc.perform(post("/ai/summary").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -92,11 +92,11 @@ class AiControllerTest {
     }
 
     @Test
-    @DisplayName("타인 TIL → 403")
+    @DisplayName("타인 화분 → 403")
     @WithMockUser
     void summary_forbidden_when_not_owner() throws Exception {
         given(aiService.summarize(any(), any()))
-                .willThrow(new CustomException(HttpStatus.FORBIDDEN, "본인의 TIL만 요약할 수 있습니다."));
+                .willThrow(new CustomException(HttpStatus.FORBIDDEN, "본인의 화분만 요약할 수 있습니다."));
 
         mockMvc.perform(post("/ai/summary").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,7 +148,7 @@ class AiControllerTest {
     void quiz_badRequest_when_count_missing() throws Exception {
         mockMvc.perform(post("/ai/quiz").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"tilId\":1}"))
+                        .content("{\"potId\":1}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -158,7 +158,7 @@ class AiControllerTest {
     void quiz_badRequest_when_count_exceeds_max() throws Exception {
         mockMvc.perform(post("/ai/quiz").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"tilId\":1,\"count\":" + (AiPolicy.QUIZ_MAX_COUNT + 1) + "}"))
+                        .content("{\"potId\":1,\"count\":" + (AiPolicy.QUIZ_MAX_COUNT + 1) + "}"))
                 .andExpect(status().isBadRequest());
     }
 

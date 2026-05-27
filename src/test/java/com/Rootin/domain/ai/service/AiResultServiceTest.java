@@ -1,13 +1,15 @@
 package com.Rootin.domain.ai.service;
 
 import com.Rootin.domain.ai.entity.AiResult;
-import com.Rootin.domain.ai.entity.enums.Difficulty;
 import com.Rootin.domain.ai.entity.enums.ToolType;
 import com.Rootin.domain.ai.dto.AiResultResponse;
 import com.Rootin.domain.ai.dto.AiResultSaveRequest;
 import com.Rootin.domain.ai.repository.AiResultRepository;
-import com.Rootin.domain.til.entity.Post;
-import com.Rootin.domain.til.repository.PostRepository;
+import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.entity.Til;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,11 +41,15 @@ class AiResultServiceTest {
     private AiResultRepository aiResultRepository;
 
     @Mock
-    private PostRepository postRepository;
+    private PotRepository potRepository;
+
+    @Mock
+    private TilRepository tilRepository;
 
     private User owner;
     private User other;
-    private Post post;
+    private Pot pot;
+    private Til til;
 
     @BeforeEach
     void setUp() {
@@ -53,9 +59,19 @@ class AiResultServiceTest {
         other = new User();
         ReflectionTestUtils.setField(other, "id", 2L);
 
-        post = new Post();
-        ReflectionTestUtils.setField(post, "id", 10L);
-        ReflectionTestUtils.setField(post, "user", owner);
+        pot = Pot.builder()
+                .userId(1L)
+                .title("테스트 화분")
+                .level(1)
+                .totalExp(0)
+                .build();
+        ReflectionTestUtils.setField(pot, "id", 10L);
+
+        til = new Til();
+        ReflectionTestUtils.setField(til, "id", 100L);
+        ReflectionTestUtils.setField(til, "user", owner);
+        ReflectionTestUtils.setField(til, "content", "TIL 본문");
+        ReflectionTestUtils.setField(til, "pot", pot);
     }
 
     // ─── save() ───────────────────────────────────────────────────────
@@ -63,73 +79,95 @@ class AiResultServiceTest {
     @Test
     @DisplayName("SUMMARY 타입 - 정상 저장")
     void save_summary_success() {
-        AiResultSaveRequest request = new AiResultSaveRequest(ToolType.SUMMARY, 10L, "요약 내용", null, null);
-        AiResult savedResult = AiResult.builder().post(post).user(owner).resultContent("요약 내용").toolType(ToolType.SUMMARY).build();
+        AiResultSaveRequest request = new AiResultSaveRequest(ToolType.SUMMARY, 10L, "요약 내용");
+        AiResult savedResult = AiResult.builder()
+                .user(owner)
+                .resultContent("요약 내용")
+                .toolType(ToolType.SUMMARY)
+                .build();
         ReflectionTestUtils.setField(savedResult, "id", 100L);
+        savedResult.addTil(til);
 
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of(til));
         given(aiResultRepository.save(any())).willReturn(savedResult);
 
         AiResultResponse response = aiResultService.save(request, owner);
         assertThat(response.type()).isEqualTo(ToolType.SUMMARY);
+        assertThat(response.potId()).isEqualTo(10L);
     }
 
     @Test
     @DisplayName("QUIZ 타입 - 정상 저장")
     void save_quiz_success() {
-        AiResultSaveRequest request = new AiResultSaveRequest(ToolType.QUIZ, 10L, "문제", Difficulty.HIGH, 5);
-        AiResult savedResult = AiResult.builder().post(post).user(owner).resultContent("문제").toolType(ToolType.QUIZ).difficulty(Difficulty.HIGH).count(5).build();
+        AiResultSaveRequest request = new AiResultSaveRequest(ToolType.QUIZ, 10L, "문제 JSON");
+        AiResult savedResult = AiResult.builder()
+                .user(owner)
+                .resultContent("문제 JSON")
+                .toolType(ToolType.QUIZ)
+                .build();
         ReflectionTestUtils.setField(savedResult, "id", 101L);
+        savedResult.addTil(til);
 
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of(til));
         given(aiResultRepository.save(any())).willReturn(savedResult);
 
         assertThat(aiResultService.save(request, owner).type()).isEqualTo(ToolType.QUIZ);
     }
 
     @Test
-    @DisplayName("타인 TIL에 저장 시도 → 403")
+    @DisplayName("타인 화분에 저장 시도 → 403")
     void save_forbidden_when_not_owner() {
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
-        assertThatThrownBy(() -> aiResultService.save(new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용", null, null), other))
+        Pot ownerPot = Pot.builder().userId(1L).title("오너 화분").level(1).totalExp(0).build();
+        ReflectionTestUtils.setField(ownerPot, "id", 10L);
+        given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
+
+        assertThatThrownBy(() -> aiResultService.save(
+                new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용"), other))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
-    @DisplayName("존재하지 않는 TIL → 404")
-    void save_notFound_when_post_not_exists() {
-        given(postRepository.findById(999L)).willReturn(Optional.empty());
-        assertThatThrownBy(() -> aiResultService.save(new AiResultSaveRequest(ToolType.SUMMARY, 999L, "내용", null, null), owner))
+    @DisplayName("존재하지 않는 화분 → 404")
+    void save_notFound_when_pot_not_exists() {
+        given(potRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> aiResultService.save(
+                new AiResultSaveRequest(ToolType.SUMMARY, 999L, "내용"), owner))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test
-    @DisplayName("QUIZ difficulty 누락 → 400")
-    void save_badRequest_when_quiz_without_difficulty() {
-        assertThatThrownBy(() -> aiResultService.save(new AiResultSaveRequest(ToolType.QUIZ, 10L, "내용", null, 5), owner))
-                .isInstanceOf(CustomException.class)
-                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
+    @DisplayName("화분에 TIL 없음 → 404")
+    void save_notFound_when_no_tils_in_pot() {
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
+                .willReturn(List.of());
 
-    @Test
-    @DisplayName("QUIZ count 0 → 400")
-    void save_badRequest_when_quiz_count_zero() {
-        assertThatThrownBy(() -> aiResultService.save(new AiResultSaveRequest(ToolType.QUIZ, 10L, "내용", Difficulty.MEDIUM, 0), owner))
+        assertThatThrownBy(() -> aiResultService.save(
+                new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용"), owner))
                 .isInstanceOf(CustomException.class)
-                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     // ─── getResults() ────────────────────────────────────────────────
 
     @Test
-    @DisplayName("tilId 없이 조회 → 전체 결과 반환")
-    void getResults_without_tilId_returns_all() {
-        AiResult r1 = AiResult.builder().post(post).user(owner).resultContent("요약1").toolType(ToolType.SUMMARY).build();
-        AiResult r2 = AiResult.builder().post(post).user(owner).resultContent("문제1").toolType(ToolType.QUIZ).difficulty(Difficulty.HIGH).count(3).build();
+    @DisplayName("potId 없이 조회 → 전체 결과 반환")
+    void getResults_without_potId_returns_all() {
+        AiResult r1 = AiResult.builder().user(owner)
+                .resultContent("요약1").toolType(ToolType.SUMMARY).build();
+        AiResult r2 = AiResult.builder().user(owner)
+                .resultContent("문제1").toolType(ToolType.QUIZ).build();
         ReflectionTestUtils.setField(r1, "id", 1L);
         ReflectionTestUtils.setField(r2, "id", 2L);
+        r1.addTil(til);
+        r2.addTil(til);
 
         given(aiResultRepository.findAllByUser(owner)).willReturn(List.of(r1, r2));
 
@@ -137,30 +175,38 @@ class AiResultServiceTest {
     }
 
     @Test
-    @DisplayName("tilId 기준 필터링 → 해당 TIL 결과만 반환")
-    void getResults_with_tilId_returns_filtered() {
-        AiResult r = AiResult.builder().post(post).user(owner).resultContent("요약").toolType(ToolType.SUMMARY).build();
+    @DisplayName("potId 기준 필터링 → 해당 화분 결과만 반환")
+    void getResults_with_potId_returns_filtered() {
+        AiResult r = AiResult.builder().user(owner)
+                .resultContent("요약").toolType(ToolType.SUMMARY).build();
         ReflectionTestUtils.setField(r, "id", 1L);
+        r.addTil(til);
 
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
-        given(aiResultRepository.findAllByUserAndPost(owner, post)).willReturn(List.of(r));
+        given(potRepository.findById(10L)).willReturn(Optional.of(pot));
+        given(aiResultRepository.findAllByUserAndPotId(owner, 10L)).willReturn(List.of(r));
 
-        assertThat(aiResultService.getResults(owner, 10L)).hasSize(1);
+        List<AiResultResponse> results = aiResultService.getResults(owner, 10L);
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).potId()).isEqualTo(10L);
     }
 
     @Test
-    @DisplayName("타인 TIL로 조회 시도 → 403")
-    void getResults_forbidden_when_not_owner_tilId() {
-        given(postRepository.findById(10L)).willReturn(Optional.of(post));
+    @DisplayName("타인 화분으로 조회 시도 → 403")
+    void getResults_forbidden_when_not_owner_potId() {
+        Pot ownerPot = Pot.builder().userId(1L).title("오너 화분").level(1).totalExp(0).build();
+        ReflectionTestUtils.setField(ownerPot, "id", 10L);
+        given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
+
         assertThatThrownBy(() -> aiResultService.getResults(other, 10L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
-    @DisplayName("존재하지 않는 tilId → 404")
-    void getResults_notFound_when_post_not_exists() {
-        given(postRepository.findById(999L)).willReturn(Optional.empty());
+    @DisplayName("존재하지 않는 potId → 404")
+    void getResults_notFound_when_pot_not_exists() {
+        given(potRepository.findById(999L)).willReturn(Optional.empty());
+
         assertThatThrownBy(() -> aiResultService.getResults(owner, 999L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
@@ -171,8 +217,10 @@ class AiResultServiceTest {
     @Test
     @DisplayName("본인 결과 삭제 → 정상 삭제")
     void delete_success() {
-        AiResult aiResult = AiResult.builder().post(post).user(owner).resultContent("요약").toolType(ToolType.SUMMARY).build();
+        AiResult aiResult = AiResult.builder().user(owner)
+                .resultContent("요약").toolType(ToolType.SUMMARY).build();
         ReflectionTestUtils.setField(aiResult, "id", 1L);
+        aiResult.addTil(til);
 
         given(aiResultRepository.findById(1L)).willReturn(Optional.of(aiResult));
 
@@ -184,8 +232,10 @@ class AiResultServiceTest {
     @Test
     @DisplayName("타인 결과 삭제 시도 → 403")
     void delete_forbidden_when_not_owner() {
-        AiResult aiResult = AiResult.builder().post(post).user(owner).resultContent("요약").toolType(ToolType.SUMMARY).build();
+        AiResult aiResult = AiResult.builder().user(owner)
+                .resultContent("요약").toolType(ToolType.SUMMARY).build();
         ReflectionTestUtils.setField(aiResult, "id", 1L);
+        aiResult.addTil(til);
 
         given(aiResultRepository.findById(1L)).willReturn(Optional.of(aiResult));
 

@@ -32,15 +32,15 @@ public class AiResultController {
     }
 
     /**
-     * GET /ai/results          → 본인 전체 AI 결과 목록
-     * GET /ai/results?tilId=1  → 특정 TIL 기준 필터링 (타인 TIL 시 403)
+     * GET /ai/results           → 본인 전체 AI 결과 목록
+     * GET /ai/results?potId=1   → 특정 화분 기준 필터링 (타인 화분 시 403)
      */
     @GetMapping
     public ResponseEntity<List<AiResultResponse>> getResults(
             @AuthenticationPrincipal User currentUser,
-            @RequestParam(required = false) Long tilId
+            @RequestParam(required = false) Long potId
     ) {
-        return ResponseEntity.ok(aiResultService.getResults(currentUser, tilId));
+        return ResponseEntity.ok(aiResultService.getResults(currentUser, potId));
     }
 
     /**
