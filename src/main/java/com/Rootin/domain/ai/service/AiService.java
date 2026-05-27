@@ -10,8 +10,11 @@ import com.Rootin.domain.ai.dto.AiSummaryResponse;
 import com.Rootin.domain.gamification.entity.PointLog;
 import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
-import com.Rootin.domain.til.entity.Post;
-import com.Rootin.domain.til.repository.PostRepository;
+import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.entity.Til;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
@@ -22,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +35,8 @@ public class AiService {
     private static final int QUIZ_POINT_COST_PER_QUESTION = AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
 
     private final AiPromptClient aiPromptClient;
-    private final PostRepository postRepository;
+    private final PotRepository potRepository;
+    private final TilRepository tilRepository;
     private final UserRepository userRepository;
     private final PointLogRepository pointLogRepository;
     private final ObjectMapper objectMapper;
@@ -39,37 +44,40 @@ public class AiService {
     /**
      * TIL 요약 요청
      * 1. 포인트 잔액 확인 (부족 시 402)
-     * 2. TIL 조회 + 소유자 검증
-     * 3. OpenAI 요약 호출
-     * 4. 포인트 차감 + PointLog 저장
-     * 5. 응답 반환
+     * 2. 화분 조회 + 소유자 검증
+     * 3. 화분 내 TIL 목록 조회 (게시된 것만) — 없으면 404
+     * 4. TIL 내용 합산 → OpenAI 요약 호출
+     * 5. 포인트 차감 + PointLog 저장
+     * 6. 응답 반환
      */
     @Transactional
     public AiSummaryResponse summarize(AiSummaryRequest request, User principal) {
-        // DB에서 최신 User 상태 조회 (포인트 잔액 신뢰성 보장)
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
-        // 포인트 잔액 확인
         if (user.getPoint() < SUMMARY_POINT_COST) {
-            throw CustomException.paymentRequired("포인트가 부족합니다. (필요: " + SUMMARY_POINT_COST + "P, 보유: " + user.getPoint() + "P)");
+            throw CustomException.paymentRequired(
+                    "포인트가 부족합니다. (필요: " + SUMMARY_POINT_COST + "P, 보유: " + user.getPoint() + "P)");
         }
 
-        // TIL 조회 및 소유자 검증
-        Post post = postRepository.findById(request.tilId())
-                .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
+        Pot pot = potRepository.findById(request.potId())
+                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
 
-        if (!post.getUser().getId().equals(user.getId())) {
-            throw CustomException.forbidden("본인의 TIL만 요약할 수 있습니다.");
+        if (!pot.getUserId().equals(user.getId())) {
+            throw CustomException.forbidden("본인의 화분만 요약할 수 있습니다.");
         }
 
-        // OpenAI 요약 요청
-        String responseJson = aiPromptClient.summarizeTil(post.getContent());
+        List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
+                user.getId(), request.potId(), PostStatus.PUBLISHED);
 
-        // JSON 파싱
+        if (tils.isEmpty()) {
+            throw CustomException.notFound("요약할 TIL이 없습니다.");
+        }
+
+        String combinedContent = combineContents(tils);
+        String responseJson = aiPromptClient.summarizeTil(combinedContent);
         SummaryResult result = parseSummaryResponse(responseJson);
 
-        // 포인트 차감 및 PointLog 기록
         user.deductPoint(SUMMARY_POINT_COST);
         pointLogRepository.save(PointLog.builder()
                 .user(user)
@@ -89,39 +97,42 @@ public class AiService {
      * 복습 문제 생성 요청
      * 1. 총 비용 계산 (count × 문항당 비용)
      * 2. 포인트 잔액 확인 (부족 시 402)
-     * 3. TIL 조회 + 소유자 검증
-     * 4. OpenAI 퀴즈 호출
-     * 5. 포인트 차감 + PointLog 저장
-     * 6. 응답 반환
+     * 3. 화분 조회 + 소유자 검증
+     * 4. 화분 내 TIL 목록 조회 — 없으면 404
+     * 5. TIL 내용 합산 → OpenAI 퀴즈 호출
+     * 6. 포인트 차감 + PointLog 저장
+     * 7. 응답 반환
      */
     @Transactional
     public AiQuizResponse generateQuiz(AiQuizRequest request, User principal) {
         int totalCost = request.count() * QUIZ_POINT_COST_PER_QUESTION;
 
-        // DB에서 최신 User 상태 조회
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
-        // 포인트 잔액 확인
         if (user.getPoint() < totalCost) {
-            throw CustomException.paymentRequired("포인트가 부족합니다. (필요: " + totalCost + "P, 보유: " + user.getPoint() + "P)");
+            throw CustomException.paymentRequired(
+                    "포인트가 부족합니다. (필요: " + totalCost + "P, 보유: " + user.getPoint() + "P)");
         }
 
-        // TIL 조회 및 소유자 검증
-        Post post = postRepository.findById(request.tilId())
-                .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
+        Pot pot = potRepository.findById(request.potId())
+                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
 
-        if (!post.getUser().getId().equals(user.getId())) {
-            throw CustomException.forbidden("본인의 TIL로만 복습 문제를 생성할 수 있습니다.");
+        if (!pot.getUserId().equals(user.getId())) {
+            throw CustomException.forbidden("본인의 화분으로만 복습 문제를 생성할 수 있습니다.");
         }
 
-        // OpenAI 퀴즈 요청
-        String responseJson = aiPromptClient.generateQuiz(post.getContent(), request.count());
+        List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
+                user.getId(), request.potId(), PostStatus.PUBLISHED);
 
-        // JSON 파싱
+        if (tils.isEmpty()) {
+            throw CustomException.notFound("문제를 생성할 TIL이 없습니다.");
+        }
+
+        String combinedContent = combineContents(tils);
+        String responseJson = aiPromptClient.generateQuiz(combinedContent, request.count());
         List<AiQuizItem> quizzes = parseQuizResponse(responseJson);
 
-        // 포인트 차감 및 PointLog 기록
         user.deductPoint(totalCost);
         pointLogRepository.save(PointLog.builder()
                 .user(user)
@@ -130,6 +141,15 @@ public class AiService {
                 .build());
 
         return new AiQuizResponse(quizzes, totalCost, user.getPoint());
+    }
+
+    // ─── 내부 헬퍼 ────────────────────────────────────────────────────
+
+    /** 여러 TIL 내용을 구분자로 합산하여 하나의 문자열로 반환 */
+    private String combineContents(List<Til> tils) {
+        return tils.stream()
+                .map(Til::getContent)
+                .collect(Collectors.joining("\n\n---\n\n"));
     }
 
     private SummaryResult parseSummaryResponse(String json) {
