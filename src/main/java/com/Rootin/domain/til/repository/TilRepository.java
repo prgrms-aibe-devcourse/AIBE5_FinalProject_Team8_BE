@@ -24,4 +24,16 @@ public interface TilRepository extends JpaRepository<Til, Long> {
     Optional<Til> findFirstByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
     // AI 서비스 전용 — 화분 내 전체 TIL 내용을 합산하여 OpenAI에 전달할 때 사용
     List<Til> findByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
+
+    /**
+     * 특정 사용자가 소유한 특정 화분에 누적되어 발행 완료(PUBLISHED)된 TIL의 총 개수를 안전하게 계산합니다.
+     * 대시보드에서 해당 화분에 작성된 총 TIL 통계를 보여줄 때 사용되며,
+     * userId를 검증 조건에 포함하여 타인의 데이터 노출 및 오염을 방지합니다.
+     *
+     * @param userId 사용자 ID
+     * @param potId 화분 ID
+     * @param status 게시글 상태 (예: PostStatus.PUBLISHED)
+     * @return 발행 완료된 TIL 개수
+     */
+    long countByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
 }
