@@ -82,7 +82,7 @@ class PotControllerTest {
         given(potService.createPot(eq(userId), any(PotCreateRequest.class))).willReturn(response);
 
         // when & then
-        mockMvc.perform(post("/api/pots")
+        mockMvc.perform(post("/api/v1/pots")
                         .header("X-USER-ID", userId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -104,7 +104,7 @@ class PotControllerTest {
                 .build();
 
         // when & then
-        mockMvc.perform(post("/api/pots")
+        mockMvc.perform(post("/api/v1/pots")
                         .header("X-USER-ID", userId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -130,7 +130,7 @@ class PotControllerTest {
         given(potService.getPots(userId)).willReturn(List.of(response));
 
         // when & then
-        mockMvc.perform(get("/api/pots")
+        mockMvc.perform(get("/api/v1/pots")
                         .header("X-USER-ID", userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("자바 화분"))
@@ -170,7 +170,7 @@ class PotControllerTest {
         given(gardenDashboardService.getGardenDashboard(potId, userId)).willReturn(response);
 
         // when & then
-        mockMvc.perform(get("/api/pots/{potId}/dashboard", potId)
+        mockMvc.perform(get("/api/v1/pots/{potId}/dashboard", potId)
                         .header("X-USER-ID", userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.potId").value(potId))
@@ -198,7 +198,7 @@ class PotControllerTest {
                 .willThrow(com.Rootin.global.exception.CustomException.forbidden("해당 화분의 대시보드에 접근할 권한이 없습니다."));
 
         // when & then
-        mockMvc.perform(get("/api/pots/{potId}/dashboard", potId)
+        mockMvc.perform(get("/api/v1/pots/{potId}/dashboard", potId)
                         .header("X-USER-ID", userId))
                 .andExpect(status().isForbidden());
     }

@@ -17,7 +17,7 @@ import java.util.List;
  * 화분 생성 및 조회를 제공하는 REST API 컨트롤러 클래스입니다.
  */
 @RestController
-@RequestMapping("/api/pots")
+@RequestMapping("/api/v1/pots")
 @RequiredArgsConstructor
 public class PotController {
 
@@ -25,7 +25,7 @@ public class PotController {
     private final GardenDashboardService gardenDashboardService;
 
     /**
-     * POST /api/pots
+     * POST /api/v1/pots
      * 화분을 새로 생성합니다.
      *
      * FIXME [보안 경고]: 현재 JWT 로그인 연동 전 임시 테스트용으로 헤더에서 X-USER-ID를 직접 받아
@@ -45,7 +45,7 @@ public class PotController {
     }
 
     /**
-     * GET /api/pots
+     * GET /api/v1/pots
      * 로그인한 사용자의 모든 화분 목록을 요약 정보(PotSummaryResponse) DTO 목록으로 조회합니다.
      *
      * FIXME [보안 경고]: JWT 토큰 도입 시 Spring Security 인증 정보(@AuthenticationPrincipal)로 교체 필수.
@@ -59,7 +59,7 @@ public class PotController {
     }
 
     /**
-     * GET /api/pots/{potId}
+     * GET /api/v1/pots/{potId}
      * 특정 화분의 상세 정보를 조회합니다.
      * 사용자 권한(소유권)을 검증합니다.
      * FIXME [보안 경고]: JWT 토큰 도입 시 Spring Security 인증 정보(@AuthenticationPrincipal)로 교체 필수.
@@ -74,7 +74,7 @@ public class PotController {
     }
 
     /**
-     * GET /api/pots/{potId}/dashboard
+     * GET /api/v1/pots/{potId}/dashboard
      * 특정 화분의 상세 대시보드 화면(GD-03)에 띄울 정보를 복합 조회합니다.
      * 사용자 권한(소유권) 검증을 내부 서비스에서 진행합니다.
      * FIXME [보안 경고]: JWT 토큰 도입 시 Spring Security 인증 정보(@AuthenticationPrincipal)로 교체 필수.
