@@ -5,7 +5,10 @@ import com.Rootin.domain.til.entity.Til;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.List;
 
@@ -36,4 +39,24 @@ public interface TilRepository extends JpaRepository<Til, Long> {
      * @return 발행 완료된 TIL 개수
      */
     long countByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
+
+    // 총 TIL 개수
+    long countByUserIdAndStatus(Long userId, PostStatus status);
+
+    // 기간 내 TIL 개수 - 주간/월간 통계용
+    long countByUserIdAndStatusAndPublishedAtBetween(
+            Long userId,
+            PostStatus status,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
+    // FD-05 주간 차트 - 기간 내 TIL 목록 (날짜별 집계용)
+    List<Til> findByUserIdAndStatusAndPublishedAtBetween(
+            Long userId,
+            PostStatus status,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
 }

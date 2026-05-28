@@ -4,6 +4,7 @@ import com.Rootin.domain.garden.entity.WateringLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -38,4 +39,14 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
      * @return 가장 최근의 물주기 로그 (존재하지 않을 수 있으므로 Optional 반환)
      */
     java.util.Optional<WateringLog> findFirstByUserIdAndPotIdOrderByWateredAtDesc(Long userId, Long potId);
+
+    // 성장 이력 차트용 - 최근 30건
+    List<WateringLog> findTop30ByUserIdOrderByWateredAtDesc(Long userId);
+
+    // 활동 캘린더용 - 기간별 물주기 이력
+    List<WateringLog> findByUserIdAndWateredAtBetween(
+            Long userId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
 }
