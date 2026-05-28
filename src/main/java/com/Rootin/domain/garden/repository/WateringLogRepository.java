@@ -40,6 +40,9 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
      */
     java.util.Optional<WateringLog> findFirstByUserIdAndPotIdOrderByWateredAtDesc(Long userId, Long potId);
 
+    // 개인 통계용 - 사용자 전체 물주기 이력
+    List<WateringLog> findAllByUserId(Long userId);
+
     // 성장 이력 차트용 - 최근 30건
     List<WateringLog> findTop30ByUserIdOrderByWateredAtDesc(Long userId);
 
