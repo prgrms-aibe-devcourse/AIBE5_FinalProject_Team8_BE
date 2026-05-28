@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LevelCalculatorTest {
@@ -182,6 +184,89 @@ class LevelCalculatorTest {
             // FULL_BLOOM (15Lv 이상)
             assertThat(calculator.determineGrowthStage(15)).isEqualTo(GrowthStage.FULL_BLOOM);
             assertThat(calculator.determineGrowthStage(100)).isEqualTo(GrowthStage.FULL_BLOOM);
+        }
+    }
+
+    @Nested
+    @DisplayName("추가 경험치/레벨 연산 기능 검증")
+    class AdditionalCalculationTest {
+
+        @Test
+        @DisplayName("레벨별 누적 최소 경험치 시작점을 정상적으로 계산한다")
+        void calculateMinExpForLevelSuccess() {
+            assertThat(calculator.calculateMinExpForLevel(1)).isEqualTo(0);
+            assertThat(calculator.calculateMinExpForLevel(2)).isEqualTo(100);
+            assertThat(calculator.calculateMinExpForLevel(3)).isEqualTo(300);
+            assertThat(calculator.calculateMinExpForLevel(4)).isEqualTo(600);
+            assertThat(calculator.calculateMinExpForLevel(0)).isEqualTo(0);
+            assertThat(calculator.calculateMinExpForLevel(-5)).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("현재 레벨 내에서 올린 순수 경험치를 정상 계산한다")
+        void calculateLevelProgressExpSuccess() {
+            // 누적 150 Exp, 현재 레벨 2 => 2레벨 구간 시작점은 100이므로 50 반환
+            assertThat(calculator.calculateLevelProgressExp(150, 2)).isEqualTo(50);
+            // 누적 50 Exp, 현재 레벨 1 => 1레벨 시작점은 0이므로 50 반환
+            assertThat(calculator.calculateLevelProgressExp(50, 1)).isEqualTo(50);
+            // 누적 650 Exp, 현재 레벨 4 => 4레벨 시작점은 600이므로 50 반환
+            assertThat(calculator.calculateLevelProgressExp(650, 4)).isEqualTo(50);
+            // 예외 상황: 누적이 시작점보다 적은 비정상 데이터의 경우 최소 0을 보장
+            assertThat(calculator.calculateLevelProgressExp(50, 2)).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("다음 레벨업에 필요한 현재 레벨의 총 요구 경험치를 정상 계산한다")
+        void calculateNextLevelRequiredExpSuccess() {
+            assertThat(calculator.calculateNextLevelRequiredExp(1)).isEqualTo(100);
+            assertThat(calculator.calculateNextLevelRequiredExp(2)).isEqualTo(200);
+            assertThat(calculator.calculateNextLevelRequiredExp(3)).isEqualTo(300);
+            assertThat(calculator.calculateNextLevelRequiredExp(0)).isEqualTo(100);
+            assertThat(calculator.calculateNextLevelRequiredExp(-1)).isEqualTo(100);
+        }
+
+        @Test
+        @DisplayName("현재 레벨 구간에서의 성장 백분율(%)을 소수점 첫째 자리까지 정확하게 반올림 계산한다")
+        void calculateProgressPercentageSuccess() {
+            // 누적 150 Exp, 현재 레벨 2 => 2레벨 시작점 100, 현재 구간 경험치 50, 2레벨 요구량 200 => (50/200)*100 = 25.0%
+            assertThat(calculator.calculateProgressPercentage(150, 2)).isEqualTo(25.0);
+            // 누적 400 Exp, 현재 레벨 3 => 3레벨 시작점 300, 현재 구간 경험치 100, 3레벨 요구량 300 => (100/300)*100 = 33.333... -> 33.3%
+            assertThat(calculator.calculateProgressPercentage(400, 3)).isEqualTo(33.3);
+            // 누적 410 Exp, 현재 레벨 3 => (110/300)*100 = 36.666... -> 36.7%
+            assertThat(calculator.calculateProgressPercentage(410, 3)).isEqualTo(36.7);
+            // 비정상 수치에 대한 0.0% 처리
+            assertThat(calculator.calculateProgressPercentage(50, 2)).isEqualTo(0.0);
+            // 비정상 수치로 현재 레벨 구간 요구량을 초과하더라도 100.0%를 넘지 않는다
+            assertThat(calculator.calculateProgressPercentage(999, 2)).isEqualTo(100.0);
+        }
+
+        @Test
+        @DisplayName("전시용 및 정산용 스트릭(연속 작성일)을 올바르게 계산한다")
+        void calculateStreakTests() {
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+            // 1. TIL이 아예 없을 때 -> 둘 다 0일
+            assertThat(calculator.calculateStreak(List.of())).isEqualTo(0);
+            assertThat(calculator.calculatePreviousStreak(List.of())).isEqualTo(0);
+
+            // 2. 오늘 처음으로 작성했을 때 (now 날짜만 리스트에 존재)
+            List<java.time.LocalDateTime> firstDayTimes = List.of(now);
+            // 대시보드 전시용은 오늘 포함 1일
+            assertThat(calculator.calculateStreak(firstDayTimes)).isEqualTo(1);
+            // 경험치 정산용은 어제 기준 0일
+            assertThat(calculator.calculatePreviousStreak(firstDayTimes)).isEqualTo(0);
+
+            // 3. 어제 쓰고 오늘 또 썼을 때 (now, now - 1일)
+            List<java.time.LocalDateTime> consecutiveTimes = List.of(now, now.minusDays(1));
+            // 대시보드 전시용은 2일 연속
+            assertThat(calculator.calculateStreak(consecutiveTimes)).isEqualTo(2);
+            // 경험치 정산용은 1일 연속 (어제까지 연속 1일)
+            assertThat(calculator.calculatePreviousStreak(consecutiveTimes)).isEqualTo(1);
+
+            // 4. 데이터 정합성 문제로 null 발행 시간이 섞여도 계산이 실패하지 않는다
+            List<java.time.LocalDateTime> timesWithNull = java.util.Arrays.asList(null, now, now.minusDays(1));
+            assertThat(calculator.calculateStreak(timesWithNull)).isEqualTo(2);
+            assertThat(calculator.calculatePreviousStreak(timesWithNull)).isEqualTo(1);
         }
     }
 }

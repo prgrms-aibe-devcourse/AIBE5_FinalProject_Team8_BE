@@ -3,6 +3,13 @@ package com.Rootin.domain.garden.service;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 /**
  * 화분과 식물의 경험치 획득량, 레벨업 여부, 포인트 지급량, 그리고 성장 단계를 수학적으로 계산해주는 전담 계산 유틸리티 컴포넌트입니다.
  */
@@ -121,5 +128,161 @@ public class LevelCalculator {
         } else {
             return GrowthStage.FULL_BLOOM;
         }
+    }
+
+    /**
+     * 특정 레벨에 도달하기 위해 필요한 누적 최소 경험치(시작점)를 구합니다.
+     * [레벨별 누적 최소 경험치 시작점 예시]
+     * - 1레벨: 0 Exp
+     * - 2레벨: 100 Exp (1레벨에서 2레벨 가는데 100 필요)
+     * - 3레벨: 300 Exp (2레벨에서 3레벨 가는데 200 필요 -> 누적 100 + 200 = 300)
+     * - 4레벨: 600 Exp (3레벨에서 4레벨 가는데 300 필요 -> 누적 300 + 300 = 600)
+     *
+     * @param level 대상 레벨
+     * @return 해당 레벨이 시작되는 누적 최소 경험치 수치
+     */
+    public int calculateMinExpForLevel(int level) {
+        if (level <= 1) {
+            return 0;
+        }
+        int n = level - 1;
+        // 등차수열의 합 공식: 100 * n * (n + 1) / 2 -> 50 * n * (n + 1)
+        // 불필요한 O(N) 반복문 루프를 제거하여 O(1) 상수시간 연산으로 성능을 개선했습니다.
+        return 50 * n * (n + 1);
+    }
+
+    /**
+     * 현재 레벨 내에서 순수하게 획득하여 올린 구간 경험치를 계산합니다.
+     * [계산 방식]
+     * - 전체 누적 경험치(totalExp)에서 현재 레벨이 시작되는 누적 최소 경험치(MinExp)를 뺍니다.
+     * - 예시: 누적 경험치 150 Exp, 현재 레벨이 2라면
+     *   -> 2레벨 시작점은 100 Exp 이므로, 2레벨 내에서 순수하게 올린 경험치는 150 - 100 = 50 Exp 입니다.
+     *
+     * @param totalExp 현재 화분의 전체 누적 경험치
+     * @param currentLevel 현재 화분의 레벨
+     * @return 현재 레벨 구간 내에서 올린 순수 경험치
+     */
+    public int calculateLevelProgressExp(int totalExp, int currentLevel) {
+        int minExpForCurrent = calculateMinExpForLevel(currentLevel);
+        int requiredExp = calculateNextLevelRequiredExp(currentLevel);
+
+        // 계산 결과가 음수가 되지 않도록 최소 0을 보장합니다.
+        return Math.min(Math.max(0, totalExp - minExpForCurrent), requiredExp);
+    }
+
+    /**
+     * 다음 레벨로 레벨업을 하기 위해 이 현재 레벨 구간에서 채워야 하는 총 경험치(구간 목표량)를 구합니다.
+     * [공식]
+     * - 구간 요구량 = 현재 레벨 * 100
+     * - 예시: 1레벨일 때 다음 레벨(2Lv)을 가기 위한 구간 요구량은 100 Exp
+     * - 예시: 2레벨일 때 다음 레벨(3Lv)을 가기 위한 구간 요구량은 200 Exp
+     *
+     * @param currentLevel 현재 레벨
+     * @return 다음 레벨로 가기 위한 해당 구간의 총 요구 경험치
+     */
+    public int calculateNextLevelRequiredExp(int currentLevel) {
+        if (currentLevel <= 0) {
+            return 100; // 0이하의 유효하지 않은 레벨이 들어오면 최소치인 100을 반환합니다.
+        }
+        return currentLevel * 100;
+    }
+
+    /**
+     * 현재 레벨 구간에서의 성장 진행률(%)을 소수점 첫째 자리까지 계산하여 반환합니다. (둘째 자리에서 반올림)
+     * [계산 공식]
+     * - 진행률(%) = (현재 레벨 내에서 올린 경험치 / 다음 레벨로 가기 위한 구간 요구 경험치) * 100.0
+     * - 소수점 둘째 자리에서 반올림하여 첫째 자리까지 표현합니다. (예: 50.34% -> 50.3%, 50.35% -> 50.4%)
+     *
+     * @param totalExp 현재 화분의 전체 누적 경험치
+     * @param currentLevel 현재 화분의 레벨
+     * @return 소수점 첫째 자리까지 반올림된 진행률 백분율(0.0 ~ 100.0)
+     */
+    public double calculateProgressPercentage(int totalExp, int currentLevel) {
+        int progressExp = calculateLevelProgressExp(totalExp, currentLevel);
+        int requiredExp = calculateNextLevelRequiredExp(currentLevel);
+
+        if (requiredExp <= 0) {
+            return 0.0;
+        }
+
+        // 진행률(%) 실수 계산
+        double percentage = ((double) progressExp / requiredExp) * 100.0;
+
+        // 소수점 둘째 자리에서 반올림하여 첫째 자리까지 표현하도록 보정합니다.
+        // Math.round(percentage * 10.0)을 수행하면 소수 첫째 자리를 정수 1의 자리로 올린 뒤 반올림하고, 다시 10.0으로 나누어 소수 첫째 자리 형태로 돌려놓습니다.
+        return Math.round(percentage * 10.0) / 10.0;
+    }
+
+    /**
+     * [대시보드 전시용] 유저의 전체 TIL 발행 일자 목록을 기반으로 연속 작성일(스트릭)을 계산합니다.
+     * 오늘 작성 완료한 기록이 있다면 오늘 날짜부터 역산하고, 없다면 어제 날짜부터 역산하여
+     * 첫 작성 시에도 자연스럽게 "1일 연속 작성"으로 보일 수 있도록 계산합니다.
+     *
+     * @param publishedTimes 유저가 작성한 TIL들의 발행 시간 목록
+     * @return 오늘을 포함해 현재 유지되고 있는 연속 작성일 수 (최소 0)
+     */
+    public int calculateStreak(List<LocalDateTime> publishedTimes) {
+        if (publishedTimes == null || publishedTimes.isEmpty()) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now();
+
+        // 날짜 단위 조회를 빠르게 처리하기 위해 Set으로 변환하여 O(1) 검색 속도를 보장합니다.
+        Set<LocalDate> dateSet = publishedTimes.stream()
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .collect(Collectors.toSet());
+
+        // 오늘 쓴 TIL이 존재한다면 오늘부터 역산하고, 없다면 어제부터 과거로 역산합니다.
+        LocalDate checkDate = dateSet.contains(today) ? today : today.minusDays(1);
+
+        // 어제와 오늘 모두 글을 쓰지 않은 상태라면 스트릭은 0일입니다.
+        if (!dateSet.contains(checkDate)) {
+            return 0;
+        }
+
+        int streak = 0;
+        while (dateSet.contains(checkDate)) {
+            streak++;
+            checkDate = checkDate.minusDays(1);
+        }
+
+        return streak;
+    }
+
+    /**
+     * [경험치 정산용] 유저가 글을 작성하기 "어제까지"의 누적 연속 작성일(스트릭)을 계산합니다.
+     * 무조건 어제(today.minusDays(1))부터 과거로 역산하므로, 첫날 처음 TIL 작성 시에는 0일 스트릭(보너스 없음)이 적용됩니다.
+     *
+     * @param publishedTimes 유저가 작성한 TIL들의 발행 시간 목록
+     * @return 어제 기준의 연속 작성일 수 (최소 0)
+     */
+    public int calculatePreviousStreak(List<LocalDateTime> publishedTimes) {
+        if (publishedTimes == null || publishedTimes.isEmpty()) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now();
+
+        Set<LocalDate> dateSet = publishedTimes.stream()
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .collect(Collectors.toSet());
+
+        // 경험치 보너스 판정용이므로 오늘 작성 여부와 무관하게 무조건 어제부터 과거로 역산합니다.
+        LocalDate checkDate = today.minusDays(1);
+
+        if (!dateSet.contains(checkDate)) {
+            return 0;
+        }
+
+        int streak = 0;
+        while (dateSet.contains(checkDate)) {
+            streak++;
+            checkDate = checkDate.minusDays(1);
+        }
+
+        return streak;
     }
 }
