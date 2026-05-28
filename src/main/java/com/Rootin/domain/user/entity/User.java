@@ -1,60 +1,112 @@
 package com.Rootin.domain.user.entity;
 
+import com.Rootin.global.BaseEntity;
+import com.Rootin.domain.user.entity.ENUM.Provider;
+import com.Rootin.domain.user.entity.ENUM.Role;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
-/**
- * TODO [로그인 담당자]: 아래 필드/기능 추가 필요
- *  - password, role 등 필드 추가
- *  - UserDetails 구현 (implements UserDetails) → @AuthenticationPrincipal 주입 연동
- *  - 소셜 로그인(Google OAuth2) 처리 로직
- *  - point 적립 로직 (일일 목표 달성 시 포인트 지급 등)
- *
- * ※ AiResult와 연관관계(ManyToOne)로 연결되어 있으므로
- *   id 필드는 반드시 유지해 주세요.
- */
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+
 @Getter
 @Entity
 @Table(name = "users")
 @NoArgsConstructor
-public class User {
+@AllArgsConstructor
+@Builder
+public class User extends BaseEntity implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(length = 50)
+    @Column(name = "nickname", nullable = false, length = 50)
     private String nickname;
 
-    @Column(length = 500)
+    @Column(name = "profile_image", length = 500)
     private String profileImage;
 
-    @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
+    @Getter(AccessLevel.NONE)
+    @Column(name = "password", length = 100)
+    private String password;
+
+    @Column(name = "bio", length = 255)
+    private String bio;
+
+    @Column(name = "point", nullable = false, columnDefinition = "INT DEFAULT 0")
     private int point;
 
-    @lombok.Builder
-    public User(String email, String nickname, String profileImage, int point) {
-        this.email = email;
-        this.nickname = nickname;
-        this.profileImage = profileImage;
-        this.point = point;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role;
+
+    @Column(name = "provider_id")
+    private String providerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", length = 20)
+    private Provider provider;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
-    /** AI 기능 사용 시 포인트 차감 */
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    @Override
+    public boolean isEnabled() {
+        return !isDeleted;
+    }
+
+    // 비즈니스 메서드
     public void deductPoint(int amount) {
+        if (this.point < amount) {
+            throw new IllegalStateException(
+                    "포인트가 부족합니다. 현재: " + this.point + ", 필요: " + amount
+            );
+        }
         this.point -= amount;
     }
 
-    /**
-     * TIL 작성 등 다양한 학습 습관 활동 성공 시 포인트를 적립합니다.
-     *
-     * @param amount 적립할 포인트 양
-     */
     public void addPoint(int amount) {
         this.point += amount;
+    }
+
+    public void deactivate() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
     }
 }
