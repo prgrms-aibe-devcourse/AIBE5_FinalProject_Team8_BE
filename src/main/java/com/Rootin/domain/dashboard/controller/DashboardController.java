@@ -1,6 +1,7 @@
 package com.Rootin.domain.dashboard.controller;
 
 import com.Rootin.domain.dashboard.dto.GrassGraphResponse;
+import com.Rootin.domain.dashboard.dto.InterestDistributionResponse;
 import com.Rootin.domain.dashboard.dto.PersonalStatsResponse;
 import com.Rootin.domain.dashboard.dto.WeeklyStatsResponse;
 import com.Rootin.domain.dashboard.service.DashboardService;
@@ -55,5 +56,17 @@ public class DashboardController {
             @RequestHeader("X-USER-ID") Long userId
     ) {
         return ResponseEntity.ok(ApiResponse.ok(dashboardService.getPersonalStats(userId)));
+    }
+
+    /**
+     * GET /api/v1/dashboard/interests
+     * 화분별 TIL 수, 레벨, 성장 단계, 상위 태그 분포를 조회합니다.
+     * FIXME: JWT 도입 후 X-USER-ID 헤더를 @AuthenticationPrincipal로 교체
+     */
+    @GetMapping("/interests")
+    public ResponseEntity<ApiResponse<InterestDistributionResponse>> getInterestDistribution(
+            @RequestHeader("X-USER-ID") Long userId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getInterestDistribution(userId)));
     }
 }

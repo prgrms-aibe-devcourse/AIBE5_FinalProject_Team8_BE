@@ -2,13 +2,18 @@ package com.Rootin.domain.dashboard.service;
 
 import com.Rootin.domain.dashboard.dto.GrassCell;
 import com.Rootin.domain.dashboard.dto.GrassGraphResponse;
+import com.Rootin.domain.dashboard.dto.InterestDistributionResponse;
 import com.Rootin.domain.dashboard.dto.PersonalStatsResponse;
+import com.Rootin.domain.dashboard.dto.PotInterestDto;
+import com.Rootin.domain.dashboard.dto.TagCountByPotDto;
 import com.Rootin.domain.dashboard.dto.WeeklyStatsResponse;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
+import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.garden.service.LevelCalculator;
+import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.til.repository.TilTagRepository;
@@ -116,6 +121,40 @@ public class DashboardService {
 
         return new PersonalStatsResponse(totalTilCount, totalContentLength, totalLearningDays,
                 totalExpGained, totalPointEarned, currentStreak, maxStreak, currentPoints);
+    }
+
+    public InterestDistributionResponse getInterestDistribution(Long userId) {
+        List<Pot> pots = potRepository.findByUserId(userId);
+        if (pots.isEmpty()) {
+            return new InterestDistributionResponse(List.of());
+        }
+
+        // 화분별 태그 빈도를 단일 쿼리로 조회 (COUNT DESC 정렬 보장)
+        List<TagCountByPotDto> tagCounts = tilTagRepository.findTagCountsByUserAndStatus(userId, PostStatus.PUBLISHED);
+
+        // potId 기준으로 그루핑, 태그명 최대 5개만 추출 (이미 COUNT 내림차순 정렬됨)
+        Map<Long, List<String>> topTagsByPot = tagCounts.stream()
+                .collect(Collectors.groupingBy(
+                        TagCountByPotDto::getPotId,
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                list -> list.stream()
+                                        .limit(5)
+                                        .map(TagCountByPotDto::getTagName)
+                                        .collect(Collectors.toList())
+                        )
+                ));
+
+        List<PotInterestDto> potDtos = pots.stream()
+                .map(pot -> {
+                    long tilCount = tilRepository.countByUserIdAndPotIdAndStatus(userId, pot.getId(), PostStatus.PUBLISHED);
+                    GrowthStage growthStage = levelCalculator.determineGrowthStage(pot.getLevel());
+                    List<String> topTags = topTagsByPot.getOrDefault(pot.getId(), List.of());
+                    return new PotInterestDto(pot.getId(), pot.getTitle(), tilCount, pot.getLevel(), growthStage, topTags);
+                })
+                .collect(Collectors.toList());
+
+        return new InterestDistributionResponse(potDtos);
     }
 
     // 날짜 Set을 오름차순 정렬 후 연속 구간의 최댓값 계산
