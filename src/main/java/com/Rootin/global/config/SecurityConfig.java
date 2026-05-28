@@ -50,18 +50,18 @@ public class SecurityConfig {
 
                         // 사용자 인증을 발급해주는 API 경로
                         .requestMatchers(
-                                "/auth/signup",
-                                "/auth/login",
-                                "/auth/google",
-                                "/auth/reissue",
-                                "auth/check-nickname"
+                                "/api/v1/auth/signup",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/google",
+                                "/api/v1/auth/reissue",
+                                "/api/v1/auth/check-nickname"
                         ).permitAll()
 
-                        .requestMatchers("/tils/**").permitAll()
-                        .requestMatchers("/til-templates/**").permitAll()
+                        .requestMatchers("/api/v1/tils/**").permitAll()
+                        .requestMatchers("/api/v1/til-templates/**").permitAll()
                         // FIXME [보안 경고]: 현재 JWT 로그인 개발 단계 이전이므로, 화분 API(/api/pots/**)를 임시로 전체 허용(permitAll)해 두었습니다.
                         // 이는 테스트를 위한 일시적인 조치이며, 프로덕션 배포 전 반드시 적절한 인증 필터와 함께 인증된 권한(authenticated)을 요구하도록 정책을 전환해야 합니다.
-                        .requestMatchers("/api/pots/**").permitAll()
+                        .requestMatchers("/api/v1/pots/**").permitAll()
 
                         // 인증(JWT 발급등)이 필요한 경로
                         .requestMatchers("/ai/results/**").authenticated()

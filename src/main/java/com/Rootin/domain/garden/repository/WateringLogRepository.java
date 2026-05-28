@@ -4,6 +4,7 @@ import com.Rootin.domain.garden.entity.WateringLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -27,4 +28,28 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
      * @return 이미 존재하면 true, 없으면 false
      */
     boolean existsByPostId(Long postId);
+
+    /**
+     * 특정 사용자가 소유한 특정 화분의 물주기 로그 중 가장 최근에 물을 준 로그 1건을 안전하게 조회합니다.
+     * 대시보드 화면에 해당 화분의 "마지막 물 준 시간"을 노출할 때 사용하며,
+     * userId 조건을 조합하여 쿼리함으로써 잘못된 potId 매칭 리스크를 예방합니다.
+     *
+     * @param userId 사용자 ID
+     * @param potId 화분 ID
+     * @return 가장 최근의 물주기 로그 (존재하지 않을 수 있으므로 Optional 반환)
+     */
+    java.util.Optional<WateringLog> findFirstByUserIdAndPotIdOrderByWateredAtDesc(Long userId, Long potId);
+
+    // 개인 통계용 - 사용자 전체 물주기 이력
+    List<WateringLog> findAllByUserId(Long userId);
+
+    // 성장 이력 차트용 - 최근 30건
+    List<WateringLog> findTop30ByUserIdOrderByWateredAtDesc(Long userId);
+
+    // 활동 캘린더용 - 기간별 물주기 이력
+    List<WateringLog> findByUserIdAndWateredAtBetween(
+            Long userId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
 }
