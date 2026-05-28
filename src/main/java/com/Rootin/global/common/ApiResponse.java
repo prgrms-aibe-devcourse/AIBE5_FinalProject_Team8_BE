@@ -1,10 +1,8 @@
 package com.Rootin.global.common;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 @Getter
 @AllArgsConstructor
@@ -20,14 +18,27 @@ public class ApiResponse<T> {
         return new ApiResponse<>(true, "성공", data, null);
     }
 
+    public static <T> ApiResponse<T> ok(T data) {
+        return success(data);
+    }
+
     public static <T> ApiResponse<T> success(String message, T data) {
         return new ApiResponse<>(true, message, data, null);
     }
+
+    public static <T> ApiResponse<T> ok(String message, T data) {
+        return success(message, data);
+    }
+
     public static ApiResponse<Void> success(String message) {
         return new ApiResponse<>(true, message, null, null);
     }
 
     // 에러 메시지
+    public static ApiResponse<Void> error(String message) {
+        return new ApiResponse<>(false, message, null, null);
+    }
+
     public static ApiResponse<Void> error(String message, String code) {
         return new ApiResponse<>(false, message, null, code);
     }

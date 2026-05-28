@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,6 +21,7 @@ import java.io.IOException;
 // 사용자의 요청마다 JWT를 검사하는 Security 필터
 @Slf4j
 @Component
+@ConditionalOnBean({JwtTokenProvider.class, CustomUserDetailsService.class})
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter{
     private final JwtTokenProvider jwtTokenProvider;

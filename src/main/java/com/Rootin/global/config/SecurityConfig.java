@@ -4,6 +4,7 @@ import com.Rootin.global.jwt.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,7 +33,7 @@ import java.util.Map;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectProvider<JwtAuthenticationFilter> jwtAuthenticationFilterProvider;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -64,12 +65,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/pots/**").permitAll()
 
                         // 인증(JWT 발급등)이 필요한 경로
-                        .requestMatchers("/ai/results/**").authenticated()
+                        .requestMatchers("/api/v1/ai/**").authenticated()
                         .anyRequest().authenticated()
                 )
-                // JWT 필터를 UsernamePasswordAuthenticationFilter 앞에 등록
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-
                 // 인증/인가 실패 시 API 설계서 에러 포맷으로 JSON 응답
                 .exceptionHandling(exception -> exception
                         // 401 — 인증 실패 (토큰 없음/만료)
@@ -102,6 +100,10 @@ public class SecurityConfig {
                             );
                         })
                 );
+
+        jwtAuthenticationFilterProvider.ifAvailable(jwtAuthenticationFilter ->
+                http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        );
 
         return http.build();
     }

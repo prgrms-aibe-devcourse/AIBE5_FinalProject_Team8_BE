@@ -4,6 +4,7 @@ import com.Rootin.domain.auth.dto.*;
 import com.Rootin.domain.auth.service.AuthService;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.common.ApiResponse;
+import com.Rootin.global.exception.CustomException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -123,6 +124,10 @@ public class AuthController {
     public ResponseEntity<ApiResponse<TokenResponse>> reissue(
             @RequestBody Map<String, String> request
     ) {
+        if (request == null) {
+            throw CustomException.badRequest("Refresh Token은 필수입니다.");
+        }
+
         String refreshToken = request.get("refreshToken");
         TokenResponse response = authService.reissue(refreshToken);
         return ResponseEntity.ok(ApiResponse.success("토큰이 재발급되었습니다.", response));
@@ -150,6 +155,10 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(
             @AuthenticationPrincipal User user
     ) {
+        if (user == null) {
+            throw CustomException.badRequest("로그인한 사용자 정보가 없습니다.");
+        }
+
         authService.logout(user.getId());
         return ResponseEntity.ok(ApiResponse.success("로그아웃 되었습니다."));
     }

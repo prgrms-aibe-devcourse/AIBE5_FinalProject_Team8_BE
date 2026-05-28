@@ -7,9 +7,12 @@ import com.Rootin.domain.user.entity.ENUM.Provider;
 import com.Rootin.domain.user.entity.ENUM.Role;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
+import com.Rootin.global.exception.CustomException;
 import com.Rootin.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -58,12 +61,12 @@ public class AuthService {
     public TokenResponse signup(SignupRequest request) {
         // 1. 이메일 중복 검사
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw CustomException.badRequest("이미 사용 중인 이메일입니다.");
         }
 
         // 2. 닉네임 중복 검사
         if (userRepository.existsByNickname(request.getNickname())) {
-            throw new IllegalArgumentException("이미 사용 중인 닉네임입니다.");
+            throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
         }
 
         // 3~4. 비밀번호 암호화 후 User 생성 및 저장
@@ -104,16 +107,20 @@ public class AuthService {
     @Transactional
     public TokenResponse login(LoginRequest request) {
         // 1. Spring Security 인증 — 실패 시 BadCredentialsException 발생
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+        } catch (BadCredentialsException e) {
+            throw new CustomException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
 
         // 2. 인증 성공 → User 조회
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."));
 
         // 3. 기존 Refresh Token 삭제 (이 사용자의 이전 세션 무효화)
         refreshTokenRepository.deleteByUserId(user.getId());
@@ -146,6 +153,9 @@ public class AuthService {
         Map<String, Object> googleUser = verifyGoogleToken(request.getIdToken());
         String email = (String) googleUser.get("email");
         String sub = (String) googleUser.get("sub"); // Google 고유 사용자 ID
+        if (email == null || sub == null) {
+            throw CustomException.badRequest("유효하지 않은 Google ID Token입니다.");
+        }
 
         // 2. 기존 사용자 조회
         boolean isNewUser = false;
@@ -154,10 +164,14 @@ public class AuthService {
 
         // 3. 신규 사용자 → 자동 회원가입
         if (user == null) {
+            if (userRepository.existsByEmail(email)) {
+                throw CustomException.badRequest("이미 다른 방식으로 가입된 이메일입니다.");
+            }
+
             isNewUser = true;
             user = User.builder()
                     .email(email)
-                    .nickname("user_" + sub.substring(0, 8)) // 임시 닉네임 (온보딩에서 변경)
+                    .nickname("user_" + sub.substring(0, Math.min(sub.length(), 8))) // 임시 닉네임 (온보딩에서 변경)
                     .role(Role.USER)
                     .provider(Provider.GOOGLE)
                     .providerId(sub)
@@ -191,15 +205,19 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse reissue(String refreshTokenValue) {
+        if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
+            throw CustomException.badRequest("Refresh Token은 필수입니다.");
+        }
+
         // 1. DB에서 Refresh Token 조회
         RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
-                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 Refresh Token입니다."));
+                .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
 
         // 2. 만료 확인
         if (refreshToken.isExpired()) {
             // 만료된 토큰은 삭제하고 재로그인 유도
             refreshTokenRepository.delete(refreshToken);
-            throw new IllegalArgumentException("만료된 Refresh Token입니다. 다시 로그인해 주세요.");
+            throw new CustomException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해 주세요.");
         }
 
         // 3. 연결된 User 정보로 새 Access Token 발급
@@ -309,9 +327,13 @@ public class AuthService {
         try {
             RestTemplate restTemplate = new RestTemplate();
             String url = "https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken;
-            return restTemplate.getForObject(url, Map.class);
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            if (response == null) {
+                throw CustomException.badRequest("유효하지 않은 Google ID Token입니다.");
+            }
+            return response;
         } catch (Exception e) {
-            throw new IllegalArgumentException("유효하지 않은 Google ID Token입니다.");
+            throw CustomException.badRequest("유효하지 않은 Google ID Token입니다.");
         }
     }
 }
