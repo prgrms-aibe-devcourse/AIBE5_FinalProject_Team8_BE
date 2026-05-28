@@ -12,9 +12,19 @@ import java.time.LocalDateTime;
  * TIL을 작성하여 화분에 물을 주었을 때의 상세 내역과 획득 경험치/포인트,
  * 그리고 계산 시점의 스트릭과 가중치 등의 통계를 영구적으로 보관하는 엔티티 클래스입니다.
  * H2/MySQL의 'watering_log' 테이블과 매핑됩니다.
+ *
+ * WateringLog는 단순 로그처럼 보이지만 중요한 역할이 있습니다.
+ * - 같은 TIL에 경험치가 중복 지급되지 않았는지 확인
+ * - 대시보드에서 마지막 물준 시간(lastWateredAt) 조회
+ * - 나중에 포인트/경험치 정산 문제가 생겼을 때 당시 계산값 추적
+ *
+ * post_id에는 unique 제약을 걸었습니다. 하나의 TIL은 한 번만 물주기/경험치 지급 대상이 되어야 하기 때문입니다.
  */
 @Entity
-@Table(name = "watering_log")
+@Table(
+        name = "watering_log",
+        uniqueConstraints = @UniqueConstraint(name = "uk_watering_log_post_id", columnNames = "post_id")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WateringLog {

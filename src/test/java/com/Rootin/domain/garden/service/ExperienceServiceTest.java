@@ -7,6 +7,7 @@ import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
+import com.Rootin.domain.til.dto.request.DraftSaveRequest;
 import com.Rootin.domain.til.dto.request.TilCreateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
 import com.Rootin.domain.til.entity.Til;
@@ -111,12 +112,12 @@ class ExperienceServiceTest {
         experienceService.applyWatering(testUser.getId(), testPot, contentLength, testTil.getId());
 
         // then
-        // 1. 화분 경험치 증가 및 레벨업 검증 (105 Exp 쌓였으므로 2레벨 도달 예상, 오늘 포함 1일 스트릭 적용됨)
+        // 1. 화분 경험치 증가 및 레벨업 검증 (100 Exp 쌓였으므로 2레벨 도달 예상, 첫 작성은 0일 스트릭 적용됨)
         Pot updatedPot = potRepository.findById(testPot.getId()).orElseThrow();
-        assertThat(updatedPot.getTotalExp()).isEqualTo(105);
+        assertThat(updatedPot.getTotalExp()).isEqualTo(100);
         assertThat(updatedPot.getLevel()).isEqualTo(2);
 
-        // 2. 유저 포인트 적립 검증 (105 Exp의 10% = 10 P)
+        // 2. 유저 포인트 적립 검증 (100 Exp의 10% = 10 P)
         User updatedUser = userRepository.findById(testUser.getId()).orElseThrow();
         assertThat(updatedUser.getPoint()).isEqualTo(10);
 
@@ -125,15 +126,15 @@ class ExperienceServiceTest {
         assertThat(logs).hasSize(1);
         WateringLog log = logs.get(0);
         assertThat(log.getUserId()).isEqualTo(testUser.getId());
-        assertThat(log.getExpGained()).isEqualTo(105);
+        assertThat(log.getExpGained()).isEqualTo(100);
         assertThat(log.getPointGained()).isEqualTo(10);
         assertThat(log.getContentLength()).isEqualTo(500);
-        assertThat(log.getStreakDays()).isEqualTo(1);
-        assertThat(log.getAppliedMultiplier()).isEqualTo(1.05);
+        assertThat(log.getStreakDays()).isEqualTo(0);
+        assertThat(log.getAppliedMultiplier()).isEqualTo(1.0);
         assertThat(log.getBeforePotLevel()).isEqualTo(1);
         assertThat(log.getAfterPotLevel()).isEqualTo(2);
         assertThat(log.getBeforeTotalExp()).isEqualTo(0);
-        assertThat(log.getAfterTotalExp()).isEqualTo(105);
+        assertThat(log.getAfterTotalExp()).isEqualTo(100);
 
         // 4. 포인트 적립 상세 이력(PointLog) 저장 상태 및 필드 검증
         List<PointLog> pointLogs = pointLogRepository.findAll();
@@ -167,14 +168,14 @@ class ExperienceServiceTest {
         tilRepository.save(todayTil);
 
         int contentLength = 500; // 기본 100점
-        // 오늘을 포함하여 스트릭 4일 -> 보너스 +20% (가중치 1.20) -> 최종 120 Exp 예상
+        // 어제 기준 연속 스트릭 3일 -> 보너스 +15% (가중치 1.15) -> 최종 115 Exp 예상
 
         // when
         experienceService.applyWatering(testUser.getId(), testPot, contentLength, todayTil.getId());
 
         // then
         Pot updatedPot = potRepository.findById(testPot.getId()).orElseThrow();
-        assertThat(updatedPot.getTotalExp()).isEqualTo(120);
+        assertThat(updatedPot.getTotalExp()).isEqualTo(115);
     }
 
     @Test
@@ -241,5 +242,40 @@ class ExperienceServiceTest {
         
         assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
         assertThat(exception.getMessage()).contains("이미 물주기가 완료된 TIL입니다.");
+    }
+
+    @Test
+    @DisplayName("타인 화분에 TIL을 작성하려고 하면 저장 전에 FORBIDDEN 에러가 발생한다")
+    void tilCreateForbiddenWhenPotOwnerMismatch() {
+        TilCreateRequest request = new TilCreateRequest(
+                "타인 화분 작성 시도",
+                "권한이 없어야 하는 내용",
+                testPot.getId(),
+                List.of("Security")
+        );
+
+        CustomException exception = assertThrows(CustomException.class, () ->
+                tilService.create(otherUser.getId(), request)
+        );
+
+        assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+        assertThat(wateringLogRepository.findByPotId(testPot.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("타인 화분에 임시저장을 시도하면 FORBIDDEN 에러가 발생한다")
+    void saveDraftForbiddenWhenPotOwnerMismatch() {
+        DraftSaveRequest request = new DraftSaveRequest(
+                testPot.getId(),
+                "타인 화분 임시저장",
+                "권한이 없어야 하는 초안",
+                List.of("Draft")
+        );
+
+        CustomException exception = assertThrows(CustomException.class, () ->
+                tilService.saveDraft(otherUser.getId(), request)
+        );
+
+        assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
     }
 }

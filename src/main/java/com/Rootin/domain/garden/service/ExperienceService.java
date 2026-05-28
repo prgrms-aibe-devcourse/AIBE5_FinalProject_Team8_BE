@@ -5,8 +5,8 @@ import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
-import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
+import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
@@ -17,16 +17,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * TIL 작성 시 발생하는 경험치 적립, 레벨 계산, 포인트 적립 및 물주기 로그(WateringLog) 기록을
  * 총괄하여 수행하는 핵심 비즈니스 서비스 클래스입니다.
+ *
+ * 이 서비스는 "쓰기 작업"을 담당하므로 클래스 레벨에 @Transactional을 적용했습니다.
+ * applyWatering() 안에서 화분 경험치 변경, 사용자 포인트 변경, 포인트 이력 저장, 물주기 이력 저장이
+ * 하나의 트랜잭션으로 묶입니다. 중간에 예외가 발생하면 전체 변경이 롤백되어 데이터가 어긋나는 상황을 막습니다.
  */
 @Slf4j
 @Service
@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
 public class ExperienceService {
 
     private final UserRepository userRepository;
-    private final PotRepository potRepository;
     private final WateringLogRepository wateringLogRepository;
     private final PointLogRepository pointLogRepository;
     private final TilRepository tilRepository;
@@ -45,6 +44,16 @@ public class ExperienceService {
      * TIL 작성 완료 이벤트 시 트리거되는 물주기 비즈니스 로직입니다.
      * 경험치/포인트를 계산하고 화분 레벨 및 사용자 포인트 상태를 변경한 뒤 물주기 이력을 DB에 기록합니다.
      *
+     * 호출 위치:
+     * - TilService.create()
+     * - TIL이 PUBLISHED 상태로 저장된 직후 호출됩니다.
+     *
+     * 중요한 설계 의도:
+     * - 임시저장(DRAFT)은 경험치 대상이 아니므로 이 메서드를 호출하지 않습니다.
+     * - 같은 TIL(postId)로 두 번 경험치를 받으면 안 되므로 WateringLog 존재 여부와 DB unique 제약으로 이중 방어합니다.
+     * - pot은 TilService에서 비관적 락으로 조회한 엔티티를 넘겨받습니다. 그래서 이 메서드는 같은 트랜잭션 안에서
+     *   잠긴 화분의 경험치를 안전하게 변경하는 역할만 수행합니다.
+     *
      * @param userId        TIL을 작성한 사용자 ID
      * @param pot           물이 공급될 대상 화분 엔티티 객체
      * @param contentLength 작성된 TIL 본문 글자 수
@@ -53,13 +62,15 @@ public class ExperienceService {
     public void applyWatering(Long userId, Pot pot, int contentLength, Long tilId) {
         log.info("=== 물주기 비즈니스 로직 기동 (User: {}, Pot: {}, TIL: {}) ===", userId, pot.getId(), tilId);
 
-        // 1. 동일 TIL 포스트에 대한 물주기 중복 적립 방지 검사
+        // 1. 동일 TIL 포스트에 대한 물주기 중복 적립 방지 검사.
+        // 애플리케이션 레벨에서 먼저 막고, WateringLog.post_id unique 제약으로 DB 레벨에서도 한 번 더 막습니다.
         if (wateringLogRepository.existsByPostId(tilId)) {
             throw CustomException.badRequest("이미 물주기가 완료된 TIL입니다.");
         }
 
-        // 2. 대상 TIL 포스트 존재 여부 및 유저 소유권, 화분 매핑 일치 검증
-        com.Rootin.domain.til.entity.Til til = tilRepository.findById(tilId)
+        // 2. 대상 TIL 포스트 존재 여부 및 유저 소유권, 화분 매핑 일치 검증.
+        // 클라이언트가 userId 또는 potId를 잘못 보내더라도, 실제 저장된 TIL 기준으로 다시 검증합니다.
+        Til til = tilRepository.findById(tilId)
                 .orElseThrow(() -> CustomException.notFound("TIL을 찾을 수 없습니다."));
 
         if (!til.getUser().getId().equals(userId)) {
@@ -70,7 +81,8 @@ public class ExperienceService {
             throw CustomException.badRequest("TIL과 화분의 정보가 일치하지 않습니다.");
         }
 
-        // 3. 유저 정보 조회 및 소유권 검증 (화분은 파라미터로 이미 제공됨)
+        // 3. 유저 정보 조회 및 화분 소유권 검증.
+        // 포인트를 실제 User 엔티티에 더해야 하므로 User를 영속 상태로 조회합니다.
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
@@ -78,29 +90,35 @@ public class ExperienceService {
             throw CustomException.forbidden("해당 화분에 대한 권한이 없습니다.");
         }
 
-        // 2. 연속 작성일(스트릭) 계산
-        // 유저가 지금까지 발행한 모든 TIL의 날짜 목록을 조회해 어제 날짜를 기준으로 연속된 작성일수를 구합니다.
+        // 4. 연속 작성일(스트릭) 계산.
+        // 경험치 보너스는 "오늘 작성한 글"을 포함하지 않고, 어제까지의 연속 기록을 기준으로 계산합니다.
+        // 예) 첫 TIL 작성일에는 이전 기록이 없으므로 0일 스트릭 -> 보너스 없음.
+        // 예) 어제도 작성했고 오늘도 작성했다면 1일 스트릭 -> 5% 보너스.
         List<LocalDateTime> publishedTimes = tilRepository.findPublishedAtByUserId(userId, PostStatus.PUBLISHED);
-        int streakDays = calculateStreak(publishedTimes);
+        int streakDays = levelCalculator.calculatePreviousStreak(publishedTimes);
         log.info("조회된 이전 연속 작성일 수 (Streak Days): {}일", streakDays);
 
-        // 3. 경험치 및 포인트 획득량 계산
+        // 5. 경험치 및 포인트 획득량 계산.
+        // 순수 계산은 LevelCalculator에 위임하여, 이 서비스는 "조회-검증-상태변경-저장" 흐름에 집중합니다.
         int gainedExp = levelCalculator.calculateExperience(contentLength, streakDays);
         int gainedPoint = levelCalculator.calculatePoints(gainedExp);
         double appliedMultiplier = levelCalculator.calculateStreakMultiplier(streakDays);
         log.info("획득 경험치: {} Exp (글자 수: {}, 배율: {}x), 적립 포인트: {} P", gainedExp, contentLength, appliedMultiplier, gainedPoint);
 
-        // 4. 화분 경험치 가산 및 레벨 계산 (레벨업 처리)
+        // 6. 화분 경험치 가산 및 레벨 계산.
+        // WateringLog에 전/후 상태를 남겨야 하므로 변경 전 값을 먼저 백업합니다.
         int beforePotLevel = pot.getLevel();
         int beforeTotalExp = pot.getTotalExp();
-        
+
         int afterTotalExp = beforeTotalExp + gainedExp;
         int afterPotLevel = levelCalculator.calculateLevel(afterTotalExp);
-        
+
+        // Pot 엔티티 내부 메서드를 통해 상태를 바꾸면, 변경 책임이 엔티티에 모여서 추후 검증 로직을 넣기 쉽습니다.
         pot.updateExperienceAndLevel(gainedExp, afterPotLevel);
         log.info("화분 레벨 변동: {} Lv -> {} Lv (누적 경험치: {} -> {})", beforePotLevel, afterPotLevel, beforeTotalExp, afterTotalExp);
 
-        // 5. 유저 포인트 가산 및 포인트 변동 이력(PointLog) 저장
+        // 7. 유저 포인트 가산 및 포인트 변동 이력(PointLog) 저장.
+        // User.point는 현재 총액이고, PointLog는 "왜 포인트가 늘었는지"를 추적하기 위한 감사 로그입니다.
         user.addPoint(gainedPoint);
         if (gainedPoint > 0) {
             PointLog pointLog = PointLog.builder()
@@ -111,7 +129,8 @@ public class ExperienceService {
             pointLogRepository.save(pointLog);
         }
 
-        // 6. 물주기 상세 이력(WateringLog) 저장
+        // 8. 물주기 상세 이력(WateringLog) 저장.
+        // 대시보드의 최근 물주기 시각, 운영 중 정산 검증, 사용자 성장 히스토리 분석에 쓰입니다.
         WateringLog wateringLog = WateringLog.builder()
                 .userId(userId)
                 .potId(pot.getId())
@@ -131,40 +150,5 @@ public class ExperienceService {
         log.info("물주기 상세 이력 저장 성공 (Log ID: {})", wateringLog.getId());
     }
 
-    /**
-     * 유저의 전체 TIL 발행 일자 목록을 기반으로 어제 날짜부터 역순으로 하루씩 차감하며 연속 작성일(스트릭)을 계산합니다.
-     *
-     * @param publishedTimes 유저가 작성한 TIL들의 발행 시간 목록
-     * @return 어제까지의 연속 작성일 수 (최소 0)
-     */
-    public int calculateStreak(List<LocalDateTime> publishedTimes) {
-        if (publishedTimes == null || publishedTimes.isEmpty()) {
-            return 0;
-        }
 
-        LocalDate today = LocalDate.now();
-
-        // 날짜 단위 조회를 빠르게 처리하기 위해 Set으로 변환하여 O(1) 검색 속도를 보장합니다.
-        Set<LocalDate> dateSet = publishedTimes.stream()
-                .map(LocalDateTime::toLocalDate)
-                .collect(Collectors.toSet());
-
-        // 오늘(today) 날짜가 작성 목록에 존재한다면 오늘부터 역산하고, 없으면 어제(yesterday)부터 역산합니다.
-        LocalDate checkDate = dateSet.contains(today) ? today : today.minusDays(1);
-
-        // 어제도 오늘도 안 쓴 상태라면 스트릭은 0일입니다.
-        if (!dateSet.contains(checkDate)) {
-            return 0;
-        }
-
-        // 하루씩 거꾸로 올라가며 연속 작성이 이어졌는지 O(1) 조회를 통해 판별합니다.
-        int streak = 0;
-        
-        while (dateSet.contains(checkDate)) {
-            streak++;
-            checkDate = checkDate.minusDays(1);
-        }
-
-        return streak;
-    }
 }
