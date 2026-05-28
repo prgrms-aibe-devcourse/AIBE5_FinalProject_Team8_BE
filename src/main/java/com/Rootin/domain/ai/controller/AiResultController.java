@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/ai/results")
+@RequestMapping("/api/v1/ai/results")
 @RequiredArgsConstructor
 public class AiResultController {
 
