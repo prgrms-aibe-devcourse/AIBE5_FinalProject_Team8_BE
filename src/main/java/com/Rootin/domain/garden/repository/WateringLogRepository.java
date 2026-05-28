@@ -4,6 +4,7 @@ import com.Rootin.domain.garden.entity.WateringLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -27,4 +28,14 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
      * @return 이미 존재하면 true, 없으면 false
      */
     boolean existsByPostId(Long postId);
+
+    // 성장 이력 차트용 - 최근 30건
+    List<WateringLog> findTop30ByUserIdOrderByWateredAtDesc(Long userId);
+
+    // 활동 캘린더용 - 기간별 물주기 이력
+    List<WateringLog> findByUserIdAndWateredAtBetween(
+            Long userId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
 }
