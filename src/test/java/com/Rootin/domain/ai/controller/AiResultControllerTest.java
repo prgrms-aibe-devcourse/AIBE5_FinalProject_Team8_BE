@@ -35,28 +35,28 @@ class AiResultControllerTest {
 
     @Test @DisplayName("type 누락 → 400") @WithMockUser
     void save_badRequest_when_type_missing() throws Exception {
-        mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"potId\":1,\"content\":\"요약\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
     }
 
     @Test @DisplayName("potId 누락 → 400") @WithMockUser
     void save_badRequest_when_potId_missing() throws Exception {
-        mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"SUMMARY\",\"content\":\"요약\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
     }
 
     @Test @DisplayName("content 누락 → 400") @WithMockUser
     void save_badRequest_when_content_missing() throws Exception {
-        mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"SUMMARY\",\"potId\":1}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
     }
 
     @Test @DisplayName("POST 미인증 → 401")
     void save_unauthorized_when_no_auth() throws Exception {
-        mockMvc.perform(post("/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"SUMMARY\",\"potId\":1,\"content\":\"요약\"}"))
                 .andExpect(status().isUnauthorized());
     }
@@ -66,19 +66,19 @@ class AiResultControllerTest {
     @Test @DisplayName("GET /ai/results → 200") @WithMockUser
     void getResults_success() throws Exception {
         given(aiResultService.getResults(any(), any())).willReturn(List.of());
-        mockMvc.perform(get("/ai/results").with(csrf())).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/ai/results").with(csrf())).andExpect(status().isOk());
     }
 
     @Test @DisplayName("GET /ai/results?potId=1 → 200") @WithMockUser
     void getResults_with_potId_success() throws Exception {
         given(aiResultService.getResults(any(), any())).willReturn(List.of());
-        mockMvc.perform(get("/ai/results").param("potId", "1").with(csrf()))
+        mockMvc.perform(get("/api/v1/ai/results").param("potId", "1").with(csrf()))
                 .andExpect(status().isOk());
     }
 
     @Test @DisplayName("GET 미인증 → 401")
     void getResults_unauthorized_when_no_auth() throws Exception {
-        mockMvc.perform(get("/ai/results")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/ai/results")).andExpect(status().isUnauthorized());
     }
 
     // ─── DELETE /ai/results/{resultId} ───────────────────────────────
@@ -86,13 +86,13 @@ class AiResultControllerTest {
     @Test @DisplayName("DELETE /ai/results/1 → 204 No Content") @WithMockUser
     void delete_success() throws Exception {
         doNothing().when(aiResultService).delete(any(), any());
-        mockMvc.perform(delete("/ai/results/1").with(csrf()))
+        mockMvc.perform(delete("/api/v1/ai/results/1").with(csrf()))
                 .andExpect(status().isNoContent());
     }
 
     @Test @DisplayName("DELETE 미인증 → 401")
     void delete_unauthorized_when_no_auth() throws Exception {
-        mockMvc.perform(delete("/ai/results/1").with(csrf()))
+        mockMvc.perform(delete("/api/v1/ai/results/1").with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 }
