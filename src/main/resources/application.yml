@@ -16,6 +16,16 @@ openai:
 #   secret: ${JWT_SECRET}
 #   expiration: ${JWT_EXPIRATION:86400000}
 
+# Actuator (Docker Health)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 ---
 spring:
   config:
@@ -56,13 +66,3 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-# Actuator 추가
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-  endpoint:
-    health:
-      show-details: never
