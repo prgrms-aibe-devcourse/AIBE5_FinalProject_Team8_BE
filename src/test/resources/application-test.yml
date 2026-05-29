@@ -1,10 +1,10 @@
-# 테스트 환경 설정 (H2 인메모리 DB)
+# 테스트 환경 설정 (MySQL)
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:mysql://${TEST_DB_HOST:localhost}:${TEST_DB_PORT:3306}/${TEST_DB_NAME:rootin_test}?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${TEST_DB_USERNAME:root}
+    password: ${TEST_DB_PASSWORD:}
 
   jpa:
     hibernate:
@@ -13,10 +13,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-  h2:
-    console:
-      enabled: false
 
 # 테스트 시 OpenAI 호출 차단 (더미 키 사용)
 openai:

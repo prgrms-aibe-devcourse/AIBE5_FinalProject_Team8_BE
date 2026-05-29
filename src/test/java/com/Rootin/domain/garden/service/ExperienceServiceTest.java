@@ -64,12 +64,13 @@ class ExperienceServiceTest {
 
     @BeforeEach
     void setUp() {
-        // H2 데이터베이스의 테이블 PK 일관성 유지를 위해 시퀀스를 초기화합니다.
-        jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN id RESTART WITH 1");
-        jdbcTemplate.execute("ALTER TABLE pot ALTER COLUMN id RESTART WITH 1");
-        jdbcTemplate.execute("ALTER TABLE posts ALTER COLUMN id RESTART WITH 1");
-        jdbcTemplate.execute("ALTER TABLE watering_log ALTER COLUMN id RESTART WITH 1");
-        jdbcTemplate.execute("ALTER TABLE point_log ALTER COLUMN id RESTART WITH 1");
+        // MySQL AUTO_INCREMENT 카운터를 초기화하여 테스트 간 PK 일관성 유지
+        // DDL이 묵시적 커밋을 유발하지만 이후 DML은 Spring @Transactional 롤백 범위에 포함됨
+        jdbcTemplate.execute("ALTER TABLE users AUTO_INCREMENT = 1");
+        jdbcTemplate.execute("ALTER TABLE pot AUTO_INCREMENT = 1");
+        jdbcTemplate.execute("ALTER TABLE posts AUTO_INCREMENT = 1");
+        jdbcTemplate.execute("ALTER TABLE watering_log AUTO_INCREMENT = 1");
+        jdbcTemplate.execute("ALTER TABLE point_log AUTO_INCREMENT = 1");
 
         // 1. 테스트용 유저 생성 및 저장
         testUser = User.builder()

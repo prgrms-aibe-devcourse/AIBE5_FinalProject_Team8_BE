@@ -6,6 +6,7 @@ import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.annotation.H2RepositoryTest;
+import com.Rootin.global.annotation.RepositoryTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +19,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@H2RepositoryTest
+@RepositoryTest
 class AiResultRepositoryTest {
 
     @Autowired
