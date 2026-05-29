@@ -12,7 +12,7 @@ openai:
     max-tokens: ${OPENAI_QUIZ_MAX_TOKENS:1000}
 
 jwt:
-  secret: "최소 32바이트 이상의 시크릿 키를 여기에 입력하세요"
+  secret: c2lsdmVyLWJlbGwtc2VjcmV0LWtleS1mb3Itc3ByaW5nLWJvb3Qtand0LXR1dG9yaWFs
   access-token-expiration: 1800000      # 30분
   refresh-token-expiration: 1209600000  # 14일
 

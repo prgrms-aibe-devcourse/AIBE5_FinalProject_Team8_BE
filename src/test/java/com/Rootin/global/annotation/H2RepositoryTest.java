@@ -15,6 +15,7 @@ import java.lang.annotation.*;
  * - JPA 관련 빈만 로드 (@DataJpaTest)
  * - MySQL 설정을 무시하고 H2로 대체
  */
+// CRUD 기능 정도만을 빠른 속도로 검사하는 H2 RepositoryTest
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented

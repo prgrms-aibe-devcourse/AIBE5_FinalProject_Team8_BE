@@ -13,6 +13,8 @@ java {
 	}
 }
 
+ext['testcontainers.version'] = '1.20.4'
+
 repositories {
 	mavenCentral()
 	maven { url = 'https://repo.spring.io/snapshot' }
@@ -60,8 +62,64 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	// Testcontainers (MySQL)
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'org.testcontainers:mysql'
+}
+
+// ─── 테스트용 MySQL 컨테이너 생명주기 태스크 ─────────────────────────────────
+// Testcontainers가 Windows Docker Desktop 환경에서 동작하지 않을 때 Docker CLI 경유로
+// MySQL을 직접 기동·종료한다. CI(Linux)에서는 Testcontainers가 정상 동작하므로 무관.
+
+task startTestDb(type: Exec) {
+	description = '테스트용 MySQL 컨테이너를 기동한다'
+	group = 'verification'
+	// 이미 동일한 이름의 컨테이너가 있으면 제거 후 재기동
+	commandLine 'docker', 'rm', '-f', 'rootin-test-mysql'
+	ignoreExitValue = true
+	doLast {
+		exec {
+			commandLine 'docker', 'run', '-d',
+					'--name', 'rootin-test-mysql',
+					'-e', 'MYSQL_ALLOW_EMPTY_PASSWORD=yes',
+					'-e', 'MYSQL_DATABASE=rootin_test',
+					'-p', '3306:3306',
+					'mysql:8.0',
+					'--character-set-server=utf8mb4',
+					'--collation-server=utf8mb4_unicode_ci'
+		}
+		// MySQL 준비 대기 (최대 30초)
+		int retries = 0
+		while (retries < 15) {
+			def result = exec {
+				commandLine 'docker', 'exec', 'rootin-test-mysql',
+						'mysqladmin', 'ping', '-u', 'root', '--silent'
+				ignoreExitValue = true
+			}
+			if (result.exitValue == 0) break
+			Thread.sleep(2000)
+			retries++
+		}
+	}
+}
+
+task stopTestDb(type: Exec) {
+	description = '테스트용 MySQL 컨테이너를 종료한다'
+	group = 'verification'
+	commandLine 'docker', 'stop', 'rootin-test-mysql'
+	ignoreExitValue = true
+	doLast {
+		exec {
+			commandLine 'docker', 'rm', '-f', 'rootin-test-mysql'
+			ignoreExitValue = true
+		}
+	}
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	dependsOn startTestDb
+	finalizedBy stopTestDb
 }
