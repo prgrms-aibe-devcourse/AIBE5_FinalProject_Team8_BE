@@ -1,9 +1,9 @@
 package com.Rootin.domain.ai.controller;
 
-import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.ai.dto.AiResultResponse;
 import com.Rootin.domain.ai.dto.AiResultSaveRequest;
 import com.Rootin.domain.ai.service.AiResultService;
+import com.Rootin.global.jwt.JwtUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,9 +26,9 @@ public class AiResultController {
     @PostMapping
     public ResponseEntity<AiResultResponse> save(
             @Valid @RequestBody AiResultSaveRequest request,
-            @AuthenticationPrincipal User currentUser
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(aiResultService.save(request, currentUser));
+        return ResponseEntity.ok(aiResultService.save(request, userDetails.getUserId()));
     }
 
     /**
@@ -37,10 +37,10 @@ public class AiResultController {
      */
     @GetMapping
     public ResponseEntity<List<AiResultResponse>> getResults(
-            @AuthenticationPrincipal User currentUser,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam(required = false) Long potId
     ) {
-        return ResponseEntity.ok(aiResultService.getResults(currentUser, potId));
+        return ResponseEntity.ok(aiResultService.getResults(userDetails.getUserId(), potId));
     }
 
     /**
@@ -50,9 +50,9 @@ public class AiResultController {
     @DeleteMapping("/{resultId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long resultId,
-            @AuthenticationPrincipal User currentUser
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        aiResultService.delete(resultId, currentUser);
+        aiResultService.delete(resultId, userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
 }

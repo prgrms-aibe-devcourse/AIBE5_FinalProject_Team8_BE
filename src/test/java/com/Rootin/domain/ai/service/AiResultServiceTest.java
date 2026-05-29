@@ -11,6 +11,7 @@ import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
+import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +46,9 @@ class AiResultServiceTest {
 
     @Mock
     private TilRepository tilRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     private User owner;
     private User other;
@@ -91,9 +95,10 @@ class AiResultServiceTest {
         given(potRepository.findById(10L)).willReturn(Optional.of(pot));
         given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
                 .willReturn(List.of(til));
+        given(userRepository.getReferenceById(1L)).willReturn(owner);
         given(aiResultRepository.save(any())).willReturn(savedResult);
 
-        AiResultResponse response = aiResultService.save(request, owner);
+        AiResultResponse response = aiResultService.save(request, 1L);
         assertThat(response.type()).isEqualTo(ToolType.SUMMARY);
         assertThat(response.potId()).isEqualTo(10L);
     }
@@ -113,9 +118,10 @@ class AiResultServiceTest {
         given(potRepository.findById(10L)).willReturn(Optional.of(pot));
         given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
                 .willReturn(List.of(til));
+        given(userRepository.getReferenceById(1L)).willReturn(owner);
         given(aiResultRepository.save(any())).willReturn(savedResult);
 
-        assertThat(aiResultService.save(request, owner).type()).isEqualTo(ToolType.QUIZ);
+        assertThat(aiResultService.save(request, 1L).type()).isEqualTo(ToolType.QUIZ);
     }
 
     @Test
@@ -126,7 +132,7 @@ class AiResultServiceTest {
         given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
 
         assertThatThrownBy(() -> aiResultService.save(
-                new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용"), other))
+                new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용"), 2L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
     }
@@ -137,7 +143,7 @@ class AiResultServiceTest {
         given(potRepository.findById(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> aiResultService.save(
-                new AiResultSaveRequest(ToolType.SUMMARY, 999L, "내용"), owner))
+                new AiResultSaveRequest(ToolType.SUMMARY, 999L, "내용"), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -150,7 +156,7 @@ class AiResultServiceTest {
                 .willReturn(List.of());
 
         assertThatThrownBy(() -> aiResultService.save(
-                new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용"), owner))
+                new AiResultSaveRequest(ToolType.SUMMARY, 10L, "내용"), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -169,9 +175,10 @@ class AiResultServiceTest {
         r1.addTil(til);
         r2.addTil(til);
 
+        given(userRepository.getReferenceById(1L)).willReturn(owner);
         given(aiResultRepository.findAllByUser(owner)).willReturn(List.of(r1, r2));
 
-        assertThat(aiResultService.getResults(owner, null)).hasSize(2);
+        assertThat(aiResultService.getResults(1L, null)).hasSize(2);
     }
 
     @Test
@@ -182,10 +189,11 @@ class AiResultServiceTest {
         ReflectionTestUtils.setField(r, "id", 1L);
         r.addTil(til);
 
+        given(userRepository.getReferenceById(1L)).willReturn(owner);
         given(potRepository.findById(10L)).willReturn(Optional.of(pot));
         given(aiResultRepository.findAllByUserAndPotId(owner, 10L)).willReturn(List.of(r));
 
-        List<AiResultResponse> results = aiResultService.getResults(owner, 10L);
+        List<AiResultResponse> results = aiResultService.getResults(1L, 10L);
         assertThat(results).hasSize(1);
         assertThat(results.get(0).potId()).isEqualTo(10L);
     }
@@ -195,9 +203,10 @@ class AiResultServiceTest {
     void getResults_forbidden_when_not_owner_potId() {
         Pot ownerPot = Pot.builder().userId(1L).title("오너 화분").level(1).totalExp(0).build();
         ReflectionTestUtils.setField(ownerPot, "id", 10L);
+        given(userRepository.getReferenceById(2L)).willReturn(other);
         given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
 
-        assertThatThrownBy(() -> aiResultService.getResults(other, 10L))
+        assertThatThrownBy(() -> aiResultService.getResults(2L, 10L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
     }
@@ -205,9 +214,10 @@ class AiResultServiceTest {
     @Test
     @DisplayName("존재하지 않는 potId → 404")
     void getResults_notFound_when_pot_not_exists() {
+        given(userRepository.getReferenceById(1L)).willReturn(owner);
         given(potRepository.findById(999L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> aiResultService.getResults(owner, 999L))
+        assertThatThrownBy(() -> aiResultService.getResults(1L, 999L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -224,7 +234,7 @@ class AiResultServiceTest {
 
         given(aiResultRepository.findById(1L)).willReturn(Optional.of(aiResult));
 
-        aiResultService.delete(1L, owner);
+        aiResultService.delete(1L, 1L);
 
         verify(aiResultRepository).delete(aiResult);
     }
@@ -239,7 +249,7 @@ class AiResultServiceTest {
 
         given(aiResultRepository.findById(1L)).willReturn(Optional.of(aiResult));
 
-        assertThatThrownBy(() -> aiResultService.delete(1L, other))
+        assertThatThrownBy(() -> aiResultService.delete(1L, 2L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
     }
@@ -249,7 +259,7 @@ class AiResultServiceTest {
     void delete_notFound_when_result_not_exists() {
         given(aiResultRepository.findById(999L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> aiResultService.delete(999L, owner))
+        assertThatThrownBy(() -> aiResultService.delete(999L, 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }

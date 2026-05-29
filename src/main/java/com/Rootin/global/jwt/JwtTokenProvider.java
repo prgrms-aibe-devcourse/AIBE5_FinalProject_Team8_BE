@@ -123,6 +123,22 @@ public class JwtTokenProvider {
     // =====================================================================
 
     /**
+     * 토큰이 '만료'로 인해 유효하지 않은지 확인.
+     * 위·변조 등 다른 이유로 무효인 경우는 false 반환.
+     * SecurityConfig의 authenticationEntryPoint에서 응답 코드를 구분하는 데 사용된다.
+     */
+    public boolean isExpiredToken(String token) {
+        try {
+            getClaims(token);
+            return false;
+        } catch (ExpiredJwtException e) {
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Access Token 만료 시간(초) 반환 — 응답용
      */
     public long getAccessTokenExpirationInSeconds() {

@@ -1,7 +1,6 @@
 package com.Rootin.domain.ai.service;
 
 import com.Rootin.domain.ai.entity.AiResult;
-import com.Rootin.domain.ai.entity.enums.ToolType;
 import com.Rootin.domain.ai.dto.AiResultResponse;
 import com.Rootin.domain.ai.dto.AiResultSaveRequest;
 import com.Rootin.domain.ai.repository.AiResultRepository;
@@ -11,6 +10,7 @@ import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
+import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,8 +23,9 @@ import java.util.List;
 public class AiResultService {
 
     private final AiResultRepository aiResultRepository;
-    private final PotRepository potRepository;
-    private final TilRepository tilRepository;
+    private final PotRepository      potRepository;
+    private final TilRepository      tilRepository;
+    private final UserRepository     userRepository;
 
     /**
      * AI 결과 저장
@@ -34,23 +35,26 @@ public class AiResultService {
      * 4. AiResult 저장 후 AiResultTil 연결
      */
     @Transactional
-    public AiResultResponse save(AiResultSaveRequest request, User currentUser) {
+    public AiResultResponse save(AiResultSaveRequest request, Long userId) {
         Pot pot = potRepository.findById(request.potId())
                 .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
 
-        if (!pot.getUserId().equals(currentUser.getId())) {
+        if (!pot.getUserId().equals(userId)) {
             throw CustomException.forbidden("본인의 화분에만 AI 결과를 저장할 수 있습니다.");
         }
 
         List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
-                currentUser.getId(), request.potId(), PostStatus.PUBLISHED);
+                userId, request.potId(), PostStatus.PUBLISHED);
 
         if (tils.isEmpty()) {
             throw CustomException.notFound("화분에 저장된 TIL이 없습니다.");
         }
 
+        // JPA FK 설정을 위해 프록시 참조 사용 (실제 SELECT 없이 ID만 사용)
+        User userRef = userRepository.getReferenceById(userId);
+
         AiResult aiResult = AiResult.builder()
-                .user(currentUser)
+                .user(userRef)
                 .resultContent(request.content())
                 .toolType(request.type())
                 .build();
@@ -67,9 +71,11 @@ public class AiResultService {
      * potId 있음 → 해당 화분 기준 필터링 (소유자 검증 포함)
      */
     @Transactional(readOnly = true)
-    public List<AiResultResponse> getResults(User currentUser, Long potId) {
+    public List<AiResultResponse> getResults(Long userId, Long potId) {
+        User userRef = userRepository.getReferenceById(userId);
+
         if (potId == null) {
-            return aiResultRepository.findAllByUser(currentUser).stream()
+            return aiResultRepository.findAllByUser(userRef).stream()
                     .map(ar -> AiResultResponse.of(ar, resolvePotId(ar)))
                     .toList();
         }
@@ -77,21 +83,21 @@ public class AiResultService {
         Pot pot = potRepository.findById(potId)
                 .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
 
-        if (!pot.getUserId().equals(currentUser.getId())) {
+        if (!pot.getUserId().equals(userId)) {
             throw CustomException.forbidden("본인의 화분 결과만 조회할 수 있습니다.");
         }
 
-        return aiResultRepository.findAllByUserAndPotId(currentUser, potId).stream()
+        return aiResultRepository.findAllByUserAndPotId(userRef, potId).stream()
                 .map(ar -> AiResultResponse.of(ar, potId))
                 .toList();
     }
 
     @Transactional
-    public void delete(Long resultId, User currentUser) {
+    public void delete(Long resultId, Long userId) {
         AiResult aiResult = aiResultRepository.findById(resultId)
                 .orElseThrow(() -> CustomException.notFound("AI 결과를 찾을 수 없습니다."));
 
-        if (!aiResult.getUser().getId().equals(currentUser.getId())) {
+        if (!aiResult.getUser().getId().equals(userId)) {
             throw CustomException.forbidden("본인의 AI 결과만 삭제할 수 있습니다.");
         }
 

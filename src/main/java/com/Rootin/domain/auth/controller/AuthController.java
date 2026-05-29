@@ -2,9 +2,9 @@ package com.Rootin.domain.auth.controller;
 
 import com.Rootin.domain.auth.dto.*;
 import com.Rootin.domain.auth.service.AuthService;
-import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.common.ApiResponse;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.jwt.JwtUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -153,13 +153,13 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal User user
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        if (user == null) {
+        if (userDetails == null) {
             throw CustomException.badRequest("로그인한 사용자 정보가 없습니다.");
         }
 
-        authService.logout(user.getId());
+        authService.logout(userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.success("로그아웃 되었습니다."));
     }
 

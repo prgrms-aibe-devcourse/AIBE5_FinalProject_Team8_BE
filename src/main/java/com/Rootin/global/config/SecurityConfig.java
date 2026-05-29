@@ -60,9 +60,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/v1/tils/**").permitAll()
                         .requestMatchers("/api/v1/til-templates/**").permitAll()
-                        // FIXME [보안 경고]: 현재 JWT 로그인 개발 단계 이전이므로, 화분 API(/api/pots/**)를 임시로 전체 허용(permitAll)해 두었습니다.
-                        // 이는 테스트를 위한 일시적인 조치이며, 프로덕션 배포 전 반드시 적절한 인증 필터와 함께 인증된 권한(authenticated)을 요구하도록 정책을 전환해야 합니다.
-                        .requestMatchers("/api/v1/pots/**").permitAll()
+                        .requestMatchers("/api/v1/pots/**").authenticated()
 
                         // 인증(JWT)이 필요한 경로
                         .requestMatchers("/api/v1/ai/**").authenticated()
@@ -73,16 +71,22 @@ public class SecurityConfig {
                 )
                 // 인증/인가 실패 시 API 설계서 에러 포맷으로 JSON 응답
                 .exceptionHandling(exception -> exception
-                        // 401 — 인증 실패 (토큰 없음/만료)
+                        // 401 — 인증 실패 (토큰 없음 / 만료 / 위변조)
+                        // JwtAuthenticationFilter가 설정한 TOKEN_EXPIRED 속성으로 세부 코드 구분
                         .authenticationEntryPoint((request, response, authException) -> {
+                            boolean isExpired = Boolean.TRUE.equals(
+                                    request.getAttribute("TOKEN_EXPIRED"));
+                            String code    = isExpired ? "TOKEN_EXPIRED" : "UNAUTHORIZED";
+                            String message = isExpired ? "토큰이 만료되었습니다. 재발급 후 다시 시도해 주세요."
+                                                       : "인증이 필요합니다.";
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json;charset=UTF-8");
                             response.getWriter().write(
                                     new ObjectMapper().writeValueAsString(
                                             Map.of(
                                                     "success", false,
-                                                    "message", "인증이 필요합니다.",
-                                                    "code", "UNAUTHORIZED"
+                                                    "message", message,
+                                                    "code",    code
                                             )
                                     )
                             );

@@ -5,7 +5,7 @@ import com.Rootin.domain.ai.dto.AiQuizResponse;
 import com.Rootin.domain.ai.dto.AiSummaryRequest;
 import com.Rootin.domain.ai.dto.AiSummaryResponse;
 import com.Rootin.domain.ai.service.AiService;
-import com.Rootin.domain.user.entity.User;
+import com.Rootin.global.jwt.JwtUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -33,9 +33,9 @@ public class AiController {
     @PostMapping("/summary")
     public ResponseEntity<AiSummaryResponse> summary(
             @Valid @RequestBody AiSummaryRequest request,
-            @AuthenticationPrincipal User currentUser
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(aiService.summarize(request, currentUser));
+        return ResponseEntity.ok(aiService.summarize(request, userDetails.getUserId()));
     }
 
     /**
@@ -49,8 +49,8 @@ public class AiController {
     @PostMapping("/quiz")
     public ResponseEntity<AiQuizResponse> quiz(
             @Valid @RequestBody AiQuizRequest request,
-            @AuthenticationPrincipal User currentUser
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(aiService.generateQuiz(request, currentUser));
+        return ResponseEntity.ok(aiService.generateQuiz(request, userDetails.getUserId()));
     }
 }

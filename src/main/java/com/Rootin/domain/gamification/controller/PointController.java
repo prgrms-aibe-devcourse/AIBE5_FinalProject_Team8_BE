@@ -3,8 +3,8 @@ package com.Rootin.domain.gamification.controller;
 import com.Rootin.domain.gamification.dto.PointLogResponse;
 import com.Rootin.domain.gamification.dto.PointSummaryResponse;
 import com.Rootin.domain.gamification.service.PointService;
-import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.common.ApiResponse;
+import com.Rootin.global.jwt.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,19 +21,19 @@ public class PointController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<PointSummaryResponse>> getSummary(
-            @AuthenticationPrincipal User user
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(pointService.getPointSummary(user.getId())));
+        return ResponseEntity.ok(ApiResponse.ok(pointService.getPointSummary(userDetails.getUserId())));
     }
 
     @GetMapping("/me/history")
     public ResponseEntity<ApiResponse<Page<PointLogResponse>>> getHistory(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
-                pointService.getPointHistory(user.getId(), PageRequest.of(page, size))
+                pointService.getPointHistory(userDetails.getUserId(), PageRequest.of(page, size))
         ));
     }
 }

@@ -220,20 +220,12 @@ public class AuthService {
             throw new CustomException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해 주세요.");
         }
 
-        // 3. 연결된 User 정보로 새 Access Token 발급
-        User user = refreshToken.getUser();
-        String newAccessToken = jwtTokenProvider.createAccessToken(
-                user.getId(),
-                user.getEmail(),
-                user.getRole().name()
-        );
+        // 3. 기존 Refresh Token 삭제 (Rotation: 재사용 불가)
+        refreshTokenRepository.delete(refreshToken);
 
-        // 4. 기존 Refresh Token 유지, 새 Access Token만 반환
-        return TokenResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(refreshTokenValue) // 기존 Refresh Token 그대로
-                .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpirationInSeconds())
-                .build();
+        // 4. 연결된 User로 Access Token + Refresh Token 모두 재발급
+        User user = refreshToken.getUser();
+        return issueTokens(user, null);
     }
 
     // =====================================================================
