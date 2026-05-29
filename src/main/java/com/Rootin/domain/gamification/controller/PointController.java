@@ -19,14 +19,14 @@ public class PointController {
 
     private final PointService pointService;
 
-    @GetMapping("/summary")
+    @GetMapping("/me")
     public ResponseEntity<ApiResponse<PointSummaryResponse>> getSummary(
             @AuthenticationPrincipal User user
     ) {
         return ResponseEntity.ok(ApiResponse.ok(pointService.getPointSummary(user.getId())));
     }
 
-    @GetMapping("/history")
+    @GetMapping("/me/history")
     public ResponseEntity<ApiResponse<Page<PointLogResponse>>> getHistory(
             @AuthenticationPrincipal User user,
             @RequestParam(defaultValue = "0") int page,

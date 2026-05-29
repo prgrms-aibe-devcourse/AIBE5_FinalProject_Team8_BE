@@ -1,15 +1,6 @@
 package com.Rootin.domain.dashboard.service;
 
-import com.Rootin.domain.dashboard.dto.DistributionItemDto;
-import com.Rootin.domain.dashboard.dto.DistributionResponse;
-import com.Rootin.domain.dashboard.dto.GrassCell;
-import com.Rootin.domain.dashboard.dto.GrassGraphResponse;
-import com.Rootin.domain.dashboard.dto.InterestsResponse;
-import com.Rootin.domain.dashboard.dto.MonthlyInterestDto;
-import com.Rootin.domain.dashboard.dto.PersonalStatsResponse;
-import com.Rootin.domain.dashboard.dto.TagCountDto;
-import com.Rootin.domain.dashboard.dto.WeeklyStatsResponse;
-import com.Rootin.domain.gamification.repository.PointLogRepository;
+import com.Rootin.domain.dashboard.dto.*;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PotRepository;
@@ -19,6 +10,7 @@ import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.entity.TilTag;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.til.repository.TilTagRepository;
+import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,10 +20,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,7 +33,6 @@ public class DashboardService {
     private final TilTagRepository tilTagRepository;
     private final PotRepository potRepository;
     private final UserRepository userRepository;
-    private final PointLogRepository pointLogRepository;
     private final LevelCalculator levelCalculator;
 
     public GrassGraphResponse getGrassGraph(Long userId, int year) {
@@ -59,9 +47,9 @@ public class DashboardService {
                 .map(entry -> {
                     LocalDate date = entry.getKey();
                     List<WateringLog> dayLogs = entry.getValue();
-                    int count = dayLogs.size();
-                    int totalContentLength = dayLogs.stream().mapToInt(WateringLog::getContentLength).sum();
-                    return new GrassCell(date, count, totalContentLength, GrassCell.resolveLevel(totalContentLength));
+                    int tilCount = dayLogs.size();
+                    int charCount = dayLogs.stream().mapToInt(WateringLog::getContentLength).sum();
+                    return new GrassCell(date, tilCount, charCount, GrassCell.resolveLevel(charCount));
                 })
                 .sorted(Comparator.comparing(GrassCell::date))
                 .collect(Collectors.toList());
@@ -75,28 +63,40 @@ public class DashboardService {
 
     public WeeklyStatsResponse getWeeklyStats(Long userId) {
         LocalDate today = LocalDate.now();
-        LocalDateTime weekStart = today.with(DayOfWeek.MONDAY).atStartOfDay();
-        LocalDateTime weekEnd   = today.with(DayOfWeek.SUNDAY).atTime(23, 59, 59);
+        LocalDate weekStart = today.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd   = today.with(DayOfWeek.SUNDAY);
 
-        List<WateringLog> weeklyLogs = wateringLogRepository.findByUserIdAndWateredAtBetween(userId, weekStart, weekEnd);
+        List<WateringLog> thisWeekLogs = wateringLogRepository.findByUserIdAndWateredAtBetween(
+                userId, weekStart.atStartOfDay(), weekEnd.atTime(23, 59, 59));
 
-        int weeklyTilCount      = weeklyLogs.size();
-        int weeklyExpGained     = weeklyLogs.stream().mapToInt(WateringLog::getExpGained).sum();
-        int weeklyPointGained   = weeklyLogs.stream().mapToInt(l -> l.getPointGained() != null ? l.getPointGained() : 0).sum();
-        int weeklyContentLength = weeklyLogs.stream().mapToInt(WateringLog::getContentLength).sum();
+        Map<LocalDate, List<WateringLog>> byDate = thisWeekLogs.stream()
+                .collect(Collectors.groupingBy(log -> log.getWateredAt().toLocalDate()));
 
-        return new WeeklyStatsResponse(weeklyTilCount, weeklyExpGained, weeklyPointGained, weeklyContentLength);
+        List<WeeklyDataDto> weeklyData = new ArrayList<>();
+        for (LocalDate cursor = weekStart; !cursor.isAfter(weekEnd); cursor = cursor.plusDays(1)) {
+            List<WateringLog> dayLogs = byDate.getOrDefault(cursor, List.of());
+            weeklyData.add(new WeeklyDataDto(
+                    cursor,
+                    dayLogs.size(),
+                    dayLogs.stream().mapToInt(WateringLog::getContentLength).sum()
+            ));
+        }
+
+        List<WateringLog> lastWeekLogs = wateringLogRepository.findByUserIdAndWateredAtBetween(
+                userId,
+                weekStart.minusWeeks(1).atStartOfDay(),
+                weekEnd.minusWeeks(1).atTime(23, 59, 59)
+        );
+
+        return new WeeklyStatsResponse(weeklyData, thisWeekLogs.size(), lastWeekLogs.size());
     }
 
     public PersonalStatsResponse getPersonalStats(Long userId) {
         long totalTilCount = tilRepository.countByUserIdAndStatus(userId, PostStatus.PUBLISHED);
 
         List<WateringLog> allLogs = wateringLogRepository.findAllByUserId(userId);
-        int totalContentLength = allLogs.stream().mapToInt(WateringLog::getContentLength).sum();
-        int totalLearningDays  = (int) allLogs.stream().map(l -> l.getWateredAt().toLocalDate()).distinct().count();
-        int totalExpGained     = allLogs.stream().mapToInt(WateringLog::getExpGained).sum();
-
-        int totalPointEarned = pointLogRepository.sumEarnedByUserId(userId);
+        int totalCharCount  = allLogs.stream().mapToInt(WateringLog::getContentLength).sum();
+        int totalStudyDays  = (int) allLogs.stream().map(l -> l.getWateredAt().toLocalDate()).distinct().count();
 
         List<LocalDateTime> publishedTimes = tilRepository.findPublishedAtByUserId(userId, PostStatus.PUBLISHED);
         int currentStreak = levelCalculator.calculateStreak(publishedTimes);
@@ -104,14 +104,14 @@ public class DashboardService {
         Set<LocalDate> allDates = allLogs.stream()
                 .map(l -> l.getWateredAt().toLocalDate())
                 .collect(Collectors.toSet());
-        int maxStreak = calculateMaxStreak(allDates);
+        int longestStreak = calculateMaxStreak(allDates);
 
         int currentPoints = userRepository.findById(userId)
-                .map(user -> user.getPoint())
+                .map(User::getPoint)
                 .orElse(0);
 
-        return new PersonalStatsResponse(totalTilCount, totalContentLength, totalLearningDays,
-                totalExpGained, totalPointEarned, currentStreak, maxStreak, currentPoints);
+        return new PersonalStatsResponse(totalTilCount, totalCharCount, totalStudyDays,
+                currentStreak, longestStreak, currentPoints);
     }
 
     public DistributionResponse getDistribution(Long userId) {
@@ -159,6 +159,42 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         return new InterestsResponse(interests);
+    }
+
+    public QuestResponse getQuests(Long userId) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime todayEnd   = today.atTime(23, 59, 59);
+
+        List<WateringLog> todayLogs = wateringLogRepository.findByUserIdAndWateredAtBetween(userId, todayStart, todayEnd);
+
+        // Q1: 오늘 TIL >= 1개
+        boolean q1 = !todayLogs.isEmpty();
+
+        // Q2: 연속 기록 2일 이상
+        List<LocalDateTime> publishedTimes = tilRepository.findPublishedAtByUserId(userId, PostStatus.PUBLISHED);
+        boolean q2 = levelCalculator.calculateStreak(publishedTimes) >= 2;
+
+        // Q3: 오늘 총 글자 수 >= 500
+        int todayCharCount = todayLogs.stream().mapToInt(WateringLog::getContentLength).sum();
+        boolean q3 = todayCharCount >= 500;
+
+        // Q4: 주말이면 TIL >= 1개, 평일이면 자동 달성
+        DayOfWeek dow = today.getDayOfWeek();
+        boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
+        boolean q4 = !isWeekend || q1;
+
+        List<QuestDto> quests = List.of(
+                new QuestDto("Q1", "TIL 1개 작성하기", q1, 50),
+                new QuestDto("Q2", "연속 기록 이어가기", q2, 30),
+                new QuestDto("Q3", "500자 이상 작성", q3, 20),
+                new QuestDto("Q4", "주말에도 한 줄 기록", q4, 10)
+        );
+
+        int earnedToday = quests.stream().filter(QuestDto::done).mapToInt(QuestDto::point).sum();
+        int totalToday  = quests.stream().mapToInt(QuestDto::point).sum();
+
+        return new QuestResponse(quests, earnedToday, totalToday);
     }
 
     private int calculateMaxStreak(Set<LocalDate> dateSet) {

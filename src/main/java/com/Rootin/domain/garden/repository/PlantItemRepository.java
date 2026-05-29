@@ -36,4 +36,7 @@ public interface PlantItemRepository extends JpaRepository<PlantItem, Long> {
               AND (pi.isHarvested = false OR pi.isHarvested IS NULL)
             """)
     List<PlantItem> findByPotIdInAndIsHarvestedFalse(@org.springframework.data.repository.query.Param("potIds") List<Long> potIds);
+
+    // 식물도감 — 사용자가 수확 완료한 식물 목록
+    List<PlantItem> findByUserIdAndIsHarvestedTrue(Long userId);
 }
