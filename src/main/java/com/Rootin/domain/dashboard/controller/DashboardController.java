@@ -6,9 +6,11 @@ import com.Rootin.domain.dashboard.dto.InterestsResponse;
 import com.Rootin.domain.dashboard.dto.PersonalStatsResponse;
 import com.Rootin.domain.dashboard.dto.WeeklyStatsResponse;
 import com.Rootin.domain.dashboard.service.DashboardService;
+import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -20,43 +22,41 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-    // FIXME: JWT 도입 후 X-USER-ID 헤더를 @AuthenticationPrincipal로 교체
-
     @GetMapping("/grass")
     public ResponseEntity<ApiResponse<GrassGraphResponse>> getGrassGraph(
-            @RequestHeader("X-USER-ID") Long userId,
+            @AuthenticationPrincipal User user,
             @RequestParam(required = false) Integer year
     ) {
         int targetYear = (year != null) ? year : LocalDate.now().getYear();
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getGrassGraph(userId, targetYear)));
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getGrassGraph(user.getId(), targetYear)));
     }
 
     @GetMapping("/weekly")
     public ResponseEntity<ApiResponse<WeeklyStatsResponse>> getWeeklyStats(
-            @RequestHeader("X-USER-ID") Long userId
+            @AuthenticationPrincipal User user
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getWeeklyStats(userId)));
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getWeeklyStats(user.getId())));
     }
 
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<PersonalStatsResponse>> getPersonalStats(
-            @RequestHeader("X-USER-ID") Long userId
+            @AuthenticationPrincipal User user
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getPersonalStats(userId)));
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getPersonalStats(user.getId())));
     }
 
     @GetMapping("/distribution")
     public ResponseEntity<ApiResponse<DistributionResponse>> getDistribution(
-            @RequestHeader("X-USER-ID") Long userId
+            @AuthenticationPrincipal User user
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getDistribution(userId)));
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getDistribution(user.getId())));
     }
 
     @GetMapping("/interests")
     public ResponseEntity<ApiResponse<InterestsResponse>> getInterests(
-            @RequestHeader("X-USER-ID") Long userId,
+            @AuthenticationPrincipal User user,
             @RequestParam(defaultValue = "6") int months
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getInterests(userId, months)));
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getInterests(user.getId(), months)));
     }
 }
