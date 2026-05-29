@@ -84,8 +84,8 @@ public class GardenDashboardService {
         Plant basePlant = plantRepository.findById(plantItem.getPlantId())
                 .orElseThrow(() -> CustomException.notFound("식물 마스터 정보가 존재하지 않습니다. ID: " + plantItem.getPlantId()));
 
-        // 5. 현재 화분 레벨을 토대로 이 식물의 런타임 성장 단계를 판별합니다.
-        GrowthStage calculatedStage = levelCalculator.determineGrowthStage(pot.getLevel());
+        // 5. 현재 식물의 누적 경험치를 토대로 이 식물의 런타임 성장 단계를 판별합니다.
+        GrowthStage calculatedStage = levelCalculator.determinePlantGrowthStage(plantItem.getGrowthExp());
 
         // 6. 해당 성장 단계의 마스터 식물 정보를 조회하여 동적 이미지를 가져옵니다.
         // 예) 기본 씨앗 + COMMON + BLOOM 행이 있으면 BLOOM 단계 이미지를 내려줍니다.
@@ -96,12 +96,18 @@ public class GardenDashboardService {
                 calculatedStage
         ).orElse(basePlant); // DB에 단계별 정보가 아직 없는 경우, 처음에 심었던 basePlant를 Fallback으로 삼습니다.
 
+        // 6-2. 식물 성장률(%) 및 수확 가능 여부를 계산합니다.
+        double growthPercentage = levelCalculator.calculatePlantGrowthPercentage(plantItem.getGrowthExp());
+        boolean canHarvest = levelCalculator.canHarvestPlant(plantItem.getGrowthExp());
+
         // 7. [Fallback 정책 적용]: 이미지는 Fallback을 쓰더라도 growthStage는 연산된 현재 단계를 정확히 노출합니다.
         PlantInfoResponse plantInfo = new PlantInfoResponse(
                 currentStagePlant.getName(),
                 calculatedStage,
                 currentStagePlant.getImageUrl(),
-                currentStagePlant.getSilhouetteUrl()
+                currentStagePlant.getSilhouetteUrl(),
+                growthPercentage,
+                canHarvest
         );
 
         // 8. 레벨 연산기(LevelCalculator)를 통해 현재 레벨 구간의 경험치 상황을 계산합니다.
