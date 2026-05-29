@@ -3,8 +3,10 @@ package com.Rootin.domain.garden.service;
 import com.Rootin.domain.gamification.entity.PointLog;
 import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
+import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
+import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.entity.PostStatus;
@@ -39,6 +41,7 @@ public class ExperienceService {
     private final PointLogRepository pointLogRepository;
     private final TilRepository tilRepository;
     private final LevelCalculator levelCalculator;
+    private final PlantItemRepository plantItemRepository;
 
     /**
      * TIL 작성 완료 이벤트 시 트리거되는 물주기 비즈니스 로직입니다.
@@ -116,6 +119,13 @@ public class ExperienceService {
         // Pot 엔티티 내부 메서드를 통해 상태를 바꾸면, 변경 책임이 엔티티에 모여서 추후 검증 로직을 넣기 쉽습니다.
         pot.updateExperienceAndLevel(gainedExp, afterPotLevel);
         log.info("화분 레벨 변동: {} Lv -> {} Lv (누적 경험치: {} -> {})", beforePotLevel, afterPotLevel, beforeTotalExp, afterTotalExp);
+
+        // [새 정책] 식물 개별 경험치 가산.
+        PlantItem plantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(pot.getId())
+                .orElseThrow(() -> CustomException.notFound("화분에 심어진 식물이 존재하지 않습니다. ID: " + pot.getId()));
+        int beforePlantExp = plantItem.getGrowthExp();
+        plantItem.increaseGrowthExp(gainedExp);
+        log.info("식물 경험치 변동: {} Exp -> {} Exp (획득 경험치: {})", beforePlantExp, plantItem.getGrowthExp(), gainedExp);
 
         // 7. 유저 포인트 가산 및 포인트 변동 이력(PointLog) 저장.
         // User.point는 현재 총액이고, PointLog는 "왜 포인트가 늘었는지"를 추적하기 위한 감사 로그입니다.

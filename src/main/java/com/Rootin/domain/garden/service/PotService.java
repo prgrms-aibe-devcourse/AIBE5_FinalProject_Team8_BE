@@ -130,10 +130,12 @@ public class PotService {
                 .map(pot -> {
                     PlantItem plantItem = plantItemMap.get(pot.getId());
                     String plantName = "알 수 없음";
+                    int plantExp = 0;
 
                     if (plantItem == null) {
                         log.warn("[데이터 정합성 유실] 화분 조회 시 심겨진 식물(PlantItem)이 존재하지 않습니다. Pot ID: {}, Owner User ID: {}", pot.getId(), pot.getUserId());
                     } else {
+                        plantExp = plantItem.getGrowthExp();
                         Plant plant = finalPlantMap.get(plantItem.getPlantId());
                         if (plant == null) {
                             log.warn("[데이터 정합성 유실] 식물 아이템(PlantItem ID: {})에 매핑된 마스터 식물 메타데이터(Plant ID: {})가 DB에 존재하지 않습니다. Pot ID: {}", plantItem.getId(), plantItem.getPlantId(), pot.getId());
@@ -142,8 +144,8 @@ public class PotService {
                         }
                     }
 
-                    // 현재 화분의 레벨을 고려해 성장 단계 계산
-                    GrowthStage growthStage = levelCalculator.determineGrowthStage(pot.getLevel());
+                    // 현재 식물의 경험치를 고려해 성장 단계 계산
+                    GrowthStage growthStage = levelCalculator.determinePlantGrowthStage(plantExp);
 
                     return new PotSummaryResponse(
                             pot.getId(),

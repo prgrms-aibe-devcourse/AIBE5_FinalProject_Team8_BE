@@ -24,5 +24,15 @@ public record PlantInfoResponse(
     /**
      * 도감용 실루엣 이미지 URL (잠겨 있는 단계 표시용)
      */
-    String silhouetteUrl
+    String silhouetteUrl,
+
+    /**
+     * 식물의 성장 진행률 (전체 만개 기준 %, 소수점 첫째 자리까지)
+     */
+    double growthPercentage,
+
+    /**
+     * 수확 가능 여부 (식물 성장 경험치가 만개 기준에 도달했는지 여부)
+     */
+    boolean canHarvest
 ) {}

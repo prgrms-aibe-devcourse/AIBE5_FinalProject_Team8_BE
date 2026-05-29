@@ -105,29 +105,52 @@ public class LevelCalculator {
     }
 
     /**
-     * 화분의 레벨을 기준으로 식물의 5단계 성장 상태(GrowthStage)를 런타임에 판별하여 반환합니다.
+     * 식물의 누적 경험치를 기준으로 식물의 5단계 성장 상태(GrowthStage)를 런타임에 판별하여 반환합니다.
      * [성장 단계 기준 테이블]
-     * - 1Lv ~ 2Lv: SEED (씨앗)
-     * - 3Lv ~ 5Lv: SPROUT (새싹)
-     * - 6Lv ~ 9Lv: MATURE (잎)
-     * - 10Lv ~ 14Lv: BLOOM (개화)
-     * - 15Lv 이상: FULL_BLOOM (만개 - 수확 가능)
+     * - 0 ~ 199 Exp: SEED (씨앗)
+     * - 200 ~ 499 Exp: SPROUT (새싹)
+     * - 500 ~ 799 Exp: MATURE (잎)
+     * - 800 ~ 999 Exp: BLOOM (개화)
+     * - 1000 Exp 이상: FULL_BLOOM (만개 - 수확 가능)
      *
-     * @param potLevel 현재 화분의 레벨
+     * @param plantExp 식물의 현재 누적 경험치
      * @return 식물의 현재 성장 단계 (GrowthStage)
      */
-    public GrowthStage determineGrowthStage(int potLevel) {
-        if (potLevel <= 2) {
+    public GrowthStage determinePlantGrowthStage(int plantExp) {
+        if (plantExp < 200) {
             return GrowthStage.SEED;
-        } else if (potLevel <= 5) {
+        } else if (plantExp < 500) {
             return GrowthStage.SPROUT;
-        } else if (potLevel <= 9) {
+        } else if (plantExp < 800) {
             return GrowthStage.MATURE;
-        } else if (potLevel <= 14) {
+        } else if (plantExp < 1000) {
             return GrowthStage.BLOOM;
         } else {
             return GrowthStage.FULL_BLOOM;
         }
+    }
+
+    /**
+     * 식물의 현재 경험치를 바탕으로 전체 만개 기준 성장률(%)을 계산하여 반환합니다.
+     * 1000 Exp 도달 시 100.0%를 초과하지 않으며, 소수점 첫째 자리까지 정확하게 반올림합니다.
+     *
+     * @param growthExp 식물의 현재 누적 경험치
+     * @return 0.0 ~ 100.0 사이의 성장도 백분율
+     */
+    public double calculatePlantGrowthPercentage(int growthExp) {
+        int safeExp = Math.max(growthExp, 0);
+        return Math.round(Math.min((safeExp / 1000.0) * 100, 100.0) * 10.0) / 10.0;
+    }
+
+    /**
+     * 식물이 수확 가능한 상태(경험치 1000 이상)인지 여부를 판별합니다.
+     * [정책] 식물의 자체적인 성장만을 기준으로 삼기 위해 화분 레벨 조건은 결합하지 않습니다.
+     *
+     * @param growthExp 식물의 현재 누적 경험치
+     * @return 수확 가능 여부
+     */
+    public boolean canHarvestPlant(int growthExp) {
+        return growthExp >= 1000;
     }
 
     /**

@@ -32,6 +32,9 @@ public class PlantItem extends BaseEntity {
     @Column(name = "plant_id", nullable = false)
     private Long plantId;
 
+    @Column(name = "growth_exp", nullable = false, columnDefinition = "int default 0")
+    private Integer growthExp = 0;
+
     @Column(name = "harvested_level")
     private Integer harvestedLevel;
 
@@ -51,15 +54,25 @@ public class PlantItem extends BaseEntity {
     private LocalDateTime harvestedAt;
 
     @Builder
-    public PlantItem(Long userId, Long potId, Long plantId, Integer harvestedLevel, Boolean isHarvested, Boolean isDisplayed, Integer positionX, Integer positionY, LocalDateTime harvestedAt) {
+    public PlantItem(Long userId, Long potId, Long plantId, Integer growthExp, Integer harvestedLevel, Boolean isHarvested, Boolean isDisplayed, Integer positionX, Integer positionY, LocalDateTime harvestedAt) {
         this.userId = userId;
         this.potId = potId;
         this.plantId = plantId;
+        this.growthExp = growthExp != null ? growthExp : 0;
         this.harvestedLevel = harvestedLevel;
         this.isHarvested = isHarvested != null ? isHarvested : false;
         this.isDisplayed = isDisplayed != null ? isDisplayed : false;
         this.positionX = positionX;
         this.positionY = positionY;
         this.harvestedAt = harvestedAt;
+    }
+
+    /**
+     * 식물의 누적 경험치를 증가시킵니다.
+     *
+     * @param gainedExp 획득한 경험치 양
+     */
+    public void increaseGrowthExp(int gainedExp) {
+        this.growthExp += gainedExp;
     }
 }
