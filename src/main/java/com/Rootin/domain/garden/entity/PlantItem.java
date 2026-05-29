@@ -75,4 +75,10 @@ public class PlantItem extends BaseEntity {
     public void increaseGrowthExp(int gainedExp) {
         this.growthExp += gainedExp;
     }
+
+    public void harvest(int potLevel) {
+        this.isHarvested = true;
+        this.harvestedAt = java.time.LocalDateTime.now();
+        this.harvestedLevel = potLevel;
+    }
 }
