@@ -8,16 +8,16 @@ import java.time.LocalDate;
  */
 public record GrassCell(
         LocalDate date,
-        int count,
-        int totalContentLength,
+        int tilCount,
+        int charCount,
         int level
 ) {
-    // totalContentLength 기준 농도 분기: 0 / 1~300 / 301~700 / 701~1200 / 1201+
-    public static int resolveLevel(int totalContentLength) {
-        if (totalContentLength <= 0)    return 0;
-        if (totalContentLength <= 300)  return 1;
-        if (totalContentLength <= 700)  return 2;
-        if (totalContentLength <= 1200) return 3;
+    // charCount 기준 농도 분기: 0 / 1~300 / 301~700 / 701~1200 / 1201+
+    public static int resolveLevel(int charCount) {
+        if (charCount <= 0)    return 0;
+        if (charCount <= 300)  return 1;
+        if (charCount <= 700)  return 2;
+        if (charCount <= 1200) return 3;
         return 4;
     }
 }

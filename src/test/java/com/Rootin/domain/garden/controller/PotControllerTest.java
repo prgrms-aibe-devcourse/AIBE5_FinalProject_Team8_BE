@@ -133,7 +133,9 @@ class PotControllerTest {
                 "기본 씨앗",
                 GrowthStage.SEED,
                 "http://image.url",
-                "http://silhouette.url"
+                "http://silhouette.url",
+                0.0,
+                false
         );
 
         GardenInfoResponse response = new GardenInfoResponse(
