@@ -1,10 +1,6 @@
 package com.Rootin.domain.dashboard.controller;
 
-import com.Rootin.domain.dashboard.dto.DistributionResponse;
-import com.Rootin.domain.dashboard.dto.GrassGraphResponse;
-import com.Rootin.domain.dashboard.dto.InterestsResponse;
-import com.Rootin.domain.dashboard.dto.PersonalStatsResponse;
-import com.Rootin.domain.dashboard.dto.WeeklyStatsResponse;
+import com.Rootin.domain.dashboard.dto.*;
 import com.Rootin.domain.dashboard.service.DashboardService;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.common.ApiResponse;
@@ -38,7 +34,7 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.ok(dashboardService.getWeeklyStats(user.getId())));
     }
 
-    @GetMapping("/stats")
+    @GetMapping("/summary")
     public ResponseEntity<ApiResponse<PersonalStatsResponse>> getPersonalStats(
             @AuthenticationPrincipal User user
     ) {
@@ -58,5 +54,12 @@ public class DashboardController {
             @RequestParam(defaultValue = "6") int months
     ) {
         return ResponseEntity.ok(ApiResponse.ok(dashboardService.getInterests(user.getId(), months)));
+    }
+
+    @GetMapping("/quests")
+    public ResponseEntity<ApiResponse<QuestResponse>> getQuests(
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getQuests(user.getId())));
     }
 }

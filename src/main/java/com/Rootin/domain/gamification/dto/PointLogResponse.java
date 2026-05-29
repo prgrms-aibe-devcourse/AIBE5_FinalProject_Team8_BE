@@ -5,16 +5,16 @@ import com.Rootin.domain.gamification.entity.PointLog;
 import java.time.LocalDateTime;
 
 public record PointLogResponse(
-        Long id,
-        String reason,
+        String type,
         int amount,
+        String reason,
         LocalDateTime createdAt
 ) {
     public static PointLogResponse from(PointLog log) {
         return new PointLogResponse(
-                log.getId(),
+                log.getAmount() > 0 ? "EARN" : "USE",
+                Math.abs(log.getAmount()),
                 log.getReason().getDescription(),
-                log.getAmount(),
                 log.getCreatedAt()
         );
     }

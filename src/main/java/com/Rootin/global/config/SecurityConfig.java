@@ -68,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/ai/**").authenticated()
                         .requestMatchers("/api/v1/dashboard/**").authenticated()
                         .requestMatchers("/api/v1/points/**").authenticated()
+                        .requestMatchers("/api/v1/collection/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 // 인증/인가 실패 시 API 설계서 에러 포맷으로 JSON 응답
