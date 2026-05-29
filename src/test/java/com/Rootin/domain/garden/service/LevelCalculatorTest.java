@@ -165,25 +165,25 @@ class LevelCalculatorTest {
         @Test
         @DisplayName("레벨 범위에 따라 정의된 성장 단계가 올바르게 판별된다")
         void determineStageCorrectly() {
-            // SEED (1 ~ 2Lv)
-            assertThat(calculator.determineGrowthStage(1)).isEqualTo(GrowthStage.SEED);
-            assertThat(calculator.determineGrowthStage(2)).isEqualTo(GrowthStage.SEED);
+            // SEED (0 ~ 199 Exp)
+            assertThat(calculator.determinePlantGrowthStage(0)).isEqualTo(GrowthStage.SEED);
+            assertThat(calculator.determinePlantGrowthStage(199)).isEqualTo(GrowthStage.SEED);
 
-            // SPROUT (3 ~ 5Lv)
-            assertThat(calculator.determineGrowthStage(3)).isEqualTo(GrowthStage.SPROUT);
-            assertThat(calculator.determineGrowthStage(5)).isEqualTo(GrowthStage.SPROUT);
+            // SPROUT (200 ~ 499 Exp)
+            assertThat(calculator.determinePlantGrowthStage(200)).isEqualTo(GrowthStage.SPROUT);
+            assertThat(calculator.determinePlantGrowthStage(499)).isEqualTo(GrowthStage.SPROUT);
 
-            // MATURE (6 ~ 9Lv)
-            assertThat(calculator.determineGrowthStage(6)).isEqualTo(GrowthStage.MATURE);
-            assertThat(calculator.determineGrowthStage(9)).isEqualTo(GrowthStage.MATURE);
+            // MATURE (500 ~ 799 Exp)
+            assertThat(calculator.determinePlantGrowthStage(500)).isEqualTo(GrowthStage.MATURE);
+            assertThat(calculator.determinePlantGrowthStage(799)).isEqualTo(GrowthStage.MATURE);
 
-            // BLOOM (10 ~ 14Lv)
-            assertThat(calculator.determineGrowthStage(10)).isEqualTo(GrowthStage.BLOOM);
-            assertThat(calculator.determineGrowthStage(14)).isEqualTo(GrowthStage.BLOOM);
+            // BLOOM (800 ~ 999 Exp)
+            assertThat(calculator.determinePlantGrowthStage(800)).isEqualTo(GrowthStage.BLOOM);
+            assertThat(calculator.determinePlantGrowthStage(999)).isEqualTo(GrowthStage.BLOOM);
 
-            // FULL_BLOOM (15Lv 이상)
-            assertThat(calculator.determineGrowthStage(15)).isEqualTo(GrowthStage.FULL_BLOOM);
-            assertThat(calculator.determineGrowthStage(100)).isEqualTo(GrowthStage.FULL_BLOOM);
+            // FULL_BLOOM (1000 Exp 이상)
+            assertThat(calculator.determinePlantGrowthStage(1000)).isEqualTo(GrowthStage.FULL_BLOOM);
+            assertThat(calculator.determinePlantGrowthStage(5000)).isEqualTo(GrowthStage.FULL_BLOOM);
         }
     }
 
@@ -200,6 +200,26 @@ class LevelCalculatorTest {
             assertThat(calculator.calculateMinExpForLevel(4)).isEqualTo(600);
             assertThat(calculator.calculateMinExpForLevel(0)).isEqualTo(0);
             assertThat(calculator.calculateMinExpForLevel(-5)).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("식물의 경험치를 기반으로 만개 기준 성장 백분율을 정상 계산한다")
+        void calculatePlantGrowthPercentageSuccess() {
+            assertThat(calculator.calculatePlantGrowthPercentage(0)).isEqualTo(0.0);
+            assertThat(calculator.calculatePlantGrowthPercentage(-150)).isEqualTo(0.0); // 음수 경험치 유입 시 최소 0.0% 보장 방어 검증
+            assertThat(calculator.calculatePlantGrowthPercentage(300)).isEqualTo(30.0);
+            assertThat(calculator.calculatePlantGrowthPercentage(999)).isEqualTo(99.9);
+            assertThat(calculator.calculatePlantGrowthPercentage(1000)).isEqualTo(100.0);
+            assertThat(calculator.calculatePlantGrowthPercentage(1500)).isEqualTo(100.0);
+        }
+
+        @Test
+        @DisplayName("식물의 경험치를 기반으로 수확 가능 여부를 판별한다")
+        void canHarvestPlantSuccess() {
+            assertThat(calculator.canHarvestPlant(0)).isFalse();
+            assertThat(calculator.canHarvestPlant(999)).isFalse();
+            assertThat(calculator.canHarvestPlant(1000)).isTrue();
+            assertThat(calculator.canHarvestPlant(1500)).isTrue();
         }
 
         @Test

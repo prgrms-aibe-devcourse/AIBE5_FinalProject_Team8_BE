@@ -3,10 +3,16 @@ package com.Rootin.domain.garden.service;
 import com.Rootin.domain.gamification.entity.PointLog;
 import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
+import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
+import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
+import com.Rootin.domain.plant.entity.Plant;
+import com.Rootin.domain.plant.entity.enums.Grade;
+import com.Rootin.domain.plant.entity.enums.GrowthStage;
+import com.Rootin.domain.plant.repository.PlantRepository;
 import com.Rootin.domain.til.dto.request.DraftSaveRequest;
 import com.Rootin.domain.til.dto.request.TilCreateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
@@ -50,6 +56,12 @@ class ExperienceServiceTest {
     private WateringLogRepository wateringLogRepository;
 
     @Autowired
+    private PlantItemRepository plantItemRepository;
+
+    @Autowired
+    private PlantRepository plantRepository;
+
+    @Autowired
     private TilRepository tilRepository;
 
     @Autowired
@@ -70,6 +82,8 @@ class ExperienceServiceTest {
         jdbcTemplate.execute("ALTER TABLE posts ALTER COLUMN id RESTART WITH 1");
         jdbcTemplate.execute("ALTER TABLE watering_log ALTER COLUMN id RESTART WITH 1");
         jdbcTemplate.execute("ALTER TABLE point_log ALTER COLUMN id RESTART WITH 1");
+        jdbcTemplate.execute("ALTER TABLE plant ALTER COLUMN id RESTART WITH 1");
+        jdbcTemplate.execute("ALTER TABLE plant_item ALTER COLUMN id RESTART WITH 1");
 
         // 1. 테스트용 유저 생성 및 저장
         testUser = User.builder()
@@ -95,6 +109,25 @@ class ExperienceServiceTest {
                 .totalExp(0)
                 .build();
         potRepository.save(testPot);
+
+        // 3. 테스트용 식물 마스터 데이터 및 식물 아이템 생성
+        Plant testPlant = Plant.builder()
+                .name("기본 씨앗")
+                .grade(Grade.COMMON)
+                .growthStage(GrowthStage.SEED)
+                .imageUrl("seed_image_url")
+                .silhouetteUrl("seed_silhouette_url")
+                .build();
+        plantRepository.save(testPlant);
+
+        PlantItem testPlantItem = PlantItem.builder()
+                .userId(testUser.getId())
+                .potId(testPot.getId())
+                .plantId(testPlant.getId())
+                .growthExp(0)
+                .isHarvested(false)
+                .build();
+        plantItemRepository.save(testPlantItem);
     }
 
     @Test
@@ -116,6 +149,10 @@ class ExperienceServiceTest {
         Pot updatedPot = potRepository.findById(testPot.getId()).orElseThrow();
         assertThat(updatedPot.getTotalExp()).isEqualTo(100);
         assertThat(updatedPot.getLevel()).isEqualTo(2);
+
+        // 1-2. 식물 경험치 증가 검증 (100 Exp)
+        PlantItem updatedPlantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(testPot.getId()).orElseThrow();
+        assertThat(updatedPlantItem.getGrowthExp()).isEqualTo(100);
 
         // 2. 유저 포인트 적립 검증 (100 Exp의 10% = 10 P)
         User updatedUser = userRepository.findById(testUser.getId()).orElseThrow();
