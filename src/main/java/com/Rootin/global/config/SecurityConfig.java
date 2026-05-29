@@ -64,8 +64,10 @@ public class SecurityConfig {
                         // 이는 테스트를 위한 일시적인 조치이며, 프로덕션 배포 전 반드시 적절한 인증 필터와 함께 인증된 권한(authenticated)을 요구하도록 정책을 전환해야 합니다.
                         .requestMatchers("/api/v1/pots/**").permitAll()
 
-                        // 인증(JWT 발급등)이 필요한 경로
+                        // 인증(JWT)이 필요한 경로
                         .requestMatchers("/api/v1/ai/**").authenticated()
+                        .requestMatchers("/api/v1/dashboard/**").authenticated()
+                        .requestMatchers("/api/v1/points/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 // 인증/인가 실패 시 API 설계서 에러 포맷으로 JSON 응답
