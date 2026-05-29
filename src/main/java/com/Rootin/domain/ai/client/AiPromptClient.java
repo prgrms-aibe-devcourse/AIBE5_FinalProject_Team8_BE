@@ -68,18 +68,22 @@ public class AiPromptClient {
     public String generateQuiz(String tilContent, int count) {
         String prompt = String.format("""
                 당신은 학습 도우미입니다.
-                주어진 TIL(Today I Learned) 내용을 분석하여 한국어로 복습 문제 %d개를 생성하세요.
+                주어진 TIL(Today I Learned) 내용을 분석하여 한국어로 4지선다 복습 문제 %d개를 생성하세요.
                 반드시 아래 형식의 유효한 JSON만 반환하세요 (설명 없이 JSON만):
                 {
                   "quizzes": [
                     {
                       "question": "문제",
-                      "answer": "정답",
+                      "choices": ["선택지1", "선택지2", "선택지3", "선택지4"],
+                      "answer": "선택지 중 정답과 정확히 일치하는 문자열",
                       "hint": "힌트"
                     }
                   ]
                 }
-                quizzes 배열에 정확히 %d개의 항목을 포함하세요.
+                규칙:
+                - choices는 반드시 4개여야 합니다.
+                - answer는 choices 중 하나와 정확히 일치해야 합니다.
+                - quizzes 배열에 정확히 %d개의 항목을 포함하세요.
                 """, count, count);
 
         ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()

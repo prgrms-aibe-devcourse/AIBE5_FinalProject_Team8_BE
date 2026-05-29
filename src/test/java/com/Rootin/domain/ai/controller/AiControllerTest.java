@@ -123,8 +123,8 @@ class AiControllerTest {
         int totalCost = count * AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
         AiQuizResponse response = new AiQuizResponse(
                 List.of(
-                        new AiQuizItem("질문1", "정답1", "힌트1"),
-                        new AiQuizItem("질문2", "정답2", "힌트2")
+                        new AiQuizItem("질문1", List.of("정답1", "오답1", "오답2", "오답3"), "정답1", "힌트1"),
+                        new AiQuizItem("질문2", List.of("오답1", "정답2", "오답2", "오답3"), "정답2", "힌트2")
                 ),
                 totalCost,
                 totalCost
@@ -136,6 +136,7 @@ class AiControllerTest {
                         .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, count))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quizzes[0].question").value("질문1"))
+                .andExpect(jsonPath("$.quizzes[0].choices[0]").value("정답1"))
                 .andExpect(jsonPath("$.quizzes[0].answer").value("정답1"))
                 .andExpect(jsonPath("$.quizzes[0].hint").value("힌트1"))
                 .andExpect(jsonPath("$.usedPoint").value(totalCost))

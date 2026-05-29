@@ -74,8 +74,10 @@ class AiServiceTest {
             "{\"summary\":\"핵심 요약 내용\",\"keyPoints\":[\"포인트1\",\"포인트2\",\"포인트3\"]}";
 
     private static final String MOCK_QUIZ_JSON =
-            "{\"quizzes\":[{\"question\":\"질문1\",\"answer\":\"정답1\",\"hint\":\"힌트1\"}," +
-            "{\"question\":\"질문2\",\"answer\":\"정답2\",\"hint\":\"힌트2\"}]}";
+            "{\"quizzes\":[" +
+            "{\"question\":\"질문1\",\"choices\":[\"정답1\",\"오답1\",\"오답2\",\"오답3\"],\"answer\":\"정답1\",\"hint\":\"힌트1\"}," +
+            "{\"question\":\"질문2\",\"choices\":[\"오답1\",\"정답2\",\"오답2\",\"오답3\"],\"answer\":\"정답2\",\"hint\":\"힌트2\"}" +
+            "]}";
 
     @BeforeEach
     void setUp() {
