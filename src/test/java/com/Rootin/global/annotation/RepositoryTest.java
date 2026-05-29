@@ -9,9 +9,9 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import java.lang.annotation.*;
 
 /**
- * 실제 DB 설정을 유지하는 Repository 테스트용 애노테이션
+ * MySQL DB를 사용하는 Repository 테스트용 애노테이션
  * - JPA 관련 빈만 로드 (@DataJpaTest)
- * - application-test.yml의 H2 설정 사용 (DB 교체 없음)
+ * - Gradle startTestDb 태스크가 Docker MySQL을 자동 프로비저닝
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -22,3 +22,4 @@ import java.lang.annotation.*;
 @ExtendWith(SpringExtension.class)
 public @interface RepositoryTest {
 }
+
