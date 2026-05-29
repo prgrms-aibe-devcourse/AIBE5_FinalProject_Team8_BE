@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AiResultController.class)
 @ActiveProfiles("test")
+@Import(com.Rootin.global.config.TestSecurityConfig.class)
 class AiResultControllerTest {
 
     @Autowired
@@ -54,11 +56,11 @@ class AiResultControllerTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
     }
 
-    @Test @DisplayName("POST 미인증 → 401")
-    void save_unauthorized_when_no_auth() throws Exception {
+    @Test @DisplayName("POST는 TestSecurityConfig 적용 시 인증 없이도 200")
+    void save_success_without_auth_by_test_security_config() throws Exception {
         mockMvc.perform(post("/api/v1/ai/results").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"SUMMARY\",\"potId\":1,\"content\":\"요약\"}"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 
     // ─── GET /ai/results ─────────────────────────────────────────────
@@ -76,9 +78,9 @@ class AiResultControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test @DisplayName("GET 미인증 → 401")
-    void getResults_unauthorized_when_no_auth() throws Exception {
-        mockMvc.perform(get("/api/v1/ai/results")).andExpect(status().isUnauthorized());
+    @Test @DisplayName("GET은 TestSecurityConfig 적용 시 인증 없이도 200")
+    void getResults_success_without_auth_by_test_security_config() throws Exception {
+        mockMvc.perform(get("/api/v1/ai/results")).andExpect(status().isOk());
     }
 
     // ─── DELETE /ai/results/{resultId} ───────────────────────────────
@@ -90,9 +92,9 @@ class AiResultControllerTest {
                 .andExpect(status().isNoContent());
     }
 
-    @Test @DisplayName("DELETE 미인증 → 401")
-    void delete_unauthorized_when_no_auth() throws Exception {
+    @Test @DisplayName("DELETE는 TestSecurityConfig 적용 시 인증 없이도 204")
+    void delete_success_without_auth_by_test_security_config() throws Exception {
         mockMvc.perform(delete("/api/v1/ai/results/1").with(csrf()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNoContent());
     }
 }

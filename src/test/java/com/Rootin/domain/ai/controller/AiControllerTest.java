@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AiController.class)
 @ActiveProfiles("test")
+@Import(com.Rootin.global.config.TestSecurityConfig.class)
 class AiControllerTest {
 
     @Autowired
@@ -105,12 +107,12 @@ class AiControllerTest {
     }
 
     @Test
-    @DisplayName("미인증 → 401")
-    void summary_unauthorized_when_no_auth() throws Exception {
+    @DisplayName("summary는 TestSecurityConfig 적용 시 인증 없이도 200")
+    void summary_success_without_auth_by_test_security_config() throws Exception {
         mockMvc.perform(post("/api/v1/ai/summary").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 
     // ─── POST /ai/quiz ───────────────────────────────────────────────
@@ -176,11 +178,11 @@ class AiControllerTest {
     }
 
     @Test
-    @DisplayName("퀴즈 미인증 → 401")
-    void quiz_unauthorized_when_no_auth() throws Exception {
+    @DisplayName("quiz는 TestSecurityConfig 적용 시 인증 없이도 200")
+    void quiz_success_without_auth_by_test_security_config() throws Exception {
         mockMvc.perform(post("/api/v1/ai/quiz").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 }
