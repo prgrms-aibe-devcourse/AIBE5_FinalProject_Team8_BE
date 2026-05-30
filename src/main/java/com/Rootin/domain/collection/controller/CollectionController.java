@@ -2,8 +2,8 @@ package com.Rootin.domain.collection.controller;
 
 import com.Rootin.domain.collection.dto.PlantCollectionResponse;
 import com.Rootin.domain.collection.service.CollectionService;
-import com.Rootin.domain.user.entity.User;
 import com.Rootin.global.common.ApiResponse;
+import com.Rootin.global.jwt.JwtUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,8 +20,8 @@ public class CollectionController {
 
     @GetMapping("/plants")
     public ResponseEntity<ApiResponse<PlantCollectionResponse>> getPlants(
-            @AuthenticationPrincipal User user
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(collectionService.getPlants(user.getId())));
+        return ResponseEntity.ok(ApiResponse.ok(collectionService.getPlants(userDetails.getUserId())));
     }
 }

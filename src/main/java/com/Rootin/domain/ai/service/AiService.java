@@ -51,8 +51,8 @@ public class AiService {
      * 6. 응답 반환
      */
     @Transactional
-    public AiSummaryResponse summarize(AiSummaryRequest request, User principal) {
-        User user = userRepository.findById(principal.getId())
+    public AiSummaryResponse summarize(AiSummaryRequest request, Long userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
         if (user.getPoint() < SUMMARY_POINT_COST) {
@@ -104,10 +104,10 @@ public class AiService {
      * 7. 응답 반환
      */
     @Transactional
-    public AiQuizResponse generateQuiz(AiQuizRequest request, User principal) {
+    public AiQuizResponse generateQuiz(AiQuizRequest request, Long userId) {
         int totalCost = request.count() * QUIZ_POINT_COST_PER_QUESTION;
 
-        User user = userRepository.findById(principal.getId())
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
         if (user.getPoint() < totalCost) {

@@ -116,7 +116,7 @@ class AiServiceTest {
                 .willReturn(List.of(til));
         given(aiPromptClient.summarizeTil(any())).willReturn(MOCK_SUMMARY_JSON);
 
-        AiSummaryResponse response = aiService.summarize(new AiSummaryRequest(10L), owner);
+        AiSummaryResponse response = aiService.summarize(new AiSummaryRequest(10L), 1L);
 
         assertThat(response.summary()).isEqualTo("핵심 요약 내용");
         assertThat(response.keyPoints()).containsExactly("포인트1", "포인트2", "포인트3");
@@ -131,7 +131,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(owner, "point", AiPolicy.SUMMARY_POINT_COST - 1);
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
 
-        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), owner))
+        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED));
 
@@ -145,7 +145,7 @@ class AiServiceTest {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
         given(potRepository.findById(999L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(999L), owner))
+        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(999L), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -165,7 +165,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(ownerPot, "id", 10L);
         given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
 
-        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), other))
+        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), 2L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
 
@@ -180,7 +180,7 @@ class AiServiceTest {
         given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
                 .willReturn(List.of());
 
-        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), owner))
+        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -190,7 +190,7 @@ class AiServiceTest {
     void summarize_userNotFound() {
         given(userRepository.findById(1L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), owner))
+        assertThatThrownBy(() -> aiService.summarize(new AiSummaryRequest(10L), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -210,7 +210,7 @@ class AiServiceTest {
                 .willReturn(List.of(til));
         given(aiPromptClient.generateQuiz(any(), eq(count))).willReturn(MOCK_QUIZ_JSON);
 
-        AiQuizResponse response = aiService.generateQuiz(new AiQuizRequest(10L, count), owner);
+        AiQuizResponse response = aiService.generateQuiz(new AiQuizRequest(10L, count), 1L);
 
         assertThat(response.quizzes()).hasSize(count);
         assertThat(response.quizzes().get(0).question()).isEqualTo("질문1");
@@ -229,7 +229,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(owner, "point", totalCost - 1);
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
 
-        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, count), owner))
+        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, count), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED));
 
@@ -247,7 +247,7 @@ class AiServiceTest {
         given(userRepository.findById(2L)).willReturn(Optional.of(other));
         given(potRepository.findById(10L)).willReturn(Optional.of(ownerPot));
 
-        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, 3), other))
+        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, 3), 2L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
 
@@ -260,7 +260,7 @@ class AiServiceTest {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
         given(potRepository.findById(999L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(999L, 3), owner))
+        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(999L, 3), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -277,7 +277,7 @@ class AiServiceTest {
         given(tilRepository.findByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.PUBLISHED))
                 .willReturn(List.of());
 
-        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, count), owner))
+        assertThatThrownBy(() -> aiService.generateQuiz(new AiQuizRequest(10L, count), 1L))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }

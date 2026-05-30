@@ -74,16 +74,22 @@ public class SecurityConfig {
                 )
                 // 인증/인가 실패 시 API 설계서 에러 포맷으로 JSON 응답
                 .exceptionHandling(exception -> exception
-                        // 401 — 인증 실패 (토큰 없음/만료)
+                        // 401 — 인증 실패 (토큰 없음 / 만료 / 위변조)
+                        // JwtAuthenticationFilter가 설정한 TOKEN_EXPIRED 속성으로 세부 코드 구분
                         .authenticationEntryPoint((request, response, authException) -> {
+                            boolean isExpired = Boolean.TRUE.equals(
+                                    request.getAttribute("TOKEN_EXPIRED"));
+                            String code    = isExpired ? "TOKEN_EXPIRED" : "UNAUTHORIZED";
+                            String message = isExpired ? "토큰이 만료되었습니다. 재발급 후 다시 시도해 주세요."
+                                                       : "인증이 필요합니다.";
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json;charset=UTF-8");
                             response.getWriter().write(
                                     new ObjectMapper().writeValueAsString(
                                             Map.of(
                                                     "success", false,
-                                                    "message", "인증이 필요합니다.",
-                                                    "code", "UNAUTHORIZED"
+                                                    "message", message,
+                                                    "code",    code
                                             )
                                     )
                             );
