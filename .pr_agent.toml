@@ -1,21 +1,8 @@
-[github_app]
-pr_commands = [
-    "/describe",
-    "/review",
-    "/improve",
-]
-
 # PR-Agent 설정
 [config]
 model = "gemini/gemini-1.5-flash"            # 사용 가능한 Gemini 모델명으로 확인
 fallback_models = ["gemini/gemini-1.5-flash"]
 response_language = "ko-KR"                   # 출력 언어 한국어
-
-# PR이 열릴 때 실행되는 자동 도구를 활성화/비활성화
-[github_action_config]
-auto_review = true
-auto_describe = true
-auto_improve = true
 
 [pr_reviewer]
 extra_instructions = """

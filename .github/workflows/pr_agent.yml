@@ -3,6 +3,7 @@ on:
   pull_request:
     types: [ opened, reopened, ready_for_review ]
   issue_comment:
+    types: [ created ]
 jobs:
   pr_agent_job:
     if: ${{ github.event.sender.type != 'Bot' }}
@@ -15,6 +16,13 @@ jobs:
       - name: PR Agent action step
         uses: the-pr-agent/pr-agent@main
         env:
-          # AI API Key 목록
-          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # AI API Key
+          GOOGLE_AI_STUDIO__GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 모델 명시적 지정 (TOML 미로딩 대비)
+          config.model: "gemini/gemini-1.5-flash"
+          config.fallback_models: '["gemini/gemini-1.5-flash"]'
+          # PR이 열릴 때 실행되는 자동 도구를 활성화/비활성화
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
