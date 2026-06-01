@@ -63,7 +63,7 @@ public class UserService {
             throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
         }
 
-        user.updateProfile(newNickname, request.getBio());
+        user.updateProfile(newNickname, request.getBio(), request.getProfileImageUrl());
         return UserMeResponse.of(user);
     }
 }
