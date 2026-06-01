@@ -1,0 +1,26 @@
+# 로컬 개발/테스트 전용 MySQL (TEST)
+# - 컨테이너를 켜질 떄마다 모든 데이터가 완전히 초기화 (영구 저장 X).
+# - 실행: BE 폴더에서  docker compose up -d
+
+services:
+  mysql-test:
+    image: mysql:8.0
+    container_name: rootin-mysql-test
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: rootin
+      TZ: Asia/Seoul
+    command:                               # 한글 깨짐 방지
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    tmpfs:
+      - /var/lib/mysql                     # 데이터를 메모리(RAM)에만 저장 → 컨테이너 중지 시 전부 소멸. 절대 영구 저장되지 않음
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
