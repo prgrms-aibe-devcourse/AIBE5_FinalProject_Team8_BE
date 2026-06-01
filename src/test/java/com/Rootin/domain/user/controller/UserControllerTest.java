@@ -23,7 +23,9 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -178,6 +180,33 @@ class UserControllerTest {
         mockMvc.perform(patch("/api/v1/users/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─── DELETE /api/v1/users/me ──────────────────────────────────────────
+
+    @Test
+    @DisplayName("회원 탈퇴 성공 → 200")
+    void deleteMe_success() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        willDoNothing().given(userService).deleteUser(1L);
+
+        // when & then
+        mockMvc.perform(delete("/api/v1/users/me")
+                        .with(user(jwtUserDetails)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("회원 탈퇴가 완료되었습니다."));
+    }
+
+    @Test
+    @DisplayName("비인증 요청 → 400")
+    void deleteMe_unauthenticated() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me"))
                 .andExpect(status().isBadRequest());
     }
 
