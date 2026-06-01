@@ -85,7 +85,7 @@ task startTestDb(type: Exec) {
 					'--name', 'rootin-test-mysql',
 					'-e', 'MYSQL_ALLOW_EMPTY_PASSWORD=yes',
 					'-e', 'MYSQL_DATABASE=rootin_test',
-					'-p', '3306:3306',
+					'-p', '3307:3306',
 					'mysql:8.0',
 					'--character-set-server=utf8mb4',
 					'--collation-server=utf8mb4_unicode_ci'
