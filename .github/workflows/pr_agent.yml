@@ -20,8 +20,8 @@ jobs:
           GOOGLE_AI_STUDIO__GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # 모델 명시적 지정 (TOML 미로딩 대비)
-          config.model: "gemini/gemini-1.5-flash"
-          config.fallback_models: '["gemini/gemini-1.5-flash"]'
+          config.model: "gemini/gemini-2.5-flash"
+          config.fallback_models: '["gemini/gemini-2.5-flash"]'
           # PR이 열릴 때 실행되는 자동 도구를 활성화/비활성화
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
