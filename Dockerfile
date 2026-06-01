@@ -36,4 +36,3 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=60s \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=prod", "app.jar"]
-
