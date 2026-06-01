@@ -1,6 +1,7 @@
 package com.Rootin.domain.user.service;
 
 import com.Rootin.domain.user.dto.UserMeResponse;
+import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
@@ -27,6 +28,14 @@ public class UserService {
     public UserMeResponse getUserMe(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+        return UserMeResponse.of(user);
+    }
+
+    @Transactional
+    public UserMeResponse updateUserMe(Long userId, UserUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+        user.updateProfile(request.getNickname(), request.getBio());
         return UserMeResponse.of(user);
     }
 }
