@@ -82,7 +82,6 @@ class UserServiceTest {
                 .build();
 
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(userRepository.existsByNickname("루틴이")).willReturn(false);
 
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "루틴이");
@@ -112,7 +111,6 @@ class UserServiceTest {
                 .build();
 
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(userRepository.existsByNickname("루틴이")).willReturn(false);
 
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "루틴이");
