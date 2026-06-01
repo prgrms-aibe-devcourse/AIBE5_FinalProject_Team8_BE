@@ -1,5 +1,6 @@
 package com.Rootin.domain.user.service;
 
+import com.Rootin.domain.auth.repository.RefreshTokenRepository;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     /**
      * 인증된 유저의 기본 정보를 반환한다.
@@ -29,6 +31,26 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
         return UserMeResponse.of(user);
+    }
+
+    /**
+     * 회원 탈퇴 (소프트 딜리트)
+     *
+     * 처리 흐름:
+     *   1. userId로 유저 조회
+     *   2. deactivate() 호출 — isDeleted=true, deletedAt=now() 기록
+     *   3. Refresh Token 전체 삭제 — 이후 토큰 갱신 불가
+     *
+     * 30일 후 스케줄러에 의해 영구 삭제된다.
+     *
+     * @param userId JWT 클레임에서 추출한 사용자 ID
+     */
+    @Transactional
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+        user.deactivate();
+        refreshTokenRepository.deleteByUserId(userId);
     }
 
     @Transactional
