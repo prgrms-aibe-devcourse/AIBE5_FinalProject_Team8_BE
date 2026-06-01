@@ -4,10 +4,12 @@ import com.Rootin.domain.til.dto.request.TilTemplateCreateRequest;
 import com.Rootin.domain.til.dto.response.TilTemplateResponse;
 import com.Rootin.domain.til.service.TilTemplateService;
 import com.Rootin.global.common.ApiResponse;
+import com.Rootin.global.jwt.JwtUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,26 +23,26 @@ public class TilTemplateController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<TilTemplateResponse>>> getTemplates(
-            @RequestHeader("X-User-Id") Long userId
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(templateService.getTemplates(userId)));
+        return ResponseEntity.ok(ApiResponse.ok(templateService.getTemplates(userDetails.getUserId())));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<TilTemplateResponse>> create(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @Valid @RequestBody TilTemplateCreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(templateService.create(userId, request)));
+                .body(ApiResponse.ok(templateService.create(userDetails.getUserId(), request)));
     }
 
     @DeleteMapping("/{templateId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long templateId,
-            @RequestHeader("X-User-Id") Long userId
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        templateService.delete(userId, templateId);
+        templateService.delete(userDetails.getUserId(), templateId);
         return ResponseEntity.noContent().build();
     }
 }
