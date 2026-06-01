@@ -124,4 +124,11 @@ public class User extends BaseEntity implements UserDetails {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
     }
+
+    public void updateProfile(String nickname, String bio) {
+        this.nickname = nickname;
+        if (bio != null) {
+            this.bio = bio;
+        }
+    }
 }
