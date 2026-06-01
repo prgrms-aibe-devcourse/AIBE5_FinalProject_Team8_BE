@@ -1,11 +1,13 @@
 package com.Rootin.domain.user.controller;
 
+import com.Rootin.domain.user.dto.PresignedUrlResponse;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.entity.ENUM.Role;
 import com.Rootin.domain.user.service.UserService;
 import com.Rootin.global.jwt.JwtUserDetails;
+import com.Rootin.global.s3.S3Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -28,6 +31,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +48,9 @@ class UserControllerTest {
 
     @MockBean
     UserService userService;
+
+    @MockBean
+    S3Service s3Service;
 
     // ─── GET /api/v1/users/me ─────────────────────────────────────────────
 
@@ -73,7 +80,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.email").value("test@rootin.com"))
                 .andExpect(jsonPath("$.data.nickname").value("루틴이"))
-                .andExpect(jsonPath("$.data.profileImage").value("https://cdn.rootin.com/profile/1.jpg"))
+                .andExpect(jsonPath("$.data.profileImageUrl").value("https://cdn.rootin.com/profile/1.jpg"))
                 .andExpect(jsonPath("$.data.point").value(100));
     }
 
@@ -207,6 +214,115 @@ class UserControllerTest {
     @DisplayName("비인증 요청 → 400")
     void deleteMe_unauthenticated() throws Exception {
         mockMvc.perform(delete("/api/v1/users/me"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─── POST /api/v1/users/me/profile-image/presigned-url ───────────────
+
+    @Test
+    @DisplayName("Presigned URL 발급 성공 — jpg 파일 → 200 + presignedUrl/fileUrl 반환")
+    void getProfileImagePresignedUrl_success() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        String fakePresignedUrl = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/1/uuid.jpg?X-Amz-Signature=abc";
+        String fakeFileUrl = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/1/uuid.jpg";
+
+        given(s3Service.generatePresignedPutUrl(anyString(), eq("image/jpeg"))).willReturn(fakePresignedUrl);
+        given(s3Service.getFileUrl(anyString())).willReturn(fakeFileUrl);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presigned-url")
+                        .with(user(jwtUserDetails))
+                        .param("fileName", "profile.jpg")
+                        .param("fileSize", "1048576"))   // 1MB
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.presignedUrl").value(fakePresignedUrl))
+                .andExpect(jsonPath("$.data.fileUrl").value(fakeFileUrl));
+    }
+
+    @Test
+    @DisplayName("Presigned URL 발급 — 1MB 초과 파일 → 400")
+    void getProfileImagePresignedUrl_fileTooLarge() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        long overLimit = 1024 * 1024L + 1; // 1MB + 1 byte
+
+        // when & then
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presigned-url")
+                        .with(user(jwtUserDetails))
+                        .param("fileName", "profile.jpg")
+                        .param("fileSize", String.valueOf(overLimit)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Presigned URL 발급 — 정확히 1MB → 200 (경계값)")
+    void getProfileImagePresignedUrl_exactLimit_success() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        String fakePresignedUrl = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/1/uuid.jpg?X-Amz-Signature=abc";
+        String fakeFileUrl = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/1/uuid.jpg";
+
+        given(s3Service.generatePresignedPutUrl(anyString(), eq("image/jpeg"))).willReturn(fakePresignedUrl);
+        given(s3Service.getFileUrl(anyString())).willReturn(fakeFileUrl);
+
+        long exactLimit = 1024 * 1024L; // 1MB
+
+        // when & then
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presigned-url")
+                        .with(user(jwtUserDetails))
+                        .param("fileName", "profile.jpg")
+                        .param("fileSize", String.valueOf(exactLimit)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Presigned URL 발급 — 지원하지 않는 확장자(bmp) → 400")
+    void getProfileImagePresignedUrl_unsupportedExtension() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presigned-url")
+                        .with(user(jwtUserDetails))
+                        .param("fileName", "profile.bmp")
+                        .param("fileSize", "1048576"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Presigned URL 발급 — 확장자 없는 파일명 → 400")
+    void getProfileImagePresignedUrl_noExtension() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presigned-url")
+                        .with(user(jwtUserDetails))
+                        .param("fileName", "profileimage")
+                        .param("fileSize", "1048576"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Presigned URL 발급 — 비인증 요청 → 400")
+    void getProfileImagePresignedUrl_unauthenticated() throws Exception {
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presigned-url")
+                        .param("fileName", "profile.jpg")
+                        .param("fileSize", "1048576"))
                 .andExpect(status().isBadRequest());
     }
 
