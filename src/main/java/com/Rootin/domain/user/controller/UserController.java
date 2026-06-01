@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,6 +34,18 @@ public class UserController {
         }
         UserMeResponse response = userService.getUserMe(userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.success("유저 정보 조회 성공", response));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> deleteMe(
+            @AuthenticationPrincipal JwtUserDetails userDetails
+    ) {
+        if (userDetails == null) {
+            throw CustomException.badRequest("로그인한 사용자 정보가 없습니다.");
+        }
+        userService.deleteUser(userDetails.getUserId());
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success("회원 탈퇴가 완료되었습니다.", null));
     }
 
     @PatchMapping("/me")
