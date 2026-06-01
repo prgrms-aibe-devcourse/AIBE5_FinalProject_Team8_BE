@@ -13,7 +13,7 @@ public class UserMeResponse {
     private Long id;
     private String email;
     private String nickname;
-    private String profileImage;
+    private String profileImageUrl;
     private String bio;
     private int point;
 
@@ -22,7 +22,7 @@ public class UserMeResponse {
                 .id(user.getId())
                 .email(user.getEmail())
                 .nickname(user.getNickname())
-                .profileImage(user.getProfileImage())
+                .profileImageUrl(user.getProfileImage())
                 .bio(user.getBio())
                 .point(user.getPoint())
                 .build();
