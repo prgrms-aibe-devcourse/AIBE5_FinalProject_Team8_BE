@@ -35,7 +35,13 @@ public class UserService {
     public UserMeResponse updateUserMe(Long userId, UserUpdateRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
-        user.updateProfile(request.getNickname(), request.getBio());
+
+        String newNickname = request.getNickname();
+        if (!user.getNickname().equals(newNickname) && userRepository.existsByNickname(newNickname)) {
+            throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
+        }
+
+        user.updateProfile(newNickname, request.getBio());
         return UserMeResponse.of(user);
     }
 }
