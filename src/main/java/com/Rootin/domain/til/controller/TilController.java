@@ -6,11 +6,13 @@ import com.Rootin.domain.til.dto.request.TilUpdateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
 import com.Rootin.domain.til.service.TilService;
 import com.Rootin.global.common.ApiResponse;
+import com.Rootin.global.jwt.JwtUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,72 +24,72 @@ public class TilController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<TilResponse>> create(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @Valid @RequestBody TilCreateRequest request
     ) {
-        TilResponse response = tilService.create(userId, request);
+        TilResponse response = tilService.create(userDetails.getUserId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
     @GetMapping("/{tilId}")
     public ResponseEntity<ApiResponse<TilResponse>> findById(
             @PathVariable Long tilId,
-            @RequestHeader("X-User-Id") Long userId
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.findById(tilId, userId)));
+        return ResponseEntity.ok(ApiResponse.ok(tilService.findById(tilId, userDetails.getUserId())));
     }
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<Page<TilResponse>>> findMyTils(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam(required = false) Long potId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "latest") String sort
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.findMyTils(userId, potId, page, size, sort)));
+        return ResponseEntity.ok(ApiResponse.ok(tilService.findMyTils(userDetails.getUserId(), potId, page, size, sort)));
     }
 
     @PutMapping("/{tilId}")
     public ResponseEntity<ApiResponse<TilResponse>> update(
             @PathVariable Long tilId,
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @Valid @RequestBody TilUpdateRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.update(tilId, userId, request)));
+        return ResponseEntity.ok(ApiResponse.ok(tilService.update(tilId, userDetails.getUserId(), request)));
     }
 
     @DeleteMapping("/{tilId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long tilId,
-            @RequestHeader("X-User-Id") Long userId
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        tilService.delete(tilId, userId);
+        tilService.delete(tilId, userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/draft")
     public ResponseEntity<ApiResponse<TilResponse>> saveDraft(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @Valid @RequestBody DraftSaveRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.saveDraft(userId, request)));
+        return ResponseEntity.ok(ApiResponse.ok(tilService.saveDraft(userDetails.getUserId(), request)));
     }
 
     @GetMapping("/draft")
     public ResponseEntity<ApiResponse<TilResponse>> getDraft(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam Long potId
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.getDraft(userId, potId)));
+        return ResponseEntity.ok(ApiResponse.ok(tilService.getDraft(userDetails.getUserId(), potId)));
     }
 
     @DeleteMapping("/draft")
     public ResponseEntity<Void> deleteDraft(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam Long potId
     ) {
-        tilService.deleteDraft(userId, potId);
+        tilService.deleteDraft(userDetails.getUserId(), potId);
         return ResponseEntity.noContent().build();
     }
 }
