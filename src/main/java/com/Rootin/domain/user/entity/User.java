@@ -127,6 +127,8 @@ public class User extends BaseEntity implements UserDetails {
 
     public void updateProfile(String nickname, String bio) {
         this.nickname = nickname;
-        this.bio = bio;
+        if (bio != null) {
+            this.bio = bio;
+        }
     }
 }
