@@ -60,10 +60,14 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse signup(SignupRequest request) {
-        // 1. 이메일 중복 검사
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw CustomException.badRequest("이미 사용 중인 이메일입니다.");
-        }
+        // 1. 이메일 중복 검사 — 탈퇴 계정이면 즉시 영구 삭제 후 재가입 허용
+        userRepository.findByEmailWithLock(request.getEmail()).ifPresent(existing -> {
+            if (!existing.isEnabled()) {
+                deleteUserAndTokens(existing);
+            } else {
+                throw CustomException.badRequest("이미 사용 중인 이메일입니다.");
+            }
+        });
 
         // 2. 닉네임 중복 검사
         if (userRepository.existsByNickname(request.getNickname())) {
@@ -160,15 +164,14 @@ public class AuthService {
             throw CustomException.badRequest("유효하지 않은 Google ID Token입니다.");
         }
 
-        // 2. 기존 사용자 조회
+        // 2. 기존 사용자 조회 (비관적 락 — 동시 재가입 요청 방지)
         boolean isNewUser = false;
-        User user = userRepository.findByProviderAndProviderId(Provider.GOOGLE, sub)
+        User user = userRepository.findByProviderAndProviderIdWithLock(Provider.GOOGLE, sub)
                 .orElse(null);
 
         // 탈퇴한 계정 → 즉시 영구 삭제 후 신규 가입 허용
         if (user != null && !user.isEnabled()) {
-            refreshTokenRepository.deleteByUserId(user.getId());
-            userRepository.delete(user);
+            deleteUserAndTokens(user);
             user = null;
         }
 
@@ -312,6 +315,17 @@ public class AuthService {
                 .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpirationInSeconds())
                 .isNewUser(isNewUser)
                 .build();
+    }
+
+    /**
+     * 탈퇴 계정의 리프레시 토큰 및 사용자 데이터 영구 삭제
+     *
+     * googleLogin, signup 양쪽에서 공통으로 사용.
+     * 호출하는 메서드(@Transactional)의 트랜잭션 안에서 실행되어 원자성이 보장된다.
+     */
+    private void deleteUserAndTokens(User user) {
+        refreshTokenRepository.deleteByUserId(user.getId());
+        userRepository.delete(user);
     }
 
     /**
