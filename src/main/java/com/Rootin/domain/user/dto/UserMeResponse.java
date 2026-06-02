@@ -16,8 +16,10 @@ public class UserMeResponse {
     private String profileImageUrl;
     private String bio;
     private int point;
+    private String provider;
+    private long tilCount;
 
-    public static UserMeResponse of(User user) {
+    public static UserMeResponse of(User user, long tilCount) {
         return UserMeResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -25,6 +27,8 @@ public class UserMeResponse {
                 .profileImageUrl(user.getProfileImage())
                 .bio(user.getBio())
                 .point(user.getPoint())
+                .provider(user.getProvider() != null ? user.getProvider().name() : null)
+                .tilCount(tilCount)
                 .build();
     }
 }
