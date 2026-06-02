@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 식물 도감 서비스(CollectionService)에 대한 비즈니스 로직 스프링 통합 테스트 클래스입니다.
  */
-// === [윤석님 작성 파일 - CollectionServiceTest 전체] ===
 @IntegrationTest
 @Transactional
 class CollectionServiceTest {

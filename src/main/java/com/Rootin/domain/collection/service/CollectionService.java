@@ -27,18 +27,14 @@ public class CollectionService {
 
     private final PlantRepository plantRepository;
     private final PlantItemRepository plantItemRepository;
-    // === [윤석님 구현 영역] ===
     // 수집된 식물이 자라난 화분의 최신 이름을 동적으로 가져오기 위해 PotRepository를 주입합니다.
     private final PotRepository potRepository;
 
     public PlantCollectionResponse getPlants(Long userId) {
-        // === [윤석님 구현 영역 시작] ===
         // 도감에는 성장 단계별이 아닌, 식물 종류(종)별로 1개씩만 노출하기 위해 SEED(씨앗) 단계의 식물 마스터 정보만 필터링하여 가져옵니다.
         List<Plant> allPlants = plantRepository.findByGrowthStage(GrowthStage.SEED);
-        // === [윤석님 구현 영역 끝] ===
         List<PlantItem> collected = plantItemRepository.findByUserIdAndIsHarvestedTrue(userId);
 
-        // === [윤석님 구현 영역 시작] ===
         // 1. N+1 쿼리 문제를 예방하기 위해, 수집 완료된 식물들이 속해있던 화분 ID들을 중복 없이 모읍니다.
         List<Long> potIds = collected.stream()
                 .map(PlantItem::getPotId)
@@ -97,7 +93,6 @@ public class CollectionService {
                     );
                 })
                 .collect(Collectors.toList());
-        // === [윤석님 구현 영역 끝] ===
 
         return new PlantCollectionResponse(plants);
     }
