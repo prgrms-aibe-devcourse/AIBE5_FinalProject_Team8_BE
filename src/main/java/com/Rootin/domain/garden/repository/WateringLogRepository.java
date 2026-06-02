@@ -52,4 +52,10 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
             LocalDateTime from,
             LocalDateTime to
     );
+
+    // 식물 성장 단계 날짜 계산용 — 특정 시점 이후 해당 화분의 물주기 이력 (시간순)
+    List<WateringLog> findByPotIdAndWateredAtGreaterThanEqualOrderByWateredAtAsc(
+            Long potId,
+            LocalDateTime from
+    );
 }

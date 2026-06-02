@@ -9,7 +9,7 @@ import java.util.List;
  * maxStreak: 조회 연도 내 최대 연속 작성일 수
  */
 public record GrassGraphResponse(
-        int year,
+        int months,
         List<GrassCell> cells,
         int currentStreak,
         int maxStreak
