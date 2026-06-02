@@ -33,7 +33,12 @@ public class CollectionService {
     public PlantCollectionResponse getPlants(Long userId) {
         // 도감에는 성장 단계별이 아닌, 식물 종류(종)별로 1개씩만 노출하기 위해 SEED(씨앗) 단계의 식물 마스터 정보만 필터링하여 가져옵니다.
         List<Plant> allPlants = plantRepository.findByGrowthStage(GrowthStage.SEED);
-        List<PlantItem> collected = plantItemRepository.findByUserIdAndIsHarvestedTrue(userId);
+        // [식물도감 최초 수확 조회 최적화 - 팀원 공유용]
+        // 기존에는 findByUserIdAndIsHarvestedTrue(userId)로 사용자의 전체 수확 이력 목록을 전부 다 어플리케이션 메모리로 가져와서
+        // 스트림 집계로 최초 수확 건만 남겼습니다. 이 경우 오랜 사용으로 중복 수확 이력이 많아지면 메모리 부하와 네트워크 전하가 유발됩니다.
+        // 이를 해결하기 위해 DB 레벨에서 서브쿼리를 사용하여 각 식물 종류(plantId)별로 가장 처음 수확(가장 이른 harvestedAt)된 레코드만
+        // 딱 1건씩 선별적으로 O(종류 수) 규모로 벌크 조회해 오도록 튜닝을 반영했습니다.
+        List<PlantItem> collected = plantItemRepository.findEarliestHarvestedPlantsByUserId(userId);
 
         // 1. N+1 쿼리 문제를 예방하기 위해, 수집 완료된 식물들이 속해있던 화분 ID들을 중복 없이 모읍니다.
         List<Long> potIds = collected.stream()

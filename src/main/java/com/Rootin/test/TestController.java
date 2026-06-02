@@ -9,6 +9,6 @@ public class TestController {
 
     @GetMapping("/test")
     public ApiResponse<String> test() {
-        return ApiResponse.ok("ApiResponse 포맷 확인", "OK");
+        return ApiResponse.success("ApiResponse 포맷 확인", "OK");
     }
 }

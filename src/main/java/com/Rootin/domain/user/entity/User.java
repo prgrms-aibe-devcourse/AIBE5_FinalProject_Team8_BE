@@ -3,6 +3,7 @@ package com.Rootin.domain.user.entity;
 import com.Rootin.global.BaseEntity;
 import com.Rootin.domain.user.entity.ENUM.Provider;
 import com.Rootin.domain.user.entity.ENUM.Role;
+import com.Rootin.domain.user.entity.ENUM.GardenTheme;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -28,7 +29,9 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "nickname", nullable = false, length = 50)
+    // 닉네임 동시성 방어 및 데이터베이스 차원에서의 고유성(Unique)을 완벽하게 보장하기 위해
+    // unique = true 제약 조건 설정을 명시적으로 추가합니다. 이로써 동일 닉네임 동시 가입/변경 시 예외가 안전하게 발생합니다.
+    @Column(name = "nickname", nullable = false, unique = true, length = 50)
     private String nickname;
 
     @Column(name = "profile_image", length = 500)
@@ -62,6 +65,11 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "garden_theme", nullable = false, columnDefinition = "VARCHAR(50) DEFAULT 'FOREST'")
+    private GardenTheme gardenTheme = GardenTheme.FOREST;
+
     @PrePersist
     protected void applyDefaults() {
         if (nickname == null || nickname.isBlank()) {
@@ -74,6 +82,9 @@ public class User extends BaseEntity implements UserDetails {
         }
         if (provider == null) {
             provider = Provider.LOCAL;
+        }
+        if (gardenTheme == null) {
+            gardenTheme = GardenTheme.FOREST;
         }
     }
 
@@ -130,8 +141,14 @@ public class User extends BaseEntity implements UserDetails {
         if (bio != null) {
             this.bio = bio;
         }
-        if (profileImageUrl != null) {
+        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
             this.profileImage = profileImageUrl;
+        }
+    }
+
+    public void updateGardenTheme(GardenTheme theme) {
+        if (theme != null) {
+            this.gardenTheme = theme;
         }
     }
 }

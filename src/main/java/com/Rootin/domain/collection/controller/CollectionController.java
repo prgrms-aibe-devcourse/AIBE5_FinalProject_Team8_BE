@@ -22,6 +22,6 @@ public class CollectionController {
     public ResponseEntity<ApiResponse<PlantCollectionResponse>> getPlants(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(collectionService.getPlants(userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.success(collectionService.getPlants(userDetails.getUserId())));
     }
 }

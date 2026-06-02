@@ -21,6 +21,6 @@ public class HarvestController {
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @PathVariable Long potId
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(harvestService.harvest(userDetails.getUserId(), potId)));
+        return ResponseEntity.ok(ApiResponse.success(harvestService.harvest(userDetails.getUserId(), potId)));
     }
 }

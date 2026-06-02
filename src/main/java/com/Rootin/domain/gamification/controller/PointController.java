@@ -23,7 +23,7 @@ public class PointController {
     public ResponseEntity<ApiResponse<PointSummaryResponse>> getSummary(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(pointService.getPointSummary(userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.success(pointService.getPointSummary(userDetails.getUserId())));
     }
 
     @GetMapping("/me/history")
@@ -32,7 +32,7 @@ public class PointController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 pointService.getPointHistory(userDetails.getUserId(), PageRequest.of(page, size))
         ));
     }

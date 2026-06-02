@@ -153,17 +153,70 @@ public class TilService {
         }
     }
 
+    /**
+     * 사용자가 작성한 TIL의 태그 정보들을 안전하고 최적화된 방식으로 데이터베이스와 동기화합니다.
+     *
+     * [태그 동기화 벌크 최적화 설계 - 팀원 공유용]
+     * 기존에는 사용자가 N개의 태그를 입력하면 루프(for) 안에서 매번 단건 조회(findByName) 쿼리를 N번 실행했습니다. (N+1 문제)
+     * 이를 개선하여 한 번의 조회와 한 번의 일괄 저장으로 끝내도록 최적화했습니다.
+     *
+     * [최적화 동기화 흐름]
+     * 1. 1차 벌크 조회: 사용자가 입력한 태그 이름 목록(tagNames)으로 DB에 존재하는 기존 태그를 findByNameIn()으로 단 1번만 쿼리해 옵니다.
+     * 2. 인메모리 맵 매핑: 가져온 기존 태그들을 O(1) 조회가 가능하도록 Map<태그이름, Tag> 구조에 캐싱합니다.
+     * 3. 신규 태그 필터링: 캐시 맵에 없는, 즉 DB에 가입된 적 없는 신규 태그들만 별도로 리스트로 골라냅니다.
+     * 4. 2차 벌크 저장: 신규 태그들이 존재하면 tagRepository.saveAll()을 활용해 단 한 번의 벌크 INSERT 쿼리로 DB에 저장합니다.
+     * 5. 연관관계 맺기: 최종적으로 완성된 맵에서 태그 데이터를 추출해 TIL과 태그 매핑 엔티티(TilTag)의 연관관계를 설정합니다.
+     *
+     * 결과적으로 기존의 쿼리 N+1 횟수를 최대 2번(기존 태그 벌크 조회 1번 + 신규 태그 벌크 저장 1번)으로 완벽하게 제한하여 DB 성능을 개선했습니다.
+     *
+     * @param til      태그를 맺어줄 대상 TIL 엔티티
+     * @param tagNames 사용자가 입력한 태그 이름 목록
+     */
     private void syncTags(Til til, List<String> tagNames) {
+        // 기존 태그 매핑 내역을 전면 초기화합니다.
         til.getTilTags().clear();
 
         if (tagNames == null || tagNames.isEmpty()) {
             return;
         }
 
-        for (String name : tagNames) {
-            Tag tag = tagRepository.findByName(name)
-                    .orElseGet(() -> tagRepository.save(Tag.create(name)));
-            til.getTilTags().add(TilTag.of(til, tag));
+        // 중복된 태그 이름이 전달되었을 때, 신규 태그 벌크 저장 시 unique 제약 조건 위배로
+        // 500 예외가 발생하는 현상을 방지하기 위해 distinct() 처리를 수행하여 고유한 리스트로 정제합니다.
+        List<String> distinctTagNames = tagNames.stream().distinct().toList();
+
+        // 1. 요청받은 태그 이름들 중 DB에 이미 존재하는 태그들을 단 한 번의 쿼리로 벌크 조회합니다. (N+1 쿼리 방지)
+        List<Tag> existingTags = tagRepository.findByNameIn(distinctTagNames);
+
+        // 빠른 조회를 위해 Map<태그이름, Tag> 형태로 임시 캐싱합니다.
+        java.util.Map<String, Tag> tagMap = existingTags.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        Tag::getName,
+                        java.util.function.Function.identity(),
+                        (t1, t2) -> t1
+                ));
+
+        // 2. 존재하지 않는 신규 태그들만 리스트로 추려냅니다.
+        List<Tag> newTagsToSave = new java.util.ArrayList<>();
+        for (String name : distinctTagNames) {
+            if (!tagMap.containsKey(name)) {
+                newTagsToSave.add(Tag.create(name));
+            }
+        }
+
+        // 3. 신규 태그들이 있다면 saveAll()을 통해 한 번의 INSERT 쿼리로 벌크 저장합니다.
+        if (!newTagsToSave.isEmpty()) {
+            List<Tag> savedTags = tagRepository.saveAll(newTagsToSave);
+            for (Tag tag : savedTags) {
+                tagMap.put(tag.getName(), tag);
+            }
+        }
+
+        // 4. 동기화가 완료된 태그 맵으로부터 데이터를 꺼내어 TIL-태그 매핑 연관 관계 엔티티를 추가합니다.
+        for (String name : distinctTagNames) {
+            Tag tag = tagMap.get(name);
+            if (tag != null) {
+                til.getTilTags().add(TilTag.of(til, tag));
+            }
         }
     }
 }
