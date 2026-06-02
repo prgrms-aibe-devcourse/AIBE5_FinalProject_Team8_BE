@@ -25,6 +25,7 @@ cloud:
       secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
     s3:
       bucket: ${AWS_S3_BUCKET:rootin-bucket}
+      endpoint: ${AWS_ENDPOINT:}
 
 
 # Actuator (Docker Health)
