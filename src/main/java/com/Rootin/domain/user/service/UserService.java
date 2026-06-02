@@ -1,6 +1,8 @@
 package com.Rootin.domain.user.service;
 
 import com.Rootin.domain.auth.repository.RefreshTokenRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
@@ -16,6 +18,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final TilRepository tilRepository;
 
     /**
      * 인증된 유저의 기본 정보를 반환한다.
@@ -30,7 +33,8 @@ public class UserService {
     public UserMeResponse getUserMe(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
-        return UserMeResponse.of(user);
+        long tilCount = tilRepository.countByUserIdAndStatus(userId, PostStatus.PUBLISHED);
+        return UserMeResponse.of(user, tilCount);
     }
 
     /**
@@ -64,6 +68,7 @@ public class UserService {
         }
 
         user.updateProfile(newNickname, request.getBio(), request.getProfileImageUrl());
-        return UserMeResponse.of(user);
+        long tilCount = tilRepository.countByUserIdAndStatus(userId, PostStatus.PUBLISHED);
+        return UserMeResponse.of(user, tilCount);
     }
 }
