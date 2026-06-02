@@ -4,6 +4,7 @@ import com.Rootin.domain.user.dto.PresignedUrlResponse;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
+import com.Rootin.domain.user.entity.ENUM.Provider;
 import com.Rootin.domain.user.entity.ENUM.Role;
 import com.Rootin.domain.user.service.UserService;
 import com.Rootin.global.jwt.JwtUserDetails;
@@ -64,13 +65,14 @@ class UserControllerTest {
                 .profileImage("https://cdn.rootin.com/profile/1.jpg")
                 .point(100)
                 .role(Role.USER)
+                .provider(Provider.LOCAL)
                 .build();
 
         JwtUserDetails jwtUserDetails = new JwtUserDetails(
                 1L, "test@rootin.com",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
-        UserMeResponse response = UserMeResponse.of(mockUser);
+        UserMeResponse response = UserMeResponse.of(mockUser, 7L);
         given(userService.getUserMe(1L)).willReturn(response);
 
         // when & then
@@ -81,7 +83,9 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.email").value("test@rootin.com"))
                 .andExpect(jsonPath("$.data.nickname").value("루틴이"))
                 .andExpect(jsonPath("$.data.profileImageUrl").value("https://cdn.rootin.com/profile/1.jpg"))
-                .andExpect(jsonPath("$.data.point").value(100));
+                .andExpect(jsonPath("$.data.point").value(100))
+                .andExpect(jsonPath("$.data.provider").value("LOCAL"))
+                .andExpect(jsonPath("$.data.tilCount").value(7));
     }
 
     @Test
