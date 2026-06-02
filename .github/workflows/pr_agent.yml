@@ -12,16 +12,16 @@ jobs:
       pull-requests: write
       issues: write
       contents: write
+    name: Run pr agent on every pull request, respond to user comments
     steps:
       - name: PR Agent action step
-        uses: the-pr-agent/pr-agent@main
+        id: pragent
+        uses: qodo-ai/pr-agent@main
         env:
-          # AI API Key
-          GOOGLE_AI_STUDIO__GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Github에서 자동 생성됨
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 모델 명시적 지정 (TOML 미로딩 대비)
-          config.model: "gemini/gemini-2.0-flash"
-          config.fallback_models: '["gemini/gemini-2.0-flash"]'
+          # AI API Key
+          GOOGLE_AI_STUDIO__GEMINI_API_KEY: ${{ secrets.GEMINI_KEY }}
           # PR이 열릴 때 실행되는 자동 도구를 활성화/비활성화
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
