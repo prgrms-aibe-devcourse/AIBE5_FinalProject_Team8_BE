@@ -21,7 +21,6 @@ public class AiResultController {
 
     /**
      * POST /ai/results
-     * TODO : JWT 필터에서 principal로 User 엔티티 주입 필요
      */
     @PostMapping
     public ResponseEntity<AiResultResponse> save(
