@@ -21,11 +21,10 @@ public class DashboardController {
     @GetMapping("/grass")
     public ResponseEntity<ApiResponse<GrassGraphResponse>> getGrassGraph(
             @AuthenticationPrincipal JwtUserDetails userDetails,
-            @RequestParam(required = false) Integer year
+            @RequestParam(defaultValue = "3") int months
     ) {
-        int targetYear = (year != null) ? year : LocalDate.now().getYear();
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getGrassGraph(userDetails.getUserId(), targetYear)));
+                dashboardService.getGrassGraph(userDetails.getUserId(), months)));
     }
 
     @GetMapping("/weekly")
