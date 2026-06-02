@@ -2,8 +2,8 @@
 [config]
 # 모델 지정
 response_language = "ko-KR"
-model = "gemini/gemini-3.5-flash"
-fallback_models = ["gemini/gemini-3.5-flash"]
+model = "gemini/gemini-2.5-flash"
+fallback_models = ["gemini/gemini-3.1-flash-lite"]
 custom_model_max_tokens = 1048576
 
 [pr_reviewer]
@@ -42,4 +42,5 @@ extra_instructions = """
 4. 중복 코드가 존재한다면 공통 유틸리티나 헬퍼로 추출하여 재사용성을 높이도록 안내할 것.
 5. 결합도가 높다면 의존성 주입(DI)이나 관심사 분리(SoC)를 통해 테스트 용이성을 높이는 설계를 조언할 것.
 6. 사소한 포맷팅보다 아키텍처와 로직의 품질을 실질적으로 높이는 유의미한 제안에 집중할 것.
+
 """
