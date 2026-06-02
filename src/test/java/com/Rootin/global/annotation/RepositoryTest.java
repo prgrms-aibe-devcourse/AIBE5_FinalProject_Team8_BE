@@ -1,6 +1,7 @@
 package com.Rootin.global.annotation;
 
 import com.Rootin.global.config.TestcontainersConfig;
+import com.Rootin.global.config.JpaAuditingConfig;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -23,8 +24,7 @@ import java.lang.annotation.*;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(TestcontainersConfig.class)
+@Import({TestcontainersConfig.class, JpaAuditingConfig.class})
 @ExtendWith(SpringExtension.class)
 public @interface RepositoryTest {
 }
-

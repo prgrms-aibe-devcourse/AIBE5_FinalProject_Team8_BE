@@ -3,9 +3,12 @@ package com.Rootin.domain.collection.service;
 import com.Rootin.domain.collection.dto.PlantCollectionItem;
 import com.Rootin.domain.collection.dto.PlantCollectionResponse;
 import com.Rootin.domain.garden.entity.PlantItem;
+import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
+import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.plant.entity.Plant;
 import com.Rootin.domain.plant.entity.enums.Grade;
+import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,31 +27,77 @@ public class CollectionService {
 
     private final PlantRepository plantRepository;
     private final PlantItemRepository plantItemRepository;
+    // === [윤석님 구현 영역] ===
+    // 수집된 식물이 자라난 화분의 최신 이름을 동적으로 가져오기 위해 PotRepository를 주입합니다.
+    private final PotRepository potRepository;
 
     public PlantCollectionResponse getPlants(Long userId) {
-        List<Plant> allPlants = plantRepository.findAll();
+        // === [윤석님 구현 영역 시작] ===
+        // 도감에는 성장 단계별이 아닌, 식물 종류(종)별로 1개씩만 노출하기 위해 SEED(씨앗) 단계의 식물 마스터 정보만 필터링하여 가져옵니다.
+        List<Plant> allPlants = plantRepository.findByGrowthStage(GrowthStage.SEED);
+        // === [윤석님 구현 영역 끝] ===
         List<PlantItem> collected = plantItemRepository.findByUserIdAndIsHarvestedTrue(userId);
 
-        // plantId별로 가장 빠른 수확 시각 (최초 수집일)
-        Map<Long, LocalDateTime> collectedAtMap = collected.stream()
+        // === [윤석님 구현 영역 시작] ===
+        // 1. N+1 쿼리 문제를 예방하기 위해, 수집 완료된 식물들이 속해있던 화분 ID들을 중복 없이 모읍니다.
+        List<Long> potIds = collected.stream()
+                .map(PlantItem::getPotId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 2. 수집된 화분 ID 목록을 가지고 DB에서 단 1번의 IN 쿼리로 모든 화분을 일괄 조회하여 맵(potId -> potTitle) 형태로 가공합니다.
+        Map<Long, String> potTitleMap = Map.of();
+        if (!potIds.isEmpty()) {
+            potTitleMap = potRepository.findAllById(potIds).stream()
+                    .collect(Collectors.toMap(Pot::getId, Pot::getTitle));
+        }
+
+        // 3. 사용자가 동일 식물을 여러 번 수확했을 경우를 감안하여, 수집된 식물들 중 '최초 수집일(수확 시각이 가장 이른 것)' 기준의 식물 아이템을 찾아 맵으로 만듭니다.
+        Map<Long, PlantItem> earliestCollectionMap = collected.stream()
                 .collect(Collectors.toMap(
                         PlantItem::getPlantId,
-                        PlantItem::getHarvestedAt,
-                        (a, b) -> a.isBefore(b) ? a : b
+                        item -> item,
+                        (a, b) -> a.getHarvestedAt().isBefore(b.getHarvestedAt()) ? a : b
                 ));
 
+        // 4. 모든 도감 씨앗 리스트를 돌며 DTO로 변환하고 뱃지 정보를 조립합니다.
+        final Map<Long, String> finalPotTitleMap = potTitleMap;
         List<PlantCollectionItem> plants = allPlants.stream()
                 .map(plant -> {
-                    boolean isCollected = collectedAtMap.containsKey(plant.getId());
+                    // 해당 식물 종류의 최초 수집 정보를 맵에서 꺼냅니다.
+                    PlantItem item = earliestCollectionMap.get(plant.getId());
+                    boolean isCollected = (item != null);
+
+                    String potName = null;
+                    Integer harvestedLevel = null;
+                    LocalDateTime collectedAt = null;
+
+                    if (isCollected) {
+                        collectedAt = item.getHarvestedAt();
+                        harvestedLevel = item.getHarvestedLevel();
+                        // 화분 ID가 유효하다면 위에서 일괄 조회한 화분 맵에서 현재 최신 화분명을 동적으로 매핑합니다.
+                        // 화분이 영구 삭제되었거나 존재하지 않는다면 "알 수 없음"으로 채워줍니다.
+                        if (item.getPotId() != null) {
+                            potName = finalPotTitleMap.getOrDefault(item.getPotId(), "알 수 없음");
+                        } else {
+                            potName = "알 수 없음";
+                        }
+                    }
+
+                    // 도감 화면에 필요한 뱃지 정보(현재 화분 이름, 수확 당시 레벨, 수확 시각 등)를 DTO 생성자에 함께 주입합니다.
                     return new PlantCollectionItem(
                             plant.getName(),
                             plant.getGrade() == Grade.RARE ? "희귀" : "일반",
                             isCollected,
-                            collectedAtMap.get(plant.getId()),
-                            plant.getImageUrl()
+                            collectedAt,
+                            plant.getImageUrl(),
+                            potName,
+                            harvestedLevel
                     );
                 })
                 .collect(Collectors.toList());
+        // === [윤석님 구현 영역 끝] ===
 
         return new PlantCollectionResponse(plants);
     }

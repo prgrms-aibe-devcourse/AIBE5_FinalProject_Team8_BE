@@ -7,5 +7,7 @@ public record PlantCollectionItem(
         String rarity,
         boolean isCollected,
         LocalDateTime collectedAt,
-        String imageUrl
+        String imageUrl,
+        String currentPotName,
+        Integer harvestedLevel
 ) {}
