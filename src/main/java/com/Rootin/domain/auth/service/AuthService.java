@@ -165,9 +165,11 @@ public class AuthService {
         User user = userRepository.findByProviderAndProviderId(Provider.GOOGLE, sub)
                 .orElse(null);
 
-        // 탈퇴한 계정 차단
+        // 탈퇴한 계정 → 즉시 영구 삭제 후 신규 가입 허용
         if (user != null && !user.isEnabled()) {
-            throw new CustomException(HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다.");
+            refreshTokenRepository.deleteByUserId(user.getId());
+            userRepository.delete(user);
+            user = null;
         }
 
         // 3. 신규 사용자 → 자동 회원가입
