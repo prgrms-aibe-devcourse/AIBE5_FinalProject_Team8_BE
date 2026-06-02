@@ -15,4 +15,6 @@ public interface PlantRepository extends JpaRepository<Plant, Long> {
     Optional<Plant> findFirstByNameAndGradeAndGrowthStage(String name, Grade grade, GrowthStage growthStage);
 
     List<Plant> findByGradeAndGrowthStage(Grade grade, GrowthStage growthStage);
+
+    List<Plant> findByGrowthStage(GrowthStage growthStage);
 }

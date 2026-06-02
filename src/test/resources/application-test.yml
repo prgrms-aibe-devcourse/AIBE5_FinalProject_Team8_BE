@@ -7,6 +7,7 @@ spring:
     password: ${TEST_DB_PASSWORD:}
 
   jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: create-drop
     show-sql: true
