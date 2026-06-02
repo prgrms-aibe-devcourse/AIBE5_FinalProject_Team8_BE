@@ -1,8 +1,10 @@
 # PR-Agent 설정
 [config]
 # 모델 지정
-model = "gemini/gemini-3.5-flash"
 response_language = "ko-KR"
+model = "gemini/gemini-3.5-flash"
+fallback_models = ["gemini/gemini-3.5-flash"]
+custom_model_max_tokens = 1048576
 
 [pr_reviewer]
 extra_instructions = """
