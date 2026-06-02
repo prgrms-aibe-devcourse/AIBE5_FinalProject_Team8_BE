@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -114,6 +115,8 @@ public class AuthService {
                             request.getPassword()
                     )
             );
+        } catch (DisabledException e) {
+            throw new CustomException(HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다.");
         } catch (BadCredentialsException e) {
             throw new CustomException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
         }
@@ -161,6 +164,11 @@ public class AuthService {
         boolean isNewUser = false;
         User user = userRepository.findByProviderAndProviderId(Provider.GOOGLE, sub)
                 .orElse(null);
+
+        // 탈퇴한 계정 차단
+        if (user != null && !user.isEnabled()) {
+            throw new CustomException(HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다.");
+        }
 
         // 3. 신규 사용자 → 자동 회원가입
         if (user == null) {
