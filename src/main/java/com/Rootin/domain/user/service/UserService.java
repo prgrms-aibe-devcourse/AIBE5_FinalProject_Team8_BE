@@ -9,6 +9,7 @@ import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +69,13 @@ public class UserService {
         }
 
         user.updateProfile(newNickname, request.getBio(), request.getProfileImageUrl());
+
+        try {
+            userRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
+        }
+
         long tilCount = tilRepository.countByUserIdAndStatus(userId, PostStatus.PUBLISHED);
         return UserMeResponse.of(user, tilCount);
     }

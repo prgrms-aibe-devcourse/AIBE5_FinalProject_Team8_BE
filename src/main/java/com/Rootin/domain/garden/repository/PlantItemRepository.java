@@ -39,4 +39,25 @@ public interface PlantItemRepository extends JpaRepository<PlantItem, Long> {
 
     // 식물도감 — 사용자가 수확 완료한 식물 목록
     List<PlantItem> findByUserIdAndIsHarvestedTrue(Long userId);
+
+    /**
+     * 사용자가 수확한 식물들 중 식물 종류(plantId)별로 최초 수확일(가장 이른 harvestedAt)을 가진 레코드만 벌크로 조회합니다.
+     * 도감 조회 시 사용자의 수많은 중복 수확 데이터가 모두 불러와져 발생하는 OOM 및 성능 저하 문제를 방지합니다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 각 식물 종류별 최초 수확 데이터 목록
+     */
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT pi FROM PlantItem pi
+            WHERE pi.userId = :userId
+              AND pi.isHarvested = true
+              AND pi.harvestedAt = (
+                  SELECT MIN(pi2.harvestedAt)
+                  FROM PlantItem pi2
+                  WHERE pi2.userId = :userId
+                    AND pi2.plantId = pi.plantId
+                    AND pi2.isHarvested = true
+              )
+            """)
+    List<PlantItem> findEarliestHarvestedPlantsByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

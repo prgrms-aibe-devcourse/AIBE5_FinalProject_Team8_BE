@@ -28,7 +28,7 @@ public class TilController {
             @Valid @RequestBody TilCreateRequest request
     ) {
         TilResponse response = tilService.create(userDetails.getUserId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
     @GetMapping("/{tilId}")
@@ -36,7 +36,7 @@ public class TilController {
             @PathVariable Long tilId,
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.findById(tilId, userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.success(tilService.findById(tilId, userDetails.getUserId())));
     }
 
     @GetMapping("/me")
@@ -47,7 +47,7 @@ public class TilController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "latest") String sort
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.findMyTils(userDetails.getUserId(), potId, page, size, sort)));
+        return ResponseEntity.ok(ApiResponse.success(tilService.findMyTils(userDetails.getUserId(), potId, page, size, sort)));
     }
 
     @PutMapping("/{tilId}")
@@ -56,7 +56,7 @@ public class TilController {
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @Valid @RequestBody TilUpdateRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.update(tilId, userDetails.getUserId(), request)));
+        return ResponseEntity.ok(ApiResponse.success(tilService.update(tilId, userDetails.getUserId(), request)));
     }
 
     @DeleteMapping("/{tilId}")
@@ -73,7 +73,7 @@ public class TilController {
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @Valid @RequestBody DraftSaveRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.saveDraft(userDetails.getUserId(), request)));
+        return ResponseEntity.ok(ApiResponse.success(tilService.saveDraft(userDetails.getUserId(), request)));
     }
 
     @GetMapping("/draft")
@@ -81,7 +81,7 @@ public class TilController {
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam Long potId
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(tilService.getDraft(userDetails.getUserId(), potId)));
+        return ResponseEntity.ok(ApiResponse.success(tilService.getDraft(userDetails.getUserId(), potId)));
     }
 
     @DeleteMapping("/draft")

@@ -25,7 +25,7 @@ public class TilTemplateController {
     public ResponseEntity<ApiResponse<List<TilTemplateResponse>>> getTemplates(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(templateService.getTemplates(userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.success(templateService.getTemplates(userDetails.getUserId())));
     }
 
     @PostMapping
@@ -34,7 +34,7 @@ public class TilTemplateController {
             @Valid @RequestBody TilTemplateCreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(templateService.create(userDetails.getUserId(), request)));
+                .body(ApiResponse.success(templateService.create(userDetails.getUserId(), request)));
     }
 
     @DeleteMapping("/{templateId}")

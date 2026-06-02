@@ -147,13 +147,13 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("nickname 51자 → 400 유효성 검증 실패")
+    @DisplayName("nickname 21자 → 400 유효성 검증 실패 (경계값 초과)")
     void updateMe_nicknameTooLong() throws Exception {
         JwtUserDetails jwtUserDetails = new JwtUserDetails(
                 1L, "test@rootin.com",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
-        String tooLong = "a".repeat(51);
+        String tooLong = "a".repeat(21);
         String body = objectMapper.writeValueAsString(
                 new TestUserUpdateRequest(tooLong, null));
 

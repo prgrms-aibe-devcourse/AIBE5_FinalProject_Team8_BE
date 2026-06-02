@@ -22,6 +22,9 @@ public class S3Service {
     @Value("${cloud.aws.region}")
     private String region;
 
+    @Value("${cloud.aws.s3.endpoint:}")
+    private String endpoint;
+
     /**
      * S3 PUT Presigned URL을 생성한다.
      *
@@ -52,6 +55,9 @@ public class S3Service {
      * @return https://{bucket}.s3.{region}.amazonaws.com/{objectKey}
      */
     public String getFileUrl(String objectKey) {
+        if (endpoint != null && !endpoint.isBlank()) {
+            return String.format("%s/%s/%s", endpoint, bucket, objectKey);
+        }
         return String.format("https://%s.s3.%s.amazonaws.com/%s", bucket, region, objectKey);
     }
 }

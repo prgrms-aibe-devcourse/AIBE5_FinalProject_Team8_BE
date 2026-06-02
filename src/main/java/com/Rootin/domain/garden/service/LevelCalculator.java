@@ -72,36 +72,40 @@ public class LevelCalculator {
         return finalExp / 10;
     }
 
+
     /**
      * 누적 경험치(totalExp)를 기반으로 현재 화분의 최종 레벨을 산출합니다.
-     * [레벨업 정책]
-     * - 다음 레벨에 도달하기 위해 필요한 경험치 = 현재 레벨 * 100
-     * - 예) 1Lv -> 2Lv: 100 Exp 필요 (누적 100)
-     * - 예) 2Lv -> 3Lv: 200 Exp 필요 (누적 300)
-     * - 예) 3Lv -> 4Lv: 300 Exp 필요 (누적 600)
+     *
+     * [수학적 O(1) 공식 설명 - 동료 개발자 공유용]
+     * 원래는 level당 필요한 경험치(1Lv: 100, 2Lv: 200, 3Lv: 300...)를 반복해서 빼주는 O(n) 루프 방식을 사용했습니다.
+     * 레벨이 높아질수록 반복 횟수가 많아지는 부하가 있어, 이를 수학적 등차수열의 합과 근의 공식으로 치환하여 O(1)로 연산합니다.
+     *
+     * 1. n레벨(구간)까지 도달하기 위한 등차수열 기반 최소 누적 경험치 공식:
+     *    exp = 50 * n * (n + 1)
+     *
+     * 2. 양변을 전개하여 n에 대한 2차 방정식 형태로 정렬:
+     *    50*n^2 + 50*n - exp = 0  ->  n^2 + n - (exp / 50.0) = 0
+     *
+     * 3. 2차 방정식 근의 공식 [ x = (-b + sqrt(b^2 - 4ac)) / 2a ] 대입:
+     *    n = (-1.0 + sqrt(1.0 - 4.0 * 1.0 * (-totalExp / 50.0))) / 2.0
+     *    n = (-1.0 + sqrt(1.0 + 4.0 * totalExp / 50.0)) / 2.0
+     *
+     * 4. 계산된 n은 레벨 구간 중간의 실수이므로 내림(Math.floor)하여 정수로 바꾼 뒤,
+     *    최종 레벨 = n + 1로 반환합니다. (예: totalExp가 150이면 n=1.3 -> 내림 시 1 -> 최종 레벨 2Lv)
      *
      * @param totalExp 현재 화분의 전체 누적 경험치
      * @return 계산된 최종 레벨 (최소 1레벨 보장)
      */
     public int calculateLevel(int totalExp) {
-        if (totalExp < 0) {
+        if (totalExp <= 0) {
             return 1;
         }
         
-        int level = 1;
-        int remainingExp = totalExp;
+        // 근의 공식을 활용해 도달한 정수 구간 n을 계산합니다.
+        int n = (int) Math.floor((-1.0 + Math.sqrt(1.0 + 4.0 * totalExp / 50.0)) / 2.0);
         
-        while (true) {
-            int nextLevelExpRequired = level * 100;
-            if (remainingExp >= nextLevelExpRequired) {
-                remainingExp -= nextLevelExpRequired;
-                level++;
-            } else {
-                break;
-            }
-        }
-        
-        return level;
+        // n레벨 구간에 1을 더해 현재 실제 레벨로 환산합니다.
+        return n + 1;
     }
 
     /**

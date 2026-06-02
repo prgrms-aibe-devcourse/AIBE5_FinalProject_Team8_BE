@@ -60,12 +60,10 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/v1/tils/**").authenticated()
                         .requestMatchers("/api/v1/til-templates/**").authenticated()
-                        // FIXME [보안 경고]: 현재 JWT 로그인 개발 단계 이전이므로, 화분 API(/api/pots/**)를 임시로 전체 허용(permitAll)해 두었습니다.
-                        // 이는 테스트를 위한 일시적인 조치이며, 프로덕션 배포 전 반드시 적절한 인증 필터와 함께 인증된 권한(authenticated)을 요구하도록 정책을 전환해야 합니다.
-                        .requestMatchers("/api/v1/pots/*/harvest").authenticated()
-                        .requestMatchers("/api/v1/pots/**").permitAll()
 
                         // 인증(JWT)이 필요한 경로
+                        .requestMatchers("/api/v1/pots/**").authenticated()
+                        .requestMatchers("/api/v1/garden/**").authenticated()
                         .requestMatchers("/api/v1/ai/**").authenticated()
                         .requestMatchers("/api/v1/dashboard/**").authenticated()
                         .requestMatchers("/api/v1/points/**").authenticated()
@@ -150,5 +148,4 @@ public class SecurityConfig {
 
         return source;
     }
-
 }

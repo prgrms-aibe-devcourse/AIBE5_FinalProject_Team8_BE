@@ -24,7 +24,7 @@ public class DashboardController {
             @RequestParam(required = false) Integer year
     ) {
         int targetYear = (year != null) ? year : LocalDate.now().getYear();
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getGrassGraph(userDetails.getUserId(), targetYear)));
     }
 
@@ -32,7 +32,7 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<WeeklyStatsResponse>> getWeeklyStats(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getWeeklyStats(userDetails.getUserId())));
     }
 
@@ -40,7 +40,7 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<PersonalStatsResponse>> getPersonalStats(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getPersonalStats(userDetails.getUserId())));
     }
 
@@ -48,7 +48,7 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<DistributionResponse>> getDistribution(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getDistribution(userDetails.getUserId())));
     }
 
@@ -57,7 +57,7 @@ public class DashboardController {
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @RequestParam(defaultValue = "6") int months
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getInterests(userDetails.getUserId(), months)));
     }
 
@@ -65,7 +65,7 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<QuestResponse>> getQuests(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getQuests(userDetails.getUserId())));
     }
 }

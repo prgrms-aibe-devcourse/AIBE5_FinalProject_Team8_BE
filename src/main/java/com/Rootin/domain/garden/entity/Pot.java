@@ -1,6 +1,7 @@
 package com.Rootin.domain.garden.entity;
 
 import com.Rootin.global.BaseEntity;
+import com.Rootin.global.exception.CustomException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -71,5 +72,19 @@ public class Pot extends BaseEntity {
     public void updateExperienceAndLevel(int gainedExp, int nextLevel) {
         this.totalExp += gainedExp;
         this.level = nextLevel;
+    }
+
+    public void updateLayout(Boolean isDisplayed, Integer positionX, Integer positionY) {
+        this.isDisplayed = isDisplayed != null ? isDisplayed : false;
+        if (Boolean.TRUE.equals(this.isDisplayed)) {
+            if (positionX == null || positionX < 0 || positionY == null || positionY < 0) {
+                throw CustomException.badRequest("정원에 배치할 경우 좌표(positionX, positionY)는 0 이상이어야 합니다.");
+            }
+            this.positionX = positionX;
+            this.positionY = positionY;
+        } else {
+            this.positionX = null;
+            this.positionY = null;
+        }
     }
 }

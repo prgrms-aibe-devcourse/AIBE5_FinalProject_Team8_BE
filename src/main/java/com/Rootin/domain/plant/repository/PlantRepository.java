@@ -17,4 +17,13 @@ public interface PlantRepository extends JpaRepository<Plant, Long> {
     List<Plant> findByGradeAndGrowthStage(Grade grade, GrowthStage growthStage);
 
     List<Plant> findByGrowthStage(GrowthStage growthStage);
+
+    /**
+     * 식물 이름 목록에 포함된 모든 식물 데이터를 한 번에 벌크로 조회합니다.
+     * 정원(Garden) 조회 시 성장 단계별 이미지를 O(1) 인메모리 매핑으로 찾기 위해 사용됩니다.
+     *
+     * @param names 식물 이름 리스트 (예: ["해바라기", "장미"])
+     * @return 해당 이름들을 가진 모든 단계/등급의 식물 엔티티 목록
+     */
+    List<Plant> findByNameIn(List<String> names);
 }
