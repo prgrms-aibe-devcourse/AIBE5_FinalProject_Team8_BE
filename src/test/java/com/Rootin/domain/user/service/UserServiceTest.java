@@ -1,9 +1,12 @@
 package com.Rootin.domain.user.service;
 
 import com.Rootin.domain.auth.repository.RefreshTokenRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
+import com.Rootin.domain.user.entity.ENUM.Provider;
 import com.Rootin.domain.user.entity.ENUM.Role;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
@@ -33,6 +36,9 @@ class UserServiceTest {
 
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private TilRepository tilRepository;
 
     // ─── deleteUser ───────────────────────────────────────────────────────
 
@@ -70,6 +76,68 @@ class UserServiceTest {
 
     // ─── updateUserMe ─────────────────────────────────────────────────────
 
+    // ─── getUserMe ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("내 정보 조회 성공 — provider, tilCount 포함 반환")
+    void getUserMe_success() {
+        // given
+        User user = User.builder()
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .role(Role.USER)
+                .provider(Provider.LOCAL)
+                .point(100)
+                .build();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(5L);
+
+        // when
+        UserMeResponse response = userService.getUserMe(1L);
+
+        // then
+        assertThat(response.getProvider()).isEqualTo("LOCAL");
+        assertThat(response.getTilCount()).isEqualTo(5L);
+        assertThat(response.getEmail()).isEqualTo("test@rootin.com");
+        assertThat(response.getPoint()).isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("내 정보 조회 — 존재하지 않는 userId → CustomException(404)")
+    void getUserMe_userNotFound() {
+        // given
+        given(userRepository.findById(99L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> userService.getUserMe(99L))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    @DisplayName("내 정보 조회 — TIL 없는 경우 tilCount = 0")
+    void getUserMe_noTil_tilCountZero() {
+        // given
+        User user = User.builder()
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .role(Role.USER)
+                .provider(Provider.GOOGLE)
+                .build();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(0L);
+
+        // when
+        UserMeResponse response = userService.getUserMe(1L);
+
+        // then
+        assertThat(response.getTilCount()).isZero();
+        assertThat(response.getProvider()).isEqualTo("GOOGLE");
+    }
+
+    // ─── updateUserMe ─────────────────────────────────────────────────────
+
     @Test
     @DisplayName("프로필 수정 성공 — profileImageUrl 포함 시 profileImage 업데이트")
     void updateUserMe_withProfileImageUrl_success() {
@@ -79,9 +147,11 @@ class UserServiceTest {
                 .nickname("루틴이")
                 .profileImage("https://old.url/image.jpg")
                 .role(Role.USER)
+                .provider(Provider.LOCAL)
                 .build();
 
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(3L);
 
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "루틴이");
@@ -96,6 +166,7 @@ class UserServiceTest {
                 .isEqualTo("https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/1/new.jpg");
         assertThat(user.getProfileImage())
                 .isEqualTo("https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/1/new.jpg");
+        assertThat(response.getTilCount()).isEqualTo(3L);
     }
 
     @Test
@@ -108,9 +179,11 @@ class UserServiceTest {
                 .nickname("루틴이")
                 .profileImage(existingImageUrl)
                 .role(Role.USER)
+                .provider(Provider.LOCAL)
                 .build();
 
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(0L);
 
         UserUpdateRequest request = new UserUpdateRequest();
         ReflectionTestUtils.setField(request, "nickname", "루틴이");
