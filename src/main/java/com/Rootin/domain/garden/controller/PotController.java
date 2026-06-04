@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 화분 생성 및 조회를 제공하는 REST API 컨트롤러 클래스입니다.
+ * 화분 생성, 조회, 수정 및 식물 심기/교체를 제공하는 REST API 컨트롤러 클래스입니다.
  */
 @RestController
 @RequestMapping("/api/v1/pots")

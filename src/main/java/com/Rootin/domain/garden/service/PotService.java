@@ -22,14 +22,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 화분 생성 및 조회에 관련된 핵심 비즈니스 로직을 담당하는 서비스 클래스입니다.
+ * 화분 생성, 조회, 수정에 관련된 핵심 비즈니스 로직을 담당하는 서비스 클래스입니다.
  *
  * 이 클래스의 책임:
  * - 화분 생성
  * - 내 화분 목록 조회
  * - 화분 단건 조회
+ * - 화분 제목/소개글 수정
  *
  * 대시보드처럼 여러 도메인의 데이터를 조합하는 복합 조회는 GardenDashboardService로 분리했습니다.
+ * 식물 심기/교체처럼 PlantItem 선택 규칙이 포함되는 로직은 PotPlantService로 분리했습니다.
  */
 @Slf4j
 @Service

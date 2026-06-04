@@ -26,7 +26,7 @@ import java.util.List;
  * 단일 책임 원칙(SRP)을 준수하여, CRUD 중심의 PotService에서 복합 조회 책임을 분리해 설계했습니다.
  *
  * PotService:
- * - 화분 생성, 목록 조회, 단건 조회처럼 "화분 자체"의 기본 기능 담당
+ * - 화분 생성, 목록 조회, 단건 조회, 정보 수정처럼 "화분 자체"의 기본 기능 담당
  *
  * GardenDashboardService:
  * - 화분 + 식물 + TIL 통계 + 물주기 이력 + 레벨 계산 결과를 모아 화면 전용 DTO로 조립
