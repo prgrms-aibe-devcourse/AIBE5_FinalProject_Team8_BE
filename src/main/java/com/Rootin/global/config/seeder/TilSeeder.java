@@ -431,74 +431,90 @@ public class TilSeeder {
             )
     );
 
+    // ── 시드 계획 레코드 ──────────────────────────────────────────────────────
+    record MonthlyEntry(int monthsAgo, int potIdx, int charCount, String tagKey, int tilCount) {}
+    record DailyEntry(int daysAgo, int charCount, String tagKey, int streakDays) {
+        DailyEntry(int daysAgo, int charCount, String tagKey) { this(daysAgo, charCount, tagKey, 0); }
+    }
+
     // ── 월별 시드 계획 ────────────────────────────────────────────────────────
-    // {monthsAgo, pot(0=코딩,1=영어,2=독서), charCount, tagKey, tilCount}
-    private static final Object[][] MONTHLY_PLAN = {
+    private static final List<MonthlyEntry> MONTHLY_PLAN = List.of(
         // Month -12
-        {12, 0, 500, "Java",   6}, {12, 0, 600, "Spring", 3},
-        {12, 1, 400, "영어",   5}, {12, 1, 400, "문법",   3},
+        new MonthlyEntry(12, 0, 500, "Java",   6), new MonthlyEntry(12, 0, 600, "Spring", 3),
+        new MonthlyEntry(12, 1, 400, "영어",   5), new MonthlyEntry(12, 1, 400, "문법",   3),
         // Month -11
-        {11, 0, 520, "Java",   6}, {11, 0, 620, "Spring", 4},
-        {11, 1, 400, "영어",   5}, {11, 1, 400, "문법",   4},
+        new MonthlyEntry(11, 0, 520, "Java",   6), new MonthlyEntry(11, 0, 620, "Spring", 4),
+        new MonthlyEntry(11, 1, 400, "영어",   5), new MonthlyEntry(11, 1, 400, "문법",   4),
         // Month -10
-        {10, 0, 600, "Java",   5}, {10, 0, 650, "Spring", 5},
-        {10, 1, 420, "영어",   6}, {10, 1, 400, "문법",   4},
+        new MonthlyEntry(10, 0, 600, "Java",   5), new MonthlyEntry(10, 0, 650, "Spring", 5),
+        new MonthlyEntry(10, 1, 420, "영어",   6), new MonthlyEntry(10, 1, 400, "문법",   4),
         // Month -9
-        {9,  0, 600, "Java",   5}, {9,  0, 600, "Spring", 4},
-        {9,  0, 700, "React",  3}, {9,  1, 420, "영어",   6}, {9, 1, 400, "문법", 4},
+        new MonthlyEntry(9, 0, 600, "Java",   5), new MonthlyEntry(9, 0, 600, "Spring", 4),
+        new MonthlyEntry(9, 0, 700, "React",  3), new MonthlyEntry(9, 1, 420, "영어",   6),
+        new MonthlyEntry(9, 1, 400, "문법",   4),
         // Month -8
-        {8,  0, 500, "Java",   3}, {8,  0, 600, "Spring", 4},
-        {8,  0, 720, "React",  6}, {8,  1, 420, "영어",   5}, {8, 1, 400, "문법", 4},
+        new MonthlyEntry(8, 0, 500, "Java",   3), new MonthlyEntry(8, 0, 600, "Spring", 4),
+        new MonthlyEntry(8, 0, 720, "React",  6), new MonthlyEntry(8, 1, 420, "영어",   5),
+        new MonthlyEntry(8, 1, 400, "문법",   4),
         // Month -7
-        {7,  0, 500, "Java",   2}, {7,  0, 550, "Spring", 3},
-        {7,  0, 750, "React",  8}, {7,  1, 420, "영어",   5}, {7, 1, 400, "문법", 3},
+        new MonthlyEntry(7, 0, 500, "Java",   2), new MonthlyEntry(7, 0, 550, "Spring", 3),
+        new MonthlyEntry(7, 0, 750, "React",  8), new MonthlyEntry(7, 1, 420, "영어",   5),
+        new MonthlyEntry(7, 1, 400, "문법",   3),
         // Month -6
-        {6,  0, 500, "Java",   2}, {6,  0, 720, "React",  8},
-        {6,  1, 400, "영어",   5}, {6,  1, 380, "문법",   3},
+        new MonthlyEntry(6, 0, 500, "Java",   2), new MonthlyEntry(6, 0, 720, "React",  8),
+        new MonthlyEntry(6, 1, 400, "영어",   5), new MonthlyEntry(6, 1, 380, "문법",   3),
         // Month -5
-        {5,  0, 500, "Java",   2}, {5,  0, 750, "React",  9},
-        {5,  0, 820, "알고리즘", 2}, {5, 1, 400, "영어",  4}, {5, 1, 370, "문법", 3},
+        new MonthlyEntry(5, 0, 500, "Java",     2), new MonthlyEntry(5, 0, 750, "React",    9),
+        new MonthlyEntry(5, 0, 820, "알고리즘", 2), new MonthlyEntry(5, 1, 400, "영어",     4),
+        new MonthlyEntry(5, 1, 370, "문법",     3),
         // Month -4
-        {4,  0, 500, "Java",   2}, {4,  0, 760, "React",  7},
-        {4,  0, 870, "알고리즘", 5}, {4, 1, 400, "영어",  4}, {4, 1, 360, "문법", 3},
+        new MonthlyEntry(4, 0, 500, "Java",     2), new MonthlyEntry(4, 0, 760, "React",    7),
+        new MonthlyEntry(4, 0, 870, "알고리즘", 5), new MonthlyEntry(4, 1, 400, "영어",     4),
+        new MonthlyEntry(4, 1, 360, "문법",     3),
         // Month -3
-        {3,  0, 500, "Java",   2}, {3,  0, 720, "React",  5},
-        {3,  0, 900, "알고리즘", 7}, {3, 1, 400, "영어",  3}, {3, 1, 360, "문법", 3},
-        {3,  2, 500, "독서",   3},
+        new MonthlyEntry(3, 0, 500, "Java",     2), new MonthlyEntry(3, 0, 720, "React",    5),
+        new MonthlyEntry(3, 0, 900, "알고리즘", 7), new MonthlyEntry(3, 1, 400, "영어",     3),
+        new MonthlyEntry(3, 1, 360, "문법",     3), new MonthlyEntry(3, 2, 500, "독서",     3),
         // Month -2
-        {2,  0, 500, "Java",   2}, {2,  0, 720, "React",  5},
-        {2,  0, 920, "알고리즘", 8}, {2, 1, 400, "영어",  3}, {2, 1, 350, "문법", 3},
-        {2,  2, 560, "독서",   5},
+        new MonthlyEntry(2, 0, 500, "Java",     2), new MonthlyEntry(2, 0, 720, "React",    5),
+        new MonthlyEntry(2, 0, 920, "알고리즘", 8), new MonthlyEntry(2, 1, 400, "영어",     3),
+        new MonthlyEntry(2, 1, 350, "문법",     3), new MonthlyEntry(2, 2, 560, "독서",     5),
         // Month -1
-        {1,  0, 500, "Java",   2}, {1,  0, 720, "React",  5},
-        {1,  0, 940, "알고리즘", 10}, {1, 1, 400, "영어", 3}, {1, 1, 350, "문법", 2},
-        {1,  2, 600, "독서",   6},
-    };
+        new MonthlyEntry(1, 0, 500, "Java",      2), new MonthlyEntry(1, 0, 720, "React",     5),
+        new MonthlyEntry(1, 0, 940, "알고리즘", 10), new MonthlyEntry(1, 1, 400, "영어",      3),
+        new MonthlyEntry(1, 1, 350, "문법",      2), new MonthlyEntry(1, 2, 600, "독서",      6)
+    );
 
     // ── 이번 달 일별 시드 계획 ────────────────────────────────────────────────
-    // {daysAgo, charCount, tagKey, streakDays(0이면 스트릭 없음)}
-    private static final Object[][] CODING_DAYS = {
-        {29,600,"React",0},   {27,800,"알고리즘",0}, {25,500,"Java",0},
-        {23,700,"React",0},   {21,400,"Spring",0},
-        {19,900,"알고리즘",0}, {17,600,"React",0},   {15,800,"Spring",0},
-        {13,500,"Java",0},
+    private static final List<DailyEntry> CODING_DAYS = List.of(
+        new DailyEntry(29, 600, "React"),    new DailyEntry(27, 800, "알고리즘"),
+        new DailyEntry(25, 500, "Java"),     new DailyEntry(23, 700, "React"),
+        new DailyEntry(21, 400, "Spring"),   new DailyEntry(19, 900, "알고리즘"),
+        new DailyEntry(17, 600, "React"),    new DailyEntry(15, 800, "Spring"),
+        new DailyEntry(13, 500, "Java"),
         // 연속 14일 스트릭
-        {13,600,"React",1},  {12,700,"알고리즘",2}, {11,600,"Java",3},
-        {10,700,"React",4},  {9,800,"Spring",5},    {8,500,"알고리즘",6},
-        {7,900,"React",7},   {6,600,"Java",8},      {5,700,"Spring",9},
-        {4,800,"알고리즘",10},{3,650,"React",11},    {2,750,"Java",12},
-        {1,600,"Spring",13}, {0,900,"알고리즘",14},
-    };
+        new DailyEntry(13, 600, "React",    1),  new DailyEntry(12, 700, "알고리즘", 2),
+        new DailyEntry(11, 600, "Java",     3),  new DailyEntry(10, 700, "React",    4),
+        new DailyEntry(9,  800, "Spring",   5),  new DailyEntry(8,  500, "알고리즘", 6),
+        new DailyEntry(7,  900, "React",    7),  new DailyEntry(6,  600, "Java",     8),
+        new DailyEntry(5,  700, "Spring",   9),  new DailyEntry(4,  800, "알고리즘", 10),
+        new DailyEntry(3,  650, "React",   11),  new DailyEntry(2,  750, "Java",    12),
+        new DailyEntry(1,  600, "Spring",  13),  new DailyEntry(0,  900, "알고리즘", 14)
+    );
 
-    private static final Object[][] ENGLISH_DAYS = {
-        {28,400,"영어"},  {24,500,"문법"},  {20,350,"영어"},
-        {16,450,"문법"},  {12,500,"영어"},  {8,400,"문법"},
-        {5,450,"영어"},   {3,500,"문법"},   {1,380,"영어"},  {0,520,"문법"},
-    };
+    private static final List<DailyEntry> ENGLISH_DAYS = List.of(
+        new DailyEntry(28, 400, "영어"), new DailyEntry(24, 500, "문법"),
+        new DailyEntry(20, 350, "영어"), new DailyEntry(16, 450, "문법"),
+        new DailyEntry(12, 500, "영어"), new DailyEntry(8,  400, "문법"),
+        new DailyEntry(5,  450, "영어"), new DailyEntry(3,  500, "문법"),
+        new DailyEntry(1,  380, "영어"), new DailyEntry(0,  520, "문법")
+    );
 
-    private static final Object[][] READING_DAYS = {
-        {6,300,"독서"}, {3,350,"독서"}, {0,400,"독서"},
-    };
+    private static final List<DailyEntry> READING_DAYS = List.of(
+        new DailyEntry(6, 300, "독서"),
+        new DailyEntry(3, 350, "독서"),
+        new DailyEntry(0, 400, "독서")
+    );
 
     // ── 제목/본문 인덱스 순환 카운터 ─────────────────────────────────────────
     private final Map<String, Integer> titleIdx = new java.util.HashMap<>();
@@ -526,73 +542,57 @@ public class TilSeeder {
         );
 
         // ── 월별 데이터 ────────────────────────────────────────────────────
-        for (Object[] row : MONTHLY_PLAN) {
-            int monthsAgo = (int) row[0];
-            int potIdx    = (int) row[1];
-            int charCount = (int) row[2];
-            String tagKey = (String) row[3];
-            int count     = (int) row[4];
-
-            Tag tag = tags.get(tagKey);
-            Pot pot = pots[potIdx];
-            int exp   = calcExp(charCount);
+        for (MonthlyEntry row : MONTHLY_PLAN) {
+            Tag tag = tags.get(row.tagKey());
+            Pot pot = pots[row.potIdx()];
+            int exp   = calcExp(row.charCount());
             int point = exp / 10;
-            LocalDate base = today.minusMonths(monthsAgo).withDayOfMonth(1);
+            LocalDate base = today.minusMonths(row.monthsAgo()).withDayOfMonth(1);
 
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < row.tilCount(); i++) {
                 LocalDate date = base.plusDays(Math.min(i * 2, 26));
-                int before = potExp[potIdx];
-                potExp[potIdx] += exp;
-                saveTil(user, pot, tag, charCount, exp, point, 0, 1.0,
-                        before, potExp[potIdx], date.atTime(21, 0));
+                int before = potExp[row.potIdx()];
+                potExp[row.potIdx()] += exp;
+                saveTil(user, pot, tag, row.charCount(), exp, point, 0, 1.0,
+                        before, potExp[row.potIdx()], date.atTime(21, 0));
             }
         }
 
         // ── 이번 달 코딩 ──────────────────────────────────────────────────
         int curCodingExp = 0;
-        for (Object[] d : CODING_DAYS) {
-            int daysAgo   = (int) d[0];
-            int charCount = (int) d[1];
-            String tagKey = (String) d[2];
-            int streakDays = (int) d[3];
-            double mult = 1.0 + Math.min(streakDays * 0.05, 0.5);
-            int exp   = (int) Math.floor(calcExp(charCount) * mult);
+        for (DailyEntry d : CODING_DAYS) {
+            double mult = 1.0 + Math.min(d.streakDays() * 0.05, 0.5);
+            int exp   = (int) Math.floor(calcExp(d.charCount()) * mult);
             int point = exp / 10;
             int before = potExp[0] + curCodingExp;
             curCodingExp += exp;
-            saveTil(user, codingPot, tags.get(tagKey), charCount, exp, point,
-                    streakDays, mult, before, before + exp,
-                    today.minusDays(daysAgo).atTime(21, 0));
+            saveTil(user, codingPot, tags.get(d.tagKey()), d.charCount(), exp, point,
+                    d.streakDays(), mult, before, before + exp,
+                    today.minusDays(d.daysAgo()).atTime(21, 0));
         }
 
         // ── 이번 달 영어 ──────────────────────────────────────────────────
         int curEnglishExp = 0;
-        for (Object[] d : ENGLISH_DAYS) {
-            int daysAgo   = (int) d[0];
-            int charCount = (int) d[1];
-            String tagKey = (String) d[2];
-            int exp   = calcExp(charCount);
+        for (DailyEntry d : ENGLISH_DAYS) {
+            int exp   = calcExp(d.charCount());
             int point = exp / 10;
             int before = potExp[1] + curEnglishExp;
             curEnglishExp += exp;
-            saveTil(user, englishPot, tags.get(tagKey), charCount, exp, point,
+            saveTil(user, englishPot, tags.get(d.tagKey()), d.charCount(), exp, point,
                     0, 1.0, before, before + exp,
-                    today.minusDays(daysAgo).atTime(20, 0));
+                    today.minusDays(d.daysAgo()).atTime(20, 0));
         }
 
         // ── 이번 달 독서 ──────────────────────────────────────────────────
         int curReadingExp = 0;
-        for (Object[] d : READING_DAYS) {
-            int daysAgo   = (int) d[0];
-            int charCount = (int) d[1];
-            String tagKey = (String) d[2];
-            int exp   = calcExp(charCount);
+        for (DailyEntry d : READING_DAYS) {
+            int exp   = calcExp(d.charCount());
             int point = exp / 10;
             int before = potExp[2] + curReadingExp;
             curReadingExp += exp;
-            saveTil(user, readingPot, tags.get(tagKey), charCount, exp, point,
+            saveTil(user, readingPot, tags.get(d.tagKey()), d.charCount(), exp, point,
                     0, 1.0, before, before + exp,
-                    today.minusDays(daysAgo).atTime(19, 0));
+                    today.minusDays(d.daysAgo()).atTime(19, 0));
         }
 
         // ── 임시저장 초안 ─────────────────────────────────────────────────
