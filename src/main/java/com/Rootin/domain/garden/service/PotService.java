@@ -3,6 +3,7 @@ package com.Rootin.domain.garden.service;
 import com.Rootin.domain.garden.dto.PotCreateRequest;
 import com.Rootin.domain.garden.dto.PotResponse;
 import com.Rootin.domain.garden.dto.PotSummaryResponse;
+import com.Rootin.domain.garden.dto.PotUpdateRequest;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
@@ -174,6 +175,21 @@ public class PotService {
         if (!pot.getUserId().equals(userId)) {
             throw CustomException.forbidden("해당 화분에 접근할 권한이 없습니다.");
         }
+
+        return PotResponse.from(pot);
+    }
+
+    @Transactional
+    public PotResponse updatePot(Long potId, Long userId, PotUpdateRequest request) {
+        Pot pot = potRepository.findById(potId)
+                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+
+        if (!pot.getUserId().equals(userId)) {
+            throw CustomException.forbidden("해당 화분을 수정할 권한이 없습니다.");
+        }
+
+        pot.updateInfo(request.getTitle().trim(),
+                request.getDescription() != null ? request.getDescription().trim() : null);
 
         return PotResponse.from(pot);
     }

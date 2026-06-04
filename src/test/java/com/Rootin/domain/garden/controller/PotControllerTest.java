@@ -1,11 +1,18 @@
 package com.Rootin.domain.garden.controller;
 
 import com.Rootin.domain.garden.dto.GardenInfoResponse;
+import com.Rootin.domain.garden.dto.PlantOptionResponse;
 import com.Rootin.domain.garden.dto.PlantInfoResponse;
+import com.Rootin.domain.garden.dto.PotPlantOptionsResponse;
+import com.Rootin.domain.garden.dto.PotPlantRequest;
+import com.Rootin.domain.garden.dto.PotPlantResponse;
 import com.Rootin.domain.garden.dto.PotCreateRequest;
 import com.Rootin.domain.garden.dto.PotResponse;
 import com.Rootin.domain.garden.dto.PotSummaryResponse;
+import com.Rootin.domain.garden.dto.PotUpdateRequest;
+import com.Rootin.domain.garden.dto.PlantingType;
 import com.Rootin.domain.garden.service.GardenDashboardService;
+import com.Rootin.domain.garden.service.PotPlantService;
 import com.Rootin.domain.garden.service.PotService;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.global.jwt.JwtUserDetails;
@@ -28,6 +35,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +56,9 @@ class PotControllerTest {
 
     @MockBean
     private GardenDashboardService gardenDashboardService;
+
+    @MockBean
+    private PotPlantService potPlantService;
 
     private JwtUserDetails userDetails;
 
@@ -136,6 +147,62 @@ class PotControllerTest {
     }
 
     @Test
+    @DisplayName("화분 수정 API 호출 시 200 OK와 수정된 화분 정보를 반환한다")
+    void updatePotSuccess() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+        String requestJson = """
+                {
+                  "title": "수정된 화분",
+                  "description": "수정된 소개글"
+                }
+                """;
+        PotResponse response = PotResponse.builder()
+                .id(potId)
+                .title("수정된 화분")
+                .description("수정된 소개글")
+                .level(2)
+                .totalExp(150)
+                .isDisplayed(false)
+                .build();
+
+        given(potService.updatePot(eq(potId), eq(userId), any(PotUpdateRequest.class))).willReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(potId))
+                .andExpect(jsonPath("$.title").value("수정된 화분"))
+                .andExpect(jsonPath("$.description").value("수정된 소개글"))
+                .andExpect(jsonPath("$.level").value(2))
+                .andExpect(jsonPath("$.totalExp").value(150));
+    }
+
+    @Test
+    @DisplayName("화분 수정 API 호출 시 제목이 비어있으면 400 Bad Request 에러를 반환한다")
+    void updatePotValidationFail() throws Exception {
+        // given
+        Long potId = 10L;
+        String requestJson = """
+                {
+                  "title": "",
+                  "description": "수정된 소개글"
+                }
+                """;
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("화분 대시보드 API 호출 시 200 OK와 상세 정보 조립 결과를 반환한다")
     void getGardenDashboardSuccess() throws Exception {
         // given
@@ -205,5 +272,86 @@ class PotControllerTest {
         mockMvc.perform(get("/api/v1/pots/{potId}/dashboard", potId)
                         .with(user(otherUserDetails)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("화분에 심을 식물 선택지 조회 API 호출 시 현재 식물과 수확 식물 목록을 반환한다")
+    void getPlantOptionsSuccess() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+
+        PotPlantResponse currentPlant = new PotPlantResponse(
+                potId,
+                100L,
+                1L,
+                "기본 씨앗",
+                "common",
+                GrowthStage.SEED,
+                0
+        );
+        PlantOptionResponse harvestedPlant = new PlantOptionResponse(
+                200L,
+                2L,
+                "버섯씨앗",
+                "common",
+                "http://mushroom.image",
+                8,
+                java.time.LocalDateTime.of(2026, 6, 1, 10, 0)
+        );
+        PotPlantOptionsResponse response = new PotPlantOptionsResponse(
+                potId,
+                true,
+                null,
+                true,
+                currentPlant,
+                List.of(harvestedPlant)
+        );
+
+        given(potPlantService.getPlantOptions(userId, potId)).willReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/pots/{potId}/plant-options", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.potId").value(potId))
+                .andExpect(jsonPath("$.canPlant").value(true))
+                .andExpect(jsonPath("$.randomSeedAvailable").value(true))
+                .andExpect(jsonPath("$.currentPlant.plantName").value("기본 씨앗"))
+                .andExpect(jsonPath("$.harvestedPlants[0].sourcePlantItemId").value(200L))
+                .andExpect(jsonPath("$.harvestedPlants[0].plantName").value("버섯씨앗"));
+    }
+
+    @Test
+    @DisplayName("화분에 새 식물 심기 API 호출 시 200 OK와 심어진 식물 정보를 반환한다")
+    void plantSuccess() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+        PotPlantRequest request = new PotPlantRequest(PlantingType.RANDOM_SEED, null);
+        PotPlantResponse response = new PotPlantResponse(
+                potId,
+                101L,
+                3L,
+                "달빛씨앗",
+                "rare",
+                GrowthStage.SEED,
+                0
+        );
+
+        given(potPlantService.plant(eq(userId), eq(potId), any(PotPlantRequest.class))).willReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}/plant", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.potId").value(potId))
+                .andExpect(jsonPath("$.plantItemId").value(101L))
+                .andExpect(jsonPath("$.plantName").value("달빛씨앗"))
+                .andExpect(jsonPath("$.rarity").value("rare"))
+                .andExpect(jsonPath("$.growthStage").value("SEED"))
+                .andExpect(jsonPath("$.growthExp").value(0));
     }
 }
