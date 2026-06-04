@@ -29,6 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -184,6 +186,41 @@ class PotServiceTest {
         assertThatCode(() -> potService.getPots(userId)).doesNotThrowAnyException();
         assertThatCode(() -> gardenDashboardService.getGardenDashboard(createdPot.getId(), userId))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("화분 목록 조회 시 화분별 PUBLISHED TIL 개수(tilCount)가 정확히 집계된다")
+    void getPotsIncludesTilCount() {
+        // given
+        User user = User.builder()
+                .email("tilcount@rootin.com")
+                .nickname("틸카운터")
+                .build();
+        userRepository.save(user);
+        Long userId = user.getId();
+
+        PotResponse pot1 = potService.createPot(userId, PotCreateRequest.builder().title("화분A").build());
+        PotResponse pot2 = potService.createPot(userId, PotCreateRequest.builder().title("화분B").build());
+
+        Pot potEntity1 = potRepository.findById(pot1.getId()).orElseThrow();
+        Pot potEntity2 = potRepository.findById(pot2.getId()).orElseThrow();
+
+        // 화분A에 PUBLISHED TIL 2건 저장
+        Til til1 = Til.create(user, "제목1", "내용1", potEntity1);
+        Til til2 = Til.create(user, "제목2", "내용2", potEntity1);
+        tilRepository.save(til1);
+        tilRepository.save(til2);
+
+        // 화분B에는 TIL 없음
+
+        // when
+        List<PotSummaryResponse> result = potService.getPots(userId);
+        Map<Long, Integer> tilCountById = result.stream()
+                .collect(Collectors.toMap(PotSummaryResponse::id, PotSummaryResponse::tilCount));
+
+        // then
+        assertThat(tilCountById.get(pot1.getId())).isEqualTo(2);
+        assertThat(tilCountById.get(pot2.getId())).isEqualTo(0);
     }
 
     @Test
