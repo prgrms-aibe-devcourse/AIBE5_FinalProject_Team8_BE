@@ -45,5 +45,10 @@ public record PotSummaryResponse(
     /**
      * 식물의 현재 성장 단계 (SEED, SPROUT 등)
      */
-    GrowthStage growthStage
+    GrowthStage growthStage,
+
+    /**
+     * 화분에 작성된 PUBLISHED 상태 TIL 총 개수
+     */
+    int tilCount
 ) {}
