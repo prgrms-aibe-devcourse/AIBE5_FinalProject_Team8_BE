@@ -5,6 +5,8 @@ import com.Rootin.domain.til.entity.Til;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.List;
@@ -36,6 +38,17 @@ public interface TilRepository extends JpaRepository<Til, Long> {
      * @return 발행 완료된 TIL 개수
      */
     long countByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
+
+    /**
+     * 화분 ID 목록에 속하는 PUBLISHED TIL 수를 화분별로 벌크 집계합니다.
+     * getPots() 목록 조회 시 N+1 없이 tilCount를 한 번에 조회하기 위해 사용됩니다.
+     *
+     * @param potIds  조회할 화분 ID 목록
+     * @param status  게시글 상태 (예: PostStatus.PUBLISHED)
+     * @return [potId, count] 형태의 Object[] 목록
+     */
+    @Query("SELECT t.pot.id, COUNT(t) FROM Til t WHERE t.pot.id IN :potIds AND t.status = :status GROUP BY t.pot.id")
+    List<Object[]> countByPotIdInAndStatus(@Param("potIds") List<Long> potIds, @Param("status") PostStatus status);
 
     // 총 TIL 개수
     long countByUserIdAndStatus(Long userId, PostStatus status);
