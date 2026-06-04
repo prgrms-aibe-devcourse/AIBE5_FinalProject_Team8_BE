@@ -7,9 +7,9 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 
 /**
- * 사용자님이 공유해주신 schema.md 속 'pot' 테이블의 전체 컬럼 구조를 온전히 리턴하기 위한 응답 DTO입니다.
- * id, user_id, title, description, level, total_exp, is_displayed, position_x, position_y, created_at
- * 컬럼들과 1:1로 정확하게 매핑됩니다.
+ * 클라이언트에 노출할 화분 기본 정보를 담는 응답 DTO입니다.
+ * user_id는 소유권 검증용 내부 값이므로 응답에 포함하지 않고,
+ * 화면에 필요한 id, title, description, level, totalExp, 배치 정보, 생성일만 내려줍니다.
  */
 @Getter
 public class PotResponse {

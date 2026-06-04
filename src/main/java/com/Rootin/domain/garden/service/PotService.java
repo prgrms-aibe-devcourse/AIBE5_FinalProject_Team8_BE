@@ -3,6 +3,7 @@ package com.Rootin.domain.garden.service;
 import com.Rootin.domain.garden.dto.PotCreateRequest;
 import com.Rootin.domain.garden.dto.PotResponse;
 import com.Rootin.domain.garden.dto.PotSummaryResponse;
+import com.Rootin.domain.garden.dto.PotUpdateRequest;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
@@ -21,14 +22,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 화분 생성 및 조회에 관련된 핵심 비즈니스 로직을 담당하는 서비스 클래스입니다.
+ * 화분 생성, 조회, 수정에 관련된 핵심 비즈니스 로직을 담당하는 서비스 클래스입니다.
  *
  * 이 클래스의 책임:
  * - 화분 생성
  * - 내 화분 목록 조회
  * - 화분 단건 조회
+ * - 화분 제목/소개글 수정
  *
  * 대시보드처럼 여러 도메인의 데이터를 조합하는 복합 조회는 GardenDashboardService로 분리했습니다.
+ * 식물 심기/교체처럼 PlantItem 선택 규칙이 포함되는 로직은 PotPlantService로 분리했습니다.
  */
 @Slf4j
 @Service
@@ -174,6 +177,21 @@ public class PotService {
         if (!pot.getUserId().equals(userId)) {
             throw CustomException.forbidden("해당 화분에 접근할 권한이 없습니다.");
         }
+
+        return PotResponse.from(pot);
+    }
+
+    @Transactional
+    public PotResponse updatePot(Long potId, Long userId, PotUpdateRequest request) {
+        Pot pot = potRepository.findById(potId)
+                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+
+        if (!pot.getUserId().equals(userId)) {
+            throw CustomException.forbidden("해당 화분을 수정할 권한이 없습니다.");
+        }
+
+        pot.updateInfo(request.getTitle().trim(),
+                request.getDescription() != null ? request.getDescription().trim() : null);
 
         return PotResponse.from(pot);
     }
