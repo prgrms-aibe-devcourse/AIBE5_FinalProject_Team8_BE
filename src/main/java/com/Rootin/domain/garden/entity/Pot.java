@@ -74,6 +74,11 @@ public class Pot extends BaseEntity {
         this.level = nextLevel;
     }
 
+    public void updateInfo(String title, String description) {
+        this.title = title;
+        this.description = description;
+    }
+
     public void updateLayout(Boolean isDisplayed, Integer positionX, Integer positionY) {
         this.isDisplayed = isDisplayed != null ? isDisplayed : false;
         if (Boolean.TRUE.equals(this.isDisplayed)) {

@@ -25,8 +25,6 @@ public class AiController {
     /**
      * POST /ai/summary
      * 작성된 TIL을 OpenAI로 요약 — 포인트 {@code SUMMARY_POINT_COST}점 차감
-     * <p>
-     * TODO : JWT 필터에서 @AuthenticationPrincipal로 User 엔티티 주입 필요
      *
      * @return 200 요약 성공 / 402 포인트 부족 / 403 타인 TIL / 404 TIL 미존재
      */
@@ -41,8 +39,6 @@ public class AiController {
     /**
      * POST /ai/quiz
      * 작성된 TIL을 기반으로 복습 문제 생성 — count × {@code QUIZ_POINT_COST_PER_QUESTION}점 차감
-     * <p>
-     * TODO : JWT 필터에서 @AuthenticationPrincipal로 User 엔티티 주입 필요
      *
      * @return 200 생성 성공 / 400 count 범위 초과 / 402 포인트 부족 / 403 타인 TIL / 404 TIL 미존재
      */
