@@ -12,6 +12,8 @@ import com.Rootin.domain.plant.entity.Plant;
 import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +47,7 @@ public class PotService {
     private final PotRepository potRepository;
     private final PlantItemRepository plantItemRepository;
     private final PlantRepository plantRepository;
+    private final TilRepository tilRepository;
     private final LevelCalculator levelCalculator;
 
     /**
@@ -92,7 +96,7 @@ public class PotService {
     /**
      * 특정 사용자가 보유한 모든 화분 목록을 요약 정보(PotSummaryResponse) DTO 목록으로 조회합니다.
      * 목록 화면에 필요한 화분의 경험치/레벨, 그리고 심겨진 식물의 이름 및 현재 성장 단계를 계산하여 제공합니다.
-     * [성능 튜닝]: IN 절 쿼리와 메모리 내 Map 조립을 통해 2N+1번 발생하는 DB 조회를 단 3번으로 최적화하여 N+1 성능 이슈를 예방합니다.
+     * [성능 튜닝]: IN 절 쿼리와 메모리 내 Map 조립을 통해 2N+1번 발생하는 DB 조회를 단 4번으로 최적화하여 N+1 성능 이슈를 예방합니다.
      *
      * @param userId 사용자 ID
      * @return 요약된 화분 정보 목록
@@ -127,7 +131,15 @@ public class PotService {
                     .collect(Collectors.toMap(Plant::getId, java.util.function.Function.identity()));
         }
 
-        // 3. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
+        // 3. 화분 ID 목록으로 PUBLISHED TIL 수를 화분별로 벌크 집계합니다. (쿼리 1회)
+        Map<Long, Integer> tilCountMap = tilRepository.countByPotIdInAndStatus(potIds, PostStatus.PUBLISHED)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> ((Long) row[1]).intValue()
+                ));
+
+        // 4. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
         final java.util.Map<Long, Plant> finalPlantMap = plantMap;
         return pots.stream()
                 .map(pot -> {
@@ -160,7 +172,8 @@ public class PotService {
                             // 방지하기 위해 Boolean.TRUE.equals()를 사용하여 안전하게 기본값 false로 언박싱 변환합니다.
                             Boolean.TRUE.equals(pot.getIsDisplayed()),
                             plantName,
-                            growthStage
+                            growthStage,
+                            tilCountMap.getOrDefault(pot.getId(), 0)
                     );
                 })
                 .collect(Collectors.toList());
