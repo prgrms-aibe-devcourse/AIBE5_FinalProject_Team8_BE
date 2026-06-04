@@ -45,10 +45,10 @@ public interface TilRepository extends JpaRepository<Til, Long> {
      *
      * @param potIds  조회할 화분 ID 목록
      * @param status  게시글 상태 (예: PostStatus.PUBLISHED)
-     * @return [potId, count] 형태의 Object[] 목록
+     * @return potId, tilCount 필드를 가진 PotTilCountProjection 목록
      */
-    @Query("SELECT t.pot.id, COUNT(t) FROM Til t WHERE t.pot.id IN :potIds AND t.status = :status GROUP BY t.pot.id")
-    List<Object[]> countByPotIdInAndStatus(@Param("potIds") List<Long> potIds, @Param("status") PostStatus status);
+    @Query("SELECT t.pot.id AS potId, COUNT(t) AS tilCount FROM Til t WHERE t.pot.id IN :potIds AND t.status = :status GROUP BY t.pot.id")
+    List<PotTilCountProjection> countByPotIdInAndStatus(@Param("potIds") List<Long> potIds, @Param("status") PostStatus status);
 
     // 총 TIL 개수
     long countByUserIdAndStatus(Long userId, PostStatus status);
