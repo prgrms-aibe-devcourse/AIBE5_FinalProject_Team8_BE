@@ -132,7 +132,8 @@ class PotControllerTest {
                 0,
                 true,
                 "기본 씨앗",
-                GrowthStage.SEED
+                GrowthStage.SEED,
+                0
         );
 
         given(potService.getPots(userId)).willReturn(List.of(response));
