@@ -13,6 +13,7 @@ import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
 import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.repository.PotTilCountProjection;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -135,8 +136,8 @@ public class PotService {
         Map<Long, Integer> tilCountMap = tilRepository.countByPotIdInAndStatus(potIds, PostStatus.PUBLISHED)
                 .stream()
                 .collect(Collectors.toMap(
-                        row -> (Long) row[0],
-                        row -> ((Long) row[1]).intValue()
+                        PotTilCountProjection::getPotId,
+                        proj -> proj.getTilCount().intValue()
                 ));
 
         // 4. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
