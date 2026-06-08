@@ -259,31 +259,8 @@ class UserServiceTest {
                 .hasMessageContaining("현재 비밀번호가 일치하지 않습니다.");
     }
 
-    @Test
-    @DisplayName("비밀번호 변경 — 새 비밀번호 불일치 → CustomException(400)")
-    void changePassword_newPasswordConfirmMismatch_throws() {
-        // given
-        User user = User.builder()
-                .email("test@rootin.com")
-                .nickname("루틴이")
-                .role(Role.USER)
-                .provider(Provider.LOCAL)
-                .password("encoded_current")
-                .build();
-
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(passwordEncoder.matches("currentPw123!", "encoded_current")).willReturn(true);
-
-        PasswordChangeRequest request = new PasswordChangeRequest();
-        ReflectionTestUtils.setField(request, "currentPassword", "currentPw123!");
-        ReflectionTestUtils.setField(request, "newPassword", "newPw123!");
-        ReflectionTestUtils.setField(request, "confirmPassword", "differentPw123!");
-
-        // when & then
-        assertThatThrownBy(() -> userService.changePassword(1L, request))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
-    }
+    // 새 비밀번호 불일치 검증은 PasswordChangeRequest.isNewPasswordConfirmed() (@AssertTrue) 에서 처리
+    // → 서비스 레벨 테스트 불필요, 컨트롤러 통합 테스트에서 검증할 것
 
     @Test
     @DisplayName("비밀번호 변경 — 소셜 로그인 유저(GOOGLE) → CustomException(403)")
