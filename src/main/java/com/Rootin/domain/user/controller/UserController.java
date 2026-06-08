@@ -1,5 +1,6 @@
 package com.Rootin.domain.user.controller;
 
+import com.Rootin.domain.user.dto.PasswordChangeRequest;
 import com.Rootin.domain.user.dto.PresignedUrlResponse;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
@@ -67,6 +68,18 @@ public class UserController {
         }
         UserMeResponse response = userService.updateUserMe(userDetails.getUserId(), request);
         return ResponseEntity.ok(ApiResponse.success("프로필 수정 성공", response));
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal JwtUserDetails userDetails,
+            @Valid @RequestBody PasswordChangeRequest request
+    ) {
+        if (userDetails == null) {
+            throw CustomException.badRequest("로그인한 사용자 정보가 없습니다.");
+        }
+        userService.changePassword(userDetails.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.success("비밀번호가 변경되었습니다.", null));
     }
 
     /**
