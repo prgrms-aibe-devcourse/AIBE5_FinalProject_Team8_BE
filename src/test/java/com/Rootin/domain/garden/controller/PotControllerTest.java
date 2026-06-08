@@ -120,6 +120,40 @@ class PotControllerTest {
     }
 
     @Test
+    @DisplayName("화분 생성 API 호출 시 제목이 10자를 초과하면 400 Bad Request 에러를 반환한다")
+    void createPotTitleLengthValidationFail() throws Exception {
+        // given
+        PotCreateRequest request = PotCreateRequest.builder()
+                .title("12345678901")
+                .description("소개글")
+                .build();
+
+        // when & then
+        mockMvc.perform(post("/api/v1/pots")
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("화분 생성 API 호출 시 소개글이 25자를 초과하면 400 Bad Request 에러를 반환한다")
+    void createPotDescriptionLengthValidationFail() throws Exception {
+        // given
+        PotCreateRequest request = PotCreateRequest.builder()
+                .title("자바화분")
+                .description("12345678901234567890123456")
+                .build();
+
+        // when & then
+        mockMvc.perform(post("/api/v1/pots")
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("로그인한 유저의 화분 목록을 조회하면 200 OK와 리스트를 반환한다")
     void getPotsSuccess() throws Exception {
         // given
@@ -192,6 +226,46 @@ class PotControllerTest {
                 {
                   "title": "",
                   "description": "수정된 소개글"
+                }
+                """;
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("화분 수정 API 호출 시 제목이 10자를 초과하면 400 Bad Request 에러를 반환한다")
+    void updatePotTitleLengthValidationFail() throws Exception {
+        // given
+        Long potId = 10L;
+        String requestJson = """
+                {
+                  "title": "12345678901",
+                  "description": "수정된 소개글"
+                }
+                """;
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("화분 수정 API 호출 시 소개글이 25자를 초과하면 400 Bad Request 에러를 반환한다")
+    void updatePotDescriptionLengthValidationFail() throws Exception {
+        // given
+        Long potId = 10L;
+        String requestJson = """
+                {
+                  "title": "수정화분",
+                  "description": "12345678901234567890123456"
                 }
                 """;
 
