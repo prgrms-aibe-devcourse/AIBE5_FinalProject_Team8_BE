@@ -3,6 +3,7 @@ package com.Rootin.domain.user.service;
 import com.Rootin.domain.auth.repository.RefreshTokenRepository;
 import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.repository.TilRepository;
+import com.Rootin.domain.user.dto.PasswordChangeRequest;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
@@ -39,6 +41,9 @@ class UserServiceTest {
 
     @Mock
     private TilRepository tilRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     // ─── deleteUser ───────────────────────────────────────────────────────
 
@@ -196,6 +201,112 @@ class UserServiceTest {
         // then
         assertThat(response.getProfileImageUrl()).isEqualTo(existingImageUrl);
         assertThat(user.getProfileImage()).isEqualTo(existingImageUrl);
+    }
+
+    // ─── changePassword ───────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("비밀번호 변경 성공 — 현재 비밀번호 검증 후 새 비밀번호로 업데이트")
+    void changePassword_success() {
+        // given
+        User user = User.builder()
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .role(Role.USER)
+                .provider(Provider.LOCAL)
+                .password("encoded_current")
+                .build();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("currentPw123!", "encoded_current")).willReturn(true);
+        given(passwordEncoder.encode("newPw123!")).willReturn("encoded_new");
+
+        PasswordChangeRequest request = new PasswordChangeRequest();
+        ReflectionTestUtils.setField(request, "currentPassword", "currentPw123!");
+        ReflectionTestUtils.setField(request, "newPassword", "newPw123!");
+        ReflectionTestUtils.setField(request, "confirmPassword", "newPw123!");
+
+        // when
+        userService.changePassword(1L, request);
+
+        // then
+        assertThat(user.getPassword()).isEqualTo("encoded_new");
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 — 현재 비밀번호 불일치 → CustomException(400)")
+    void changePassword_currentPasswordMismatch_throws() {
+        // given
+        User user = User.builder()
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .role(Role.USER)
+                .provider(Provider.LOCAL)
+                .password("encoded_current")
+                .build();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("wrongPw!", "encoded_current")).willReturn(false);
+
+        PasswordChangeRequest request = new PasswordChangeRequest();
+        ReflectionTestUtils.setField(request, "currentPassword", "wrongPw!");
+        ReflectionTestUtils.setField(request, "newPassword", "newPw123!");
+        ReflectionTestUtils.setField(request, "confirmPassword", "newPw123!");
+
+        // when & then
+        assertThatThrownBy(() -> userService.changePassword(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining("현재 비밀번호가 일치하지 않습니다.");
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 — 새 비밀번호 불일치 → CustomException(400)")
+    void changePassword_newPasswordConfirmMismatch_throws() {
+        // given
+        User user = User.builder()
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .role(Role.USER)
+                .provider(Provider.LOCAL)
+                .password("encoded_current")
+                .build();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("currentPw123!", "encoded_current")).willReturn(true);
+
+        PasswordChangeRequest request = new PasswordChangeRequest();
+        ReflectionTestUtils.setField(request, "currentPassword", "currentPw123!");
+        ReflectionTestUtils.setField(request, "newPassword", "newPw123!");
+        ReflectionTestUtils.setField(request, "confirmPassword", "differentPw123!");
+
+        // when & then
+        assertThatThrownBy(() -> userService.changePassword(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 — 소셜 로그인 유저(GOOGLE) → CustomException(403)")
+    void changePassword_googleUser_throws() {
+        // given
+        User user = User.builder()
+                .email("google@rootin.com")
+                .nickname("구글유저")
+                .role(Role.USER)
+                .provider(Provider.GOOGLE)
+                .build();
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        PasswordChangeRequest request = new PasswordChangeRequest();
+        ReflectionTestUtils.setField(request, "currentPassword", "currentPw123!");
+        ReflectionTestUtils.setField(request, "newPassword", "newPw123!");
+        ReflectionTestUtils.setField(request, "confirmPassword", "newPw123!");
+
+        // when & then
+        assertThatThrownBy(() -> userService.changePassword(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.");
     }
 
     @Test
