@@ -1,5 +1,6 @@
 package com.Rootin.domain.user.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -20,4 +21,9 @@ public class PasswordChangeRequest {
 
     @NotBlank(message = "비밀번호 확인은 필수입니다.")
     private String confirmPassword;
+
+    @AssertTrue(message = "새 비밀번호와 확인 비밀번호가 일치하지 않습니다.")
+    public boolean isNewPasswordConfirmed() {
+        return newPassword != null && newPassword.equals(confirmPassword);
+    }
 }
