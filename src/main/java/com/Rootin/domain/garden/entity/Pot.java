@@ -8,6 +8,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import static com.Rootin.domain.garden.constant.PotPolicy.DESCRIPTION_MAX_LENGTH;
+import static com.Rootin.domain.garden.constant.PotPolicy.TITLE_MAX_LENGTH;
+
 /**
  * 사용자가 생성한 '화분(폴더)' 정보를 담는 엔티티 클래스입니다.
  * BaseEntity를 상속받아 생성시간(created_at)을 자동으로 상속받아 로깅합니다.
@@ -26,10 +29,10 @@ public class Pot extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "title", nullable = false, length = 100)
+    @Column(name = "title", nullable = false, length = TITLE_MAX_LENGTH)
     private String title;
 
-    @Column(name = "description", length = 255)
+    @Column(name = "description", length = DESCRIPTION_MAX_LENGTH)
     private String description;
 
     @Column(name = "level", nullable = false)

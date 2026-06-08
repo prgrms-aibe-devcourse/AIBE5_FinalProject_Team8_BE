@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -119,6 +121,27 @@ class PotControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "12345678901, 소개글",
+            "자바화분, 12345678901234567890123456"
+    })
+    @DisplayName("화분 생성 API 호출 시 제목 또는 소개글 길이 검증에 실패하면 400 Bad Request 에러를 반환한다")
+    void createPotLengthValidationFail(String title, String description) throws Exception {
+        // given
+        PotCreateRequest request = PotCreateRequest.builder()
+                .title(title)
+                .description(description)
+                .build();
+
+        // when & then
+        mockMvc.perform(post("/api/v1/pots")
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     @DisplayName("로그인한 유저의 화분 목록을 조회하면 200 OK와 리스트를 반환한다")
     void getPotsSuccess() throws Exception {
@@ -194,6 +217,27 @@ class PotControllerTest {
                   "description": "수정된 소개글"
                 }
                 """;
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "12345678901, 수정된 소개글",
+            "수정화분, 12345678901234567890123456"
+    })
+    @DisplayName("화분 수정 API 호출 시 제목 또는 소개글 길이 검증에 실패하면 400 Bad Request 에러를 반환한다")
+    void updatePotLengthValidationFail(String title, String description) throws Exception {
+        // given
+        Long potId = 10L;
+        String requestJson = objectMapper.writeValueAsString(
+                java.util.Map.of("title", title, "description", description)
+        );
 
         // when & then
         mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
