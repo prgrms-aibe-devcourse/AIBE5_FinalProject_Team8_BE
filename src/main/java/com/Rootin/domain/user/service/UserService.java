@@ -3,13 +3,16 @@ package com.Rootin.domain.user.service;
 import com.Rootin.domain.auth.repository.RefreshTokenRepository;
 import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.repository.TilRepository;
+import com.Rootin.domain.user.dto.PasswordChangeRequest;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
+import com.Rootin.domain.user.entity.ENUM.Provider;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final TilRepository tilRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 인증된 유저의 기본 정보를 반환한다.
@@ -56,6 +60,39 @@ public class UserService {
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
         user.deactivate();
         refreshTokenRepository.deleteByUserId(userId);
+    }
+
+    /**
+     * 비밀번호 변경
+     *
+     * 처리 흐름:
+     *   1. userId로 유저 조회
+     *   2. 소셜 로그인(GOOGLE) 유저는 변경 불가 — 403 반환
+     *   3. 현재 비밀번호 BCrypt 검증 — 불일치 시 400 반환
+     *   4. newPassword / confirmPassword 일치 확인 — 불일치 시 400 반환
+     *   5. 새 비밀번호 encode 후 저장
+     *
+     * @param userId  JWT 클레임에서 추출한 사용자 ID
+     * @param request 현재 비밀번호, 새 비밀번호, 확인 비밀번호
+     */
+    @Transactional
+    public void changePassword(Long userId, PasswordChangeRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+
+        if (user.getProvider() != Provider.LOCAL) {
+            throw CustomException.forbidden("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.");
+        }
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw CustomException.badRequest("현재 비밀번호가 일치하지 않습니다.");
+        }
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw CustomException.badRequest("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+        }
+
+        user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
     }
 
     @Transactional
