@@ -1,4 +1,4 @@
-package com.Rootin.domain.garden.controller;
+dpackage com.Rootin.domain.garden.controller;
 
 import com.Rootin.domain.garden.dto.GardenLayoutUpdateRequest;
 import com.Rootin.domain.garden.dto.GardenResponse;

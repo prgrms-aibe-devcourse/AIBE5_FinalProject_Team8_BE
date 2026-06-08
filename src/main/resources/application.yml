@@ -24,11 +24,11 @@ cloud:
   aws:
     region: ${AWS_S3_REGION:ap-northeast-2}
     credentials:
-      access-key: ${AWS_ACCESS_KEY_ID:dummy}
-      secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
     s3:
-      bucket: ${AWS_S3_BUCKET:rootin-bucket}
-      endpoint: ${AWS_ENDPOINT:}
+      bucket: ${AWS_S3_BUCKET:team8-rootin-s3}
+      endpoint: ${AWS_S3_ENDPOINT:}
 
 
 # Actuator (Docker Health)
