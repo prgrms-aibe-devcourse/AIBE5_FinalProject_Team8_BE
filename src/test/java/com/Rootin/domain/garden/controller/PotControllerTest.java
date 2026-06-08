@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -119,30 +121,17 @@ class PotControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    @DisplayName("화분 생성 API 호출 시 제목이 10자를 초과하면 400 Bad Request 에러를 반환한다")
-    void createPotTitleLengthValidationFail() throws Exception {
+    @ParameterizedTest
+    @CsvSource({
+            "12345678901, 소개글",
+            "자바화분, 12345678901234567890123456"
+    })
+    @DisplayName("화분 생성 API 호출 시 제목 또는 소개글 길이 검증에 실패하면 400 Bad Request 에러를 반환한다")
+    void createPotLengthValidationFail(String title, String description) throws Exception {
         // given
         PotCreateRequest request = PotCreateRequest.builder()
-                .title("12345678901")
-                .description("소개글")
-                .build();
-
-        // when & then
-        mockMvc.perform(post("/api/v1/pots")
-                        .with(user(userDetails))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("화분 생성 API 호출 시 소개글이 25자를 초과하면 400 Bad Request 에러를 반환한다")
-    void createPotDescriptionLengthValidationFail() throws Exception {
-        // given
-        PotCreateRequest request = PotCreateRequest.builder()
-                .title("자바화분")
-                .description("12345678901234567890123456")
+                .title(title)
+                .description(description)
                 .build();
 
         // when & then
@@ -237,37 +226,18 @@ class PotControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    @DisplayName("화분 수정 API 호출 시 제목이 10자를 초과하면 400 Bad Request 에러를 반환한다")
-    void updatePotTitleLengthValidationFail() throws Exception {
+    @ParameterizedTest
+    @CsvSource({
+            "12345678901, 수정된 소개글",
+            "수정화분, 12345678901234567890123456"
+    })
+    @DisplayName("화분 수정 API 호출 시 제목 또는 소개글 길이 검증에 실패하면 400 Bad Request 에러를 반환한다")
+    void updatePotLengthValidationFail(String title, String description) throws Exception {
         // given
         Long potId = 10L;
-        String requestJson = """
-                {
-                  "title": "12345678901",
-                  "description": "수정된 소개글"
-                }
-                """;
-
-        // when & then
-        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
-                        .with(user(userDetails))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestJson))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("화분 수정 API 호출 시 소개글이 25자를 초과하면 400 Bad Request 에러를 반환한다")
-    void updatePotDescriptionLengthValidationFail() throws Exception {
-        // given
-        Long potId = 10L;
-        String requestJson = """
-                {
-                  "title": "수정화분",
-                  "description": "12345678901234567890123456"
-                }
-                """;
+        String requestJson = objectMapper.writeValueAsString(
+                java.util.Map.of("title", title, "description", description)
+        );
 
         // when & then
         mockMvc.perform(patch("/api/v1/pots/{potId}", potId)

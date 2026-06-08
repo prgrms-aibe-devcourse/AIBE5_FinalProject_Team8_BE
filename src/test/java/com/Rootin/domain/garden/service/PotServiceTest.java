@@ -169,7 +169,7 @@ class PotServiceTest {
         Long userId = 101L;
         PotResponse createdPot = potService.createPot(
                 userId,
-                PotCreateRequest.builder().title("중복 데이터 방어 화분").build()
+                PotCreateRequest.builder().title("중복방어화분").build()
         );
 
         Plant defaultPlant = plantRepository
