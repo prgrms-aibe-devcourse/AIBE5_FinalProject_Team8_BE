@@ -151,4 +151,8 @@ public class User extends BaseEntity implements UserDetails {
             this.gardenTheme = theme;
         }
     }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }
