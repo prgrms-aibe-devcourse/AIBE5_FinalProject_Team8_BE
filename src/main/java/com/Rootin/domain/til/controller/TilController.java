@@ -45,9 +45,12 @@ public class TilController {
             @RequestParam(required = false) Long potId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "latest") String sort
+            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String tag
     ) {
-        return ResponseEntity.ok(ApiResponse.success(tilService.findMyTils(userDetails.getUserId(), potId, page, size, sort)));
+        return ResponseEntity.ok(ApiResponse.success(
+                tilService.findMyTils(userDetails.getUserId(), potId, page, size, sort, keyword, tag)));
     }
 
     @PutMapping("/{tilId}")
