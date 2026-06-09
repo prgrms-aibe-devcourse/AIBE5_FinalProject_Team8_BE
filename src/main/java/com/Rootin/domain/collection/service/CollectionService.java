@@ -88,37 +88,38 @@ public class CollectionService {
                     .put(plant.getGrowthStage().ordinal(), plant.getImageUrl());
         }
 
-        // 수확 완료된 식물들의 harvestedAt을 species별로 정렬 수집
+        // 수확 완료된 식물들을 species × stageIndex별로 수집 (최초 수확 날짜 보관)
         List<PlantItem> harvestedItems = plantItemRepository.findByUserIdAndIsHarvestedTrue(userId);
 
-        Map<String, List<LocalDateTime>> datesBySpecies = new HashMap<>();
+        // speciesKey → (stageIndex → 최초 harvestedAt)
+        Map<String, Map<Integer, LocalDateTime>> harvestDateBySpeciesStage = new HashMap<>();
         for (PlantItem item : harvestedItems) {
             Plant plant = plantById.get(item.getPlantId());
             if (plant == null) continue;
             String speciesKey = PLANT_NAME_TO_SPECIES.get(plant.getName());
-            if (speciesKey == null) continue;
-            if (item.getHarvestedAt() != null) {
-                datesBySpecies.computeIfAbsent(speciesKey, k -> new ArrayList<>())
-                        .add(item.getHarvestedAt());
-            }
+            if (speciesKey == null || item.getHarvestedAt() == null) continue;
+            // harvestedStageIndex가 null인 기존 데이터는 growthExp로 추정 (4 = FULL_BLOOM)
+            int stageIndex = item.getHarvestedStageIndex() != null
+                    ? item.getHarvestedStageIndex() : 4;
+            harvestDateBySpeciesStage
+                    .computeIfAbsent(speciesKey, k -> new HashMap<>())
+                    .merge(stageIndex, item.getHarvestedAt(),
+                            (existing, newer) -> existing.isBefore(newer) ? existing : newer);
         }
-        datesBySpecies.values().forEach(list -> list.sort(Comparator.naturalOrder()));
 
         int totalCollected = 0;
         List<DexSection> sections = new ArrayList<>();
 
         for (int si = 0; si < SPECIES_LIST.size(); si++) {
             SpeciesMeta meta = SPECIES_LIST.get(si);
-            List<LocalDateTime> dates = datesBySpecies.getOrDefault(meta.key(), List.of());
-            int harvestCount = dates.size();
+            Map<Integer, LocalDateTime> stageDates = harvestDateBySpeciesStage.getOrDefault(meta.key(), Map.of());
             Map<Integer, String> stageImageUrls = imageUrlBySpeciesStage.getOrDefault(meta.key(), Map.of());
 
             List<DexEntry> entries = new ArrayList<>();
             for (int stage = 0; stage < 5; stage++) {
-                boolean collected = stage < harvestCount;
+                boolean collected = stageDates.containsKey(stage);
                 String dexNum = String.format("%03d", si * 5 + stage + 1);
-                String harvestedAt = (collected && stage < dates.size())
-                        ? dates.get(stage).format(LONG_FMT) : null;
+                String harvestedAt = collected ? stageDates.get(stage).format(LONG_FMT) : null;
                 String imageUrl = stageImageUrls.get(stage);
 
                 entries.add(new DexEntry(
