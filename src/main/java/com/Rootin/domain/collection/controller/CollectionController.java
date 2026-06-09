@@ -1,6 +1,6 @@
 package com.Rootin.domain.collection.controller;
 
-import com.Rootin.domain.collection.dto.PlantCollectionResponse;
+import com.Rootin.domain.collection.dto.CollectionDexResponse;
 import com.Rootin.domain.collection.service.CollectionService;
 import com.Rootin.global.common.ApiResponse;
 import com.Rootin.global.jwt.JwtUserDetails;
@@ -19,7 +19,7 @@ public class CollectionController {
     private final CollectionService collectionService;
 
     @GetMapping("/plants")
-    public ResponseEntity<ApiResponse<PlantCollectionResponse>> getPlants(
+    public ResponseEntity<ApiResponse<CollectionDexResponse>> getPlants(
             @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
         return ResponseEntity.ok(ApiResponse.success(collectionService.getPlants(userDetails.getUserId())));

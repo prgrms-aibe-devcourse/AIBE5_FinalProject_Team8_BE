@@ -1,7 +1,8 @@
 package com.Rootin.domain.collection.service;
 
-import com.Rootin.domain.collection.dto.PlantCollectionItem;
-import com.Rootin.domain.collection.dto.PlantCollectionResponse;
+import com.Rootin.domain.collection.dto.CollectionDexResponse;
+import com.Rootin.domain.collection.dto.DexEntry;
+import com.Rootin.domain.collection.dto.DexSection;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
@@ -36,8 +37,8 @@ class CollectionServiceTest {
 
     private User testUser;
     private Pot testPot;
-    private Plant commonPlant;
-    private Plant rarePlant;
+    private Plant seedPlant;
+    private Plant moonPlant;
 
     @BeforeEach
     void setUp() {
@@ -55,105 +56,139 @@ class CollectionServiceTest {
                 .build();
         potRepository.save(testPot);
 
-        commonPlant = Plant.builder()
-                .name("일반 장미").grade(Grade.COMMON).growthStage(GrowthStage.SEED)
-                .imageUrl("common_rose_url").build();
-        plantRepository.save(commonPlant);
+        seedPlant = Plant.builder()
+                .name("기본 씨앗").grade(Grade.COMMON).growthStage(GrowthStage.SEED)
+                .imageUrl("seed_url").build();
+        plantRepository.save(seedPlant);
 
-        rarePlant = Plant.builder()
-                .name("희귀 선인장").grade(Grade.RARE).growthStage(GrowthStage.SEED)
-                .imageUrl("rare_cactus_url").build();
-        plantRepository.save(rarePlant);
+        moonPlant = Plant.builder()
+                .name("달빛씨앗").grade(Grade.RARE).growthStage(GrowthStage.SEED)
+                .imageUrl("moon_url").build();
+        plantRepository.save(moonPlant);
     }
 
     @Test
-    @DisplayName("식물 도감 조회 시 수확 완료 식물은 state=harvested, 미수집 식물은 state=locked로 구분되고 뱃지 정보(화분명, 수확 레벨, 수확일)가 정상 제공된다")
-    void getPlantsCollectionBadgeSuccess() {
-        // given
-        LocalDateTime harvestTime = LocalDateTime.of(2026, 6, 1, 12, 0);
-        PlantItem harvestedItem = PlantItem.builder()
-                .userId(testUser.getId()).potId(testPot.getId()).plantId(commonPlant.getId())
-                .growthExp(1000).isHarvested(true).harvestedLevel(4).harvestedAt(harvestTime)
-                .build();
-        plantItemRepository.save(harvestedItem);
+    @DisplayName("도감 응답은 40칸 고정 구조(8종 × 5단계)와 통계를 반환한다")
+    void getDex_returnsFixedStructure() {
+        CollectionDexResponse response = collectionService.getPlants(testUser.getId());
 
-        // when
-        PlantCollectionResponse response = collectionService.getPlants(testUser.getId());
+        assertThat(response.stats().total()).isEqualTo(40);
+        assertThat(response.stats().common()).isEqualTo(25);
+        assertThat(response.stats().rare()).isEqualTo(15);
+        assertThat(response.stats().collected()).isZero();
+        assertThat(response.sections()).hasSize(8);
 
-        // then
-        assertThat(response).isNotNull();
-        List<PlantCollectionItem> items = response.plants();
-        assertThat(items).hasSize(2);
-
-        // 수확 완료된 '일반 장미' 검증
-        PlantCollectionItem commonItemDto = items.stream()
-                .filter(i -> i.plantType().equals("일반 장미"))
-                .findFirst().orElseThrow();
-        assertThat(commonItemDto.state()).isEqualTo("harvested");
-        assertThat(commonItemDto.rarity()).isEqualTo("common");
-        assertThat(commonItemDto.harvestedAt()).isEqualTo(harvestTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd")));
-        assertThat(commonItemDto.imageUrl()).isEqualTo("common_rose_url");
-        assertThat(commonItemDto.potTitle()).isEqualTo("자바 정복 화분");
-        assertThat(commonItemDto.potLevel()).isEqualTo(4); // harvestedLevel
-
-        // 미수집 '희귀 선인장' 검증
-        PlantCollectionItem rareItemDto = items.stream()
-                .filter(i -> i.plantType().equals("희귀 선인장"))
-                .findFirst().orElseThrow();
-        assertThat(rareItemDto.state()).isEqualTo("locked");
-        assertThat(rareItemDto.rarity()).isEqualTo("rare");
-        assertThat(rareItemDto.harvestedAt()).isNull();
-        assertThat(rareItemDto.potTitle()).isNull();
-        assertThat(rareItemDto.potLevel()).isNull();
+        long totalEntries = response.sections().stream()
+                .mapToLong(s -> s.entries().size())
+                .sum();
+        assertThat(totalEntries).isEqualTo(40);
     }
 
     @Test
-    @DisplayName("수집한 식물이 자랐던 화분이 삭제된 경우 도감 조회 시 화분명이 null로 안전하게 처리된다")
-    void getPlantsCollectionDynamicPotDeletedFallback() {
-        // given
-        PlantItem harvestedItem = PlantItem.builder()
-                .userId(testUser.getId()).potId(999L) // 존재하지 않는 화분 ID
-                .plantId(commonPlant.getId())
-                .growthExp(1000).isHarvested(true).harvestedLevel(2).harvestedAt(LocalDateTime.now())
-                .build();
-        plantItemRepository.save(harvestedItem);
-
-        // when
-        PlantCollectionResponse response = collectionService.getPlants(testUser.getId());
-
-        // then — 화분이 없어도 에러 없이 potTitle = null 처리
-        PlantCollectionItem commonItemDto = response.plants().stream()
-                .filter(i -> i.plantType().equals("일반 장미"))
-                .findFirst().orElseThrow();
-        assertThat(commonItemDto.state()).isEqualTo("harvested");
-        assertThat(commonItemDto.potTitle()).isNull();
-        assertThat(commonItemDto.potLevel()).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("동일 식물을 여러 번 수확한 경우 최초 수확 데이터가 도감에 대표로 표시된다")
-    void getPlantsCollectionFirstEarnedRepresentative() {
-        // given
-        LocalDateTime earliestTime = LocalDateTime.of(2026, 5, 20, 10, 0);
-        LocalDateTime laterTime   = LocalDateTime.of(2026, 6, 1, 15, 0);
+    @DisplayName("N번 수확하면 해당 species의 stage 0~N-1이 collected=true로 표시된다")
+    void harvest_unlocksStagesInOrder() {
+        LocalDateTime first  = LocalDateTime.of(2026, 5, 20, 10, 0);
+        LocalDateTime second = LocalDateTime.of(2026, 6, 1, 15, 0);
+        LocalDateTime third  = LocalDateTime.of(2026, 6, 5, 9, 0);
 
         plantItemRepository.save(PlantItem.builder()
-                .userId(testUser.getId()).potId(testPot.getId()).plantId(commonPlant.getId())
-                .isHarvested(true).harvestedLevel(2).harvestedAt(earliestTime).build());
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(seedPlant.getId())
+                .growthExp(1000).isHarvested(true).harvestedLevel(4).harvestedAt(first).build());
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(seedPlant.getId())
+                .growthExp(1000).isHarvested(true).harvestedLevel(5).harvestedAt(second).build());
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(seedPlant.getId())
+                .growthExp(1000).isHarvested(true).harvestedLevel(6).harvestedAt(third).build());
+
+        CollectionDexResponse response = collectionService.getPlants(testUser.getId());
+
+        DexSection seedSection = response.sections().stream()
+                .filter(s -> s.speciesKey().equals("seed"))
+                .findFirst().orElseThrow();
+
+        List<DexEntry> entries = seedSection.entries();
+        assertThat(entries.get(0).collected()).isTrue();
+        assertThat(entries.get(0).monName()).isEqualTo("씨드몬");
+        assertThat(entries.get(0).harvestedAt()).isEqualTo("2026.05.20");
+        assertThat(entries.get(1).collected()).isTrue();
+        assertThat(entries.get(1).monName()).isEqualTo("새싹몬");
+        assertThat(entries.get(1).harvestedAt()).isEqualTo("2026.06.01");
+        assertThat(entries.get(2).collected()).isTrue();
+        assertThat(entries.get(2).monName()).isEqualTo("잎몬");
+        assertThat(entries.get(3).collected()).isFalse();
+        assertThat(entries.get(3).monName()).isNull();
+        assertThat(entries.get(4).collected()).isFalse();
+
+        assertThat(response.stats().collected()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("수확이 없는 species는 모든 단계가 locked(collected=false)로 표시된다")
+    void noHarvest_allLocked() {
+        CollectionDexResponse response = collectionService.getPlants(testUser.getId());
+
+        DexSection seedSection = response.sections().stream()
+                .filter(s -> s.speciesKey().equals("seed"))
+                .findFirst().orElseThrow();
+
+        assertThat(seedSection.entries()).allMatch(e -> !e.collected());
+        assertThat(seedSection.entries()).allMatch(e -> e.monName() == null);
+        assertThat(seedSection.rare()).isFalse();
+    }
+
+    @Test
+    @DisplayName("희귀 종(RARE) species는 rare=true 섹션으로 분류된다")
+    void rareSpecies_markedRare() {
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(moonPlant.getId())
+                .growthExp(1000).isHarvested(true).harvestedLevel(3)
+                .harvestedAt(LocalDateTime.of(2026, 6, 1, 12, 0)).build());
+
+        CollectionDexResponse response = collectionService.getPlants(testUser.getId());
+
+        DexSection moonSection = response.sections().stream()
+                .filter(s -> s.speciesKey().equals("moon"))
+                .findFirst().orElseThrow();
+
+        assertThat(moonSection.rare()).isTrue();
+        assertThat(moonSection.entries().get(0).collected()).isTrue();
+        assertThat(moonSection.entries().get(0).monName()).isEqualTo("달빛씨");
+        assertThat(moonSection.entries().get(1).collected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("도감 번호는 001~040 순서로 species 순서대로 연속 부여된다")
+    void dexNumbers_sequentialAcrossSections() {
+        CollectionDexResponse response = collectionService.getPlants(testUser.getId());
+
+        int expected = 1;
+        for (DexSection section : response.sections()) {
+            for (DexEntry entry : section.entries()) {
+                assertThat(entry.dexNumber()).isEqualTo(String.format("%03d", expected));
+                expected++;
+            }
+        }
+        assertThat(expected).isEqualTo(41);
+    }
+
+    @Test
+    @DisplayName("plant name이 매핑되지 않는 식물의 수확은 도감에 영향을 주지 않는다")
+    void unmappedPlant_ignoredInDex() {
+        Plant unknownPlant = Plant.builder()
+                .name("알 수 없는 식물").grade(Grade.COMMON).growthStage(GrowthStage.SEED)
+                .build();
+        plantRepository.save(unknownPlant);
 
         plantItemRepository.save(PlantItem.builder()
-                .userId(testUser.getId()).potId(testPot.getId()).plantId(commonPlant.getId())
-                .isHarvested(true).harvestedLevel(4).harvestedAt(laterTime).build());
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(unknownPlant.getId())
+                .growthExp(1000).isHarvested(true).harvestedLevel(2)
+                .harvestedAt(LocalDateTime.now()).build());
 
-        // when
-        PlantCollectionResponse response = collectionService.getPlants(testUser.getId());
+        CollectionDexResponse response = collectionService.getPlants(testUser.getId());
 
-        // then — 최초 수확(earliestTime, 레벨 2)이 대표 정보로 표시
-        PlantCollectionItem commonItemDto = response.plants().stream()
-                .filter(i -> i.plantType().equals("일반 장미"))
-                .findFirst().orElseThrow();
-        assertThat(commonItemDto.state()).isEqualTo("harvested");
-        assertThat(commonItemDto.harvestedAt()).isEqualTo(earliestTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd")));
-        assertThat(commonItemDto.potLevel()).isEqualTo(2);
+        assertThat(response.stats().collected()).isZero();
+        assertThat(response.sections().stream().allMatch(s ->
+                s.entries().stream().noneMatch(DexEntry::collected))).isTrue();
     }
 }
