@@ -16,4 +16,5 @@ public class PotGardenResponse {
     private Boolean isDisplayed;
     private Integer positionX;
     private Integer positionY;
+    private Boolean wateredToday;
 }

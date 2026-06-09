@@ -50,5 +50,10 @@ public record PotSummaryResponse(
     /**
      * 화분에 작성된 PUBLISHED 상태 TIL 총 개수
      */
-    int tilCount
+    int tilCount,
+
+    /**
+     * 오늘 물을 주었는지 여부
+     */
+    boolean wateredToday
 ) {}
