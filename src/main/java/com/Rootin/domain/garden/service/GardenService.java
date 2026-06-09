@@ -5,6 +5,7 @@ import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.plant.entity.Plant;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
@@ -32,6 +33,7 @@ public class GardenService {
     private final PlantItemRepository plantItemRepository;
     private final PlantRepository plantRepository;
     private final LevelCalculator levelCalculator;
+    private final WateringLogRepository wateringLogRepository;
 
     /**
      * 로그인한 사용자의 정원 테마와 배치된(또는 배치 가능한) 화분 및 수확 식물 정보를 종합하여 반환합니다.
@@ -81,8 +83,17 @@ public class GardenService {
                         (p1, p2) -> p1 // 혹시 중복된 데이터가 감지되면 첫 번째 값을 보존합니다.
                 ));
 
-        // 7. 응답 DTO 조립
+        // 7. 오늘 물을 준 화분 ID 목록을 조회합니다. (N+1 방지 벌크 조회)
+        java.util.Set<Long> wateredPotIds = java.util.Collections.emptySet();
+        if (!potIds.isEmpty()) {
+            wateredPotIds = new java.util.HashSet<>(
+                    wateringLogRepository.findWateredPotIdsToday(userId, potIds)
+            );
+        }
+
+        // 8. 응답 DTO 조립
         final Map<Long, Plant> finalMasterPlantMap = masterPlantMap;
+        final java.util.Set<Long> finalWateredPotIds = wateredPotIds;
 
         List<PotGardenResponse> potResponses = pots.stream().map(pot -> {
             PlantItem activeItem = activePlantMap.get(pot.getId());
@@ -113,7 +124,8 @@ public class GardenService {
                     imageUrl,
                     Boolean.TRUE.equals(pot.getIsDisplayed()),
                     pot.getPositionX(),
-                    pot.getPositionY()
+                    pot.getPositionY(),
+                    finalWateredPotIds.contains(pot.getId())
             );
         }).toList();
 

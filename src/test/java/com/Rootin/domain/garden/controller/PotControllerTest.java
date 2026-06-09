@@ -156,7 +156,8 @@ class PotControllerTest {
                 true,
                 "기본 씨앗",
                 GrowthStage.SEED,
-                0
+                0,
+                false
         );
 
         given(potService.getPots(userId)).willReturn(List.of(response));
@@ -167,7 +168,8 @@ class PotControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("자바 화분"))
                 .andExpect(jsonPath("$[0].plantName").value("기본 씨앗"))
-                .andExpect(jsonPath("$[0].growthStage").value("SEED"));
+                .andExpect(jsonPath("$[0].growthStage").value("SEED"))
+                .andExpect(jsonPath("$[0].wateredToday").value(false));
     }
 
     @Test

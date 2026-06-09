@@ -2,6 +2,8 @@ package com.Rootin.domain.garden.repository;
 
 import com.Rootin.domain.garden.entity.WateringLog;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -58,4 +60,29 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
             Long potId,
             LocalDateTime from
     );
+
+    @Query("""
+        SELECT DISTINCT w.potId
+        FROM WateringLog w
+        WHERE w.userId = :userId
+          AND w.potId IN :potIds
+          AND w.wateredAt >= :startOfDay
+          AND w.wateredAt < :startOfNextDay
+    """)
+    List<Long> findWateredPotIds(
+        @Param("userId") Long userId,
+        @Param("potIds") List<Long> potIds,
+        @Param("startOfDay") LocalDateTime startOfDay,
+        @Param("startOfNextDay") LocalDateTime startOfNextDay
+    );
+
+    default List<Long> findWateredPotIdsToday(Long userId, List<Long> potIds) {
+        if (potIds == null || potIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDateTime startOfDay = today.atStartOfDay();
+        java.time.LocalDateTime startOfNextDay = today.plusDays(1).atStartOfDay();
+        return findWateredPotIds(userId, potIds, startOfDay, startOfNextDay);
+    }
 }

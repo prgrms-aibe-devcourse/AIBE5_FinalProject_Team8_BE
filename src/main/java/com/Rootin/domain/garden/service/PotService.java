@@ -8,6 +8,7 @@ import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.plant.entity.Plant;
 import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
@@ -53,6 +54,7 @@ public class PotService {
     private final PlantRepository plantRepository;
     private final TilRepository tilRepository;
     private final AiResultRepository aiResultRepository;
+    private final WateringLogRepository wateringLogRepository;
     private final LevelCalculator levelCalculator;
 
     /**
@@ -101,7 +103,7 @@ public class PotService {
     /**
      * 특정 사용자가 보유한 모든 화분 목록을 요약 정보(PotSummaryResponse) DTO 목록으로 조회합니다.
      * 목록 화면에 필요한 화분의 경험치/레벨, 그리고 심겨진 식물의 이름 및 현재 성장 단계를 계산하여 제공합니다.
-     * [성능 튜닝]: IN 절 쿼리와 메모리 내 Map 조립을 통해 2N+1번 발생하는 DB 조회를 단 4번으로 최적화하여 N+1 성능 이슈를 예방합니다.
+     * [성능 튜닝]: IN 절 쿼리와 메모리 내 Map 조립을 통해 2N+1번 발생하는 DB 조회를 단 5번으로 최적화하여 N+1 성능 이슈를 예방합니다.
      *
      * @param userId 사용자 ID
      * @return 요약된 화분 정보 목록
@@ -144,7 +146,12 @@ public class PotService {
                         proj -> proj.getTilCount().intValue()
                 ));
 
-        // 4. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
+        // 4. 오늘 물을 준 화분 ID 목록을 조회합니다. (오늘 00:00:00 ~ 내일 00:00:00 기준)
+        java.util.Set<Long> wateredPotIds = new java.util.HashSet<>(
+                wateringLogRepository.findWateredPotIdsToday(userId, potIds)
+        );
+
+        // 5. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
         final java.util.Map<Long, Plant> finalPlantMap = plantMap;
         return pots.stream()
                 .map(pot -> {
@@ -178,7 +185,8 @@ public class PotService {
                             Boolean.TRUE.equals(pot.getIsDisplayed()),
                             plantName,
                             growthStage,
-                            tilCountMap.getOrDefault(pot.getId(), 0)
+                            tilCountMap.getOrDefault(pot.getId(), 0),
+                            wateredPotIds.contains(pot.getId())
                     );
                 })
                 .collect(Collectors.toList());

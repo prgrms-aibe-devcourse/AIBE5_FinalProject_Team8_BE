@@ -76,7 +76,8 @@ class GardenControllerTest {
                         "https://image.example/pot.png",
                         true,
                         100,
-                        120
+                        120,
+                        true
                 )),
                 List.of(new HarvestedPlantResponse(
                         20L,
@@ -98,6 +99,7 @@ class GardenControllerTest {
                 .andExpect(jsonPath("$.pots[0].id").value(10L))
                 .andExpect(jsonPath("$.pots[0].plantName").value("씨앗몬"))
                 .andExpect(jsonPath("$.pots[0].growthStage").value("SPROUT"))
+                .andExpect(jsonPath("$.pots[0].wateredToday").value(true))
                 .andExpect(jsonPath("$.harvestedPlants[0].id").value(20L))
                 .andExpect(jsonPath("$.harvestedPlants[0].name").value("장미"));
 

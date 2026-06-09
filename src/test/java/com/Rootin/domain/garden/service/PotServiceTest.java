@@ -172,6 +172,67 @@ class PotServiceTest {
     }
 
     @Test
+    @DisplayName("사용자의 화분 목록 조회 시 오늘 물을 준 화분은 wateredToday = true로 반환된다")
+    void getPotsSummaryWithWateredToday() {
+        // given
+        Long userId = 200L;
+        PotCreateRequest req1 = PotCreateRequest.builder().title("오늘 물준 화분").build();
+        PotCreateRequest req2 = PotCreateRequest.builder().title("오늘 물안준 화분").build();
+
+        PotResponse pot1 = potService.createPot(userId, req1);
+        PotResponse pot2 = potService.createPot(userId, req2);
+
+        // 오늘 물주기 로그 생성
+        WateringLog todayLog = WateringLog.builder()
+                .userId(userId)
+                .potId(pot1.getId())
+                .postId(1001L)
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(50)
+                .streakDays(1)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build();
+        wateringLogRepository.save(todayLog);
+
+        // 어제 물주기 로그 생성 (pot2에 어제 물준 기록이 있지만 오늘 물준건 아님)
+        WateringLog yesterdayLog = WateringLog.builder()
+                .userId(userId)
+                .potId(pot2.getId())
+                .postId(1002L)
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(50)
+                .streakDays(1)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build();
+        WateringLog savedYesterdayLog = wateringLogRepository.save(yesterdayLog);
+        jdbcTemplate.update("UPDATE watering_log SET watered_at = ? WHERE id = ?",
+                java.time.LocalDateTime.now().minusDays(1),
+                savedYesterdayLog.getId()
+        );
+
+        // when
+        List<PotSummaryResponse> pots = potService.getPots(userId);
+
+        // then
+        assertThat(pots).hasSize(2);
+        PotSummaryResponse firstPot = pots.stream().filter(p -> p.id().equals(pot1.getId())).findFirst().orElseThrow();
+        PotSummaryResponse secondPot = pots.stream().filter(p -> p.id().equals(pot2.getId())).findFirst().orElseThrow();
+
+        assertThat(firstPot.wateredToday()).isTrue();
+        assertThat(secondPot.wateredToday()).isFalse();
+    }
+
+    @Test
     @DisplayName("중복 활성 PlantItem 데이터가 있어도 목록과 대시보드 조회는 실패하지 않는다")
     void gardenViewsDoNotFailWhenDuplicatedActivePlantItemsExist() {
         // given
