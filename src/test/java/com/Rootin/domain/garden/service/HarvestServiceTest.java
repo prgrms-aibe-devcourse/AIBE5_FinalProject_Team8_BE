@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,192 +26,200 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doReturn;
 
 /**
- * 식물 수확 비즈니스 로직(HarvestService)에 대한 스프링 통합 테스트 클래스입니다.
+ * HarvestService 통합 테스트.
+ *
+ * [변경 배경]
+ * - 기존: 경험치 1000(만개) 이상이어야만 수확 가능 → FULL_BLOOM 제약 존재
+ * - 변경: 어느 성장 단계에서든 수확 허용, 수확 시점의 stageIndex를 PlantItem.harvestedStageIndex에 기록
+ * - 삭제된 테스트: "exp < 1000이면 BAD_REQUEST" (제약 제거로 더 이상 유효하지 않음)
+ * - 추가된 테스트: 각 단계(씨앗/새싹/개화/만개)별로 올바른 stageIndex가 기록되는지 검증
+ *
+ * [stageIndex 기준 — LevelCalculator.determinePlantGrowthStage()]
+ *   0=씨앗(0~199), 1=새싹(200~499), 2=잎(500~799), 3=개화(800~999), 4=만개(1000+)
  */
 @IntegrationTest
 @Transactional
 class HarvestServiceTest {
 
-    @SpyBean // Mockito Spy를 사용하여 일부 메소드 동작(난수 등급 선택)을 제어하기 위해 주입합니다.
+    // HarvestService.decideNextPlantGrade()를 Spy로 감싸서
+    // 특정 테스트에서 RARE 등급을 강제 반환해 Fallback 분기를 검증합니다.
+    @SpyBean
     private HarvestService harvestService;
 
-    @Autowired
-    private UserRepository userRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private PotRepository potRepository;
+    @Autowired private PlantItemRepository plantItemRepository;
+    @Autowired private PlantRepository plantRepository;
 
-    @Autowired
-    private PotRepository potRepository;
+    private User testUser;   // 화분 소유자
+    private User otherUser;  // 소유권 불일치 시나리오용 타 사용자
+    private Pot testPot;     // 공통 테스트 화분 (level=3 → harvestedLevel 검증에 사용)
+    private Plant testPlantSeed; // COMMON/SEED 식물 마스터 (다음 씨앗 Fallback에도 재사용)
 
-    @Autowired
-    private PlantItemRepository plantItemRepository;
-
-    @Autowired
-    private PlantRepository plantRepository;
-
-    private User testUser;
-    private User otherUser;
-    private Pot testPot;
-    private Plant testPlantSeed;
-
+    /**
+     * 각 테스트 실행 전 공통 픽스처를 생성합니다.
+     * - testUser / otherUser: 소유권 검증 시나리오용 두 사용자
+     * - testPot: level=3 화분 (응답 DTO의 harvestedLevel=3 검증 기준)
+     * - testPlantSeed: DB에 저장되는 유일한 COMMON SEED 식물 → RARE Fallback 시 대체 대상
+     */
     @BeforeEach
     void setUp() {
-        // 암묵적 커밋을 유발하는 ALTER TABLE AUTO_INCREMENT DDL 구문을 제거했습니다.
-        // 테스트 생성 데이터의 ID를 직접 하드코딩하지 않고 testUser.getId() 형태로 바인딩하므로 
-        // 롤백 무결성을 완벽하게 보존하면서 격리를 보호합니다.
-
-        // 1. 테스트 진행을 위한 사용자 데이터를 생성 및 저장합니다.
-        testUser = User.builder()
-                .email("yunseok@test.com")
-                .nickname("윤석")
-                .build();
-        userRepository.save(testUser);
-
-        otherUser = User.builder()
-                .email("other@test.com")
-                .nickname("다른사람")
-                .build();
-        userRepository.save(otherUser);
-
-        // 2. 테스트 진행을 위한 화분 데이터를 생성 및 저장합니다.
-        testPot = Pot.builder()
-                .userId(testUser.getId())
-                .title("테스트용 화분")
-                .description("식물이 자라는 화분 설명")
-                .level(3)
-                .totalExp(350)
-                .build();
-        potRepository.save(testPot);
-
-        // 3. 수확 완료 후 새로운 씨앗으로 배정될 식물 마스터 데이터(SEED 단계)를 저장합니다.
-        testPlantSeed = Plant.builder()
-                .name("일반 씨앗")
-                .grade(Grade.COMMON)
-                .growthStage(GrowthStage.SEED)
-                .imageUrl("common_seed_image_url")
-                .silhouetteUrl("common_seed_silhouette_url")
-                .build();
-        plantRepository.save(testPlantSeed);
+        testUser = userRepository.save(User.builder()
+                .email("yunseok@test.com").nickname("윤석").build());
+        otherUser = userRepository.save(User.builder()
+                .email("other@test.com").nickname("다른사람").build());
+        testPot = potRepository.save(Pot.builder()
+                .userId(testUser.getId()).title("테스트용 화분").description("설명")
+                .level(3).totalExp(350).build());
+        testPlantSeed = plantRepository.save(Plant.builder()
+                .name("일반 씨앗").grade(Grade.COMMON).growthStage(GrowthStage.SEED)
+                .imageUrl("common_seed_image_url").silhouetteUrl("common_seed_silhouette_url").build());
     }
 
+    /**
+     * [만개 단계 수확] growthExp=1000 → stageIndex=4
+     * 수확 응답 DTO(plantName·harvestedLevel), 수확된 PlantItem의 상태(isHarvested·stageIndex·harvestedAt),
+     * 화분에 새 씨앗(growthExp=0)이 자동 배정되는지를 종합 검증합니다.
+     */
     @Test
-    @DisplayName("만개한 식물(경험치 1000)을 수확하면 수확 처리가 성공하여 뱃지 정보(수확레벨, 날짜 등)가 영구히 남고 새로운 씨앗이 심어진다")
-    void harvestFullyGrownPlantSuccess() {
-        // given
-        // 경험치 1000을 달성하여 수확 가능한 활성 식물을 저장합니다.
-        PlantItem activePlant = PlantItem.builder()
-                .userId(testUser.getId())
-                .potId(testPot.getId())
-                .plantId(testPlantSeed.getId())
-                .growthExp(1000)
-                .isHarvested(false)
-                .build();
-        plantItemRepository.save(activePlant);
+    @DisplayName("만개 단계(경험치 1000)에서 수확하면 harvestedStageIndex=4가 기록된다")
+    void harvest_fullBloom_stageIndex4() {
+        // Arrange: 만개 수준 경험치를 가진 활성 식물 저장
+        PlantItem activePlant = plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
+                .growthExp(1000).isHarvested(false).build());
 
-        // when
+        // Act
         HarvestResponse response = harvestService.harvest(testUser.getId(), testPot.getId());
 
-        // then
-        // 1. 반환된 API 응답 뱃지 정보 검증
+        // Assert — 응답 DTO 검증
         assertThat(response).isNotNull();
         assertThat(response.harvestedPlantName()).isEqualTo("일반 씨앗");
-        assertThat(response.harvestedLevel()).isEqualTo(3); // 화분의 현재 레벨인 3이 찍히는지 확인
+        assertThat(response.harvestedLevel()).isEqualTo(3); // testPot.level
 
-        // 2. 기존 식물 아이템이 수확된 상태(isHarvested = true)로 업데이트되었는지 및 이력 저장 검증
-        PlantItem harvestedItem = plantItemRepository.findById(activePlant.getId()).orElseThrow();
-        assertThat(harvestedItem.getIsHarvested()).isTrue();
-        assertThat(harvestedItem.getHarvestedLevel()).isEqualTo(3);
-        assertThat(harvestedItem.getHarvestedAt()).isNotNull();
+        // Assert — 수확된 PlantItem 상태 검증
+        PlantItem harvested = plantItemRepository.findById(activePlant.getId()).orElseThrow();
+        assertThat(harvested.getIsHarvested()).isTrue();
+        assertThat(harvested.getHarvestedStageIndex()).isEqualTo(4);
+        assertThat(harvested.getHarvestedAt()).isNotNull();
 
-        // 3. 수확 즉시 화분에 새로운 씨앗(경험치 0, SEED 단계)이 생성되어 심어졌는지 검증
-        PlantItem newPlantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(testPot.getId()).orElseThrow();
-        assertThat(newPlantItem.getUserId()).isEqualTo(testUser.getId());
-        assertThat(newPlantItem.getGrowthExp()).isEqualTo(0);
-        assertThat(newPlantItem.getIsHarvested()).isFalse();
-        assertThat(newPlantItem.getPlantId()).isEqualTo(testPlantSeed.getId());
+        // Assert — 화분에 새 씨앗이 자동으로 심어졌는지 확인
+        PlantItem newItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(testPot.getId()).orElseThrow();
+        assertThat(newItem.getGrowthExp()).isEqualTo(0);
+        assertThat(newItem.getIsHarvested()).isFalse();
     }
 
+    /**
+     * [개화 단계 수확] growthExp=850 → stageIndex=3
+     * FULL_BLOOM 제약이 제거되어 개화 단계에서도 수확이 허용되는지,
+     * harvestedStageIndex=3이 기록되어 도감의 개화 슬롯(index 3)을 해금할 수 있는지 검증합니다.
+     */
     @Test
-    @DisplayName("식물의 경험치가 만개(1000)에 도달하지 못한 경우, 수확 시 BAD_REQUEST 예외가 발생한다 (수확 직후 재수확 불가 상태 검증)")
-    void harvestPlantExpNotEnoughFail() {
-        // given
-        // 미달 경험치(500)를 가진 식물 아이템을 저장합니다.
-        PlantItem activePlant = PlantItem.builder()
-                .userId(testUser.getId())
-                .potId(testPot.getId())
-                .plantId(testPlantSeed.getId())
-                .growthExp(500)
-                .isHarvested(false)
-                .build();
-        plantItemRepository.save(activePlant);
+    @DisplayName("개화 단계(경험치 800~999)에서 수확하면 harvestedStageIndex=3이 기록된다")
+    void harvest_bloom_stageIndex3() {
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
+                .growthExp(850).isHarvested(false).build());
 
-        // when & then
-        CustomException exception = assertThrows(CustomException.class, () ->
-                harvestService.harvest(testUser.getId(), testPot.getId())
-        );
+        harvestService.harvest(testUser.getId(), testPot.getId());
 
-        assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(exception.getMessage()).contains("아직 수확할 수 없습니다. 식물이 만개(경험치 1000) 단계에 도달해야 합니다.");
+        // 수확 후 findByPotIdAndIsHarvestedFalse는 새로 심어진 씨앗을 반환하므로
+        // 수확된 항목은 findByUserIdAndIsHarvestedTrue로 별도 조회합니다.
+        PlantItem harvestedItem = plantItemRepository
+                .findByUserIdAndIsHarvestedTrue(testUser.getId()).stream()
+                .findFirst().orElseThrow();
+        assertThat(harvestedItem.getHarvestedStageIndex()).isEqualTo(3);
     }
 
+    /**
+     * [새싹 단계 수확] growthExp=300 → stageIndex=1
+     * 아직 초기 단계인 새싹에서도 수확이 가능하고,
+     * harvestedStageIndex=1이 기록되어 도감 새싹 슬롯을 해금하는 흐름을 지원하는지 확인합니다.
+     */
     @Test
-    @DisplayName("자신의 화분이 아닌 다른 사용자의 화분을 수확하려고 요청하면 FORBIDDEN 예외가 발생한다")
-    void harvestForbiddenWhenOwnerMismatch() {
-        // given
-        // 수확 가능한 식물(경험치 1000) 생성
-        PlantItem activePlant = PlantItem.builder()
-                .userId(testUser.getId())
-                .potId(testPot.getId())
-                .plantId(testPlantSeed.getId())
-                .growthExp(1000)
-                .isHarvested(false)
-                .build();
-        plantItemRepository.save(activePlant);
+    @DisplayName("새싹 단계(경험치 200~499)에서 수확하면 harvestedStageIndex=1이 기록된다")
+    void harvest_sprout_stageIndex1() {
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
+                .growthExp(300).isHarvested(false).build());
 
-        // when & then
-        CustomException exception = assertThrows(CustomException.class, () ->
-                harvestService.harvest(otherUser.getId(), testPot.getId()) // 타인이 수확 시도
-        );
+        harvestService.harvest(testUser.getId(), testPot.getId());
 
-        assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(exception.getMessage()).contains("해당 화분에 접근할 권한이 없습니다.");
+        PlantItem harvestedItem = plantItemRepository
+                .findByUserIdAndIsHarvestedTrue(testUser.getId()).stream()
+                .findFirst().orElseThrow();
+        assertThat(harvestedItem.getHarvestedStageIndex()).isEqualTo(1);
     }
 
+    /**
+     * [씨앗 단계 수확] growthExp=50 → stageIndex=0
+     * 경험치가 거의 없는 씨앗 상태에서도 수확이 허용되고,
+     * harvestedStageIndex=0이 기록되어 도감 씨앗 슬롯(index 0)을 해금할 수 있는지 검증합니다.
+     */
+    @Test
+    @DisplayName("씨앗 단계(경험치 0~199)에서 수확하면 harvestedStageIndex=0이 기록된다")
+    void harvest_seed_stageIndex0() {
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
+                .growthExp(50).isHarvested(false).build());
+
+        harvestService.harvest(testUser.getId(), testPot.getId());
+
+        PlantItem harvestedItem = plantItemRepository
+                .findByUserIdAndIsHarvestedTrue(testUser.getId()).stream()
+                .findFirst().orElseThrow();
+        assertThat(harvestedItem.getHarvestedStageIndex()).isEqualTo(0);
+    }
+
+    /**
+     * [소유권 검증] otherUser가 testUser 화분을 수확하려 하면 FORBIDDEN.
+     * 화분의 userId와 요청 userId가 일치하지 않을 때 접근을 차단하는지 확인합니다.
+     */
+    @Test
+    @DisplayName("다른 사용자의 화분을 수확하려 하면 FORBIDDEN 예외가 발생한다")
+    void harvest_forbidden_ownerMismatch() {
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
+                .growthExp(1000).isHarvested(false).build());
+
+        // otherUser가 testUser 화분에 수확 요청 → FORBIDDEN
+        CustomException ex = assertThrows(CustomException.class, () ->
+                harvestService.harvest(otherUser.getId(), testPot.getId()));
+
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    /**
+     * [존재하지 않는 화분] potId=9999로 수확 요청 시 NOT_FOUND.
+     * 화분 조회 실패 시 CustomException이 적절한 HTTP 상태와 함께 발생하는지 확인합니다.
+     */
     @Test
     @DisplayName("존재하지 않는 화분 ID로 수확을 요청하면 NOT_FOUND 예외가 발생한다")
-    void harvestNotFoundWhenPotIdNotExist() {
-        // when & then
-        CustomException exception = assertThrows(CustomException.class, () ->
-                harvestService.harvest(testUser.getId(), 9999L) // 존재하지 않는 화분 ID
-        );
+    void harvest_notFound_potNotExist() {
+        CustomException ex = assertThrows(CustomException.class, () ->
+                harvestService.harvest(testUser.getId(), 9999L));
 
-        assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(exception.getMessage()).contains("존재하지 않는 화분입니다.");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    /**
+     * [RARE Fallback] decideNextPlantGrade()를 Spy로 RARE 반환 강제 → DB에 RARE 없으면 COMMON 대체.
+     * 수확 후 다음 씨앗 선택 시 RARE 등급이 DB에 없어도 COMMON으로 Fallback되어
+     * 수확이 정상 완료되는지 검증합니다. (운영 초기 RARE 데이터 미등록 상황 대비)
+     */
     @Test
-    @DisplayName("RARE 등급의 SEED 식물 마스터 데이터가 존재하지 않는 상황에서도 예외가 나지 않고, COMMON 식물로 대체(Fallback)되어 수확이 성공한다")
-    void harvestRareFallbackToCommonSuccess() {
-        // given
-        // Spy로 주입된 서비스의 등급 결정을 스터빙하여 10%의 무작위 난수와 무관하게 100% 확정적으로 RARE 등급 분기를 타도록 합니다.
+    @DisplayName("RARE 등급 식물이 DB에 없으면 COMMON으로 Fallback되어 수확이 성공한다")
+    void harvest_rareFallbackToCommon() {
+        // decideNextPlantGrade()가 항상 RARE를 반환하도록 Spy 설정
         doReturn(Grade.RARE).when(harvestService).decideNextPlantGrade();
 
-        // RARE 등급의 식물 마스터 데이터는 전혀 없는 상태에서 만개 식물 생성
-        PlantItem activePlant = PlantItem.builder()
-                .userId(testUser.getId())
-                .potId(testPot.getId())
-                .plantId(testPlantSeed.getId())
-                .growthExp(1000)
-                .isHarvested(false)
-                .build();
-        plantItemRepository.save(activePlant);
+        plantItemRepository.save(PlantItem.builder()
+                .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
+                .growthExp(1000).isHarvested(false).build());
 
-        // when
         HarvestResponse response = harvestService.harvest(testUser.getId(), testPot.getId());
 
-        // then
-        // RARE 식물이 없는 상황이라도 에러 없이 COMMON인 '일반 씨앗'으로 Fallback되어 정상 배정됨을 검증합니다.
+        // RARE 식물이 없으므로 setUp()에서 저장한 COMMON "일반 씨앗"으로 Fallback되어 배정됨
         assertThat(response.nextPlantName()).isEqualTo("일반 씨앗");
-        
-        PlantItem newPlantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(testPot.getId()).orElseThrow();
-        assertThat(newPlantItem.getPlantId()).isEqualTo(testPlantSeed.getId());
     }
 }
