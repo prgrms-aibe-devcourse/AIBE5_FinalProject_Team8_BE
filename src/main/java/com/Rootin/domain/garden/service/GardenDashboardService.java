@@ -98,7 +98,7 @@ public class GardenDashboardService {
 
         // 6-2. 식물 성장률(%) 및 수확 가능 여부를 계산합니다.
         double growthPercentage = levelCalculator.calculatePlantGrowthPercentage(plantItem.getGrowthExp());
-        boolean canHarvest = levelCalculator.canHarvestPlant(plantItem.getGrowthExp());
+        boolean canHarvest = true;
 
         // 7. [Fallback 정책 적용]: 이미지는 Fallback을 쓰더라도 growthStage는 연산된 현재 단계를 정확히 노출합니다.
         PlantInfoResponse plantInfo = new PlantInfoResponse(

@@ -160,7 +160,7 @@ public class UserPotSeeder {
                                LocalDateTime createdAt, LocalDateTime harvestedAt) {
         PlantItem item = plantItemRepository.save(PlantItem.builder()
                 .userId(user.getId()).potId(pot.getId()).plantId(plant.getId())
-                .isHarvested(true).harvestedLevel(10).growthExp(1000).build());
+                .isHarvested(true).harvestedLevel(10).growthExp(1000).harvestedStageIndex(4).build());
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, harvested_at=? WHERE id=?",
                 createdAt, harvestedAt, item.getId());
     }
