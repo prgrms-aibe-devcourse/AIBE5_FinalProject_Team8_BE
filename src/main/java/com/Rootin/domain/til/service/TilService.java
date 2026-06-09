@@ -68,13 +68,20 @@ public class TilService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TilResponse> findMyTils(Long userId, Long potId, int page, int size, String sort) {
+    public Page<TilResponse> findMyTils(Long userId, Long potId, int page, int size, String sort,
+                                        String keyword, String tag) {
         Sort.Direction direction = "oldest".equals(sort) ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, "createdAt"));
 
-        Page<Til> tils = potId != null
-                ? tilRepository.findByUserIdAndPotIdAndStatus(userId, potId, PostStatus.PUBLISHED, pageable)
-                : tilRepository.findByUserIdAndStatus(userId, PostStatus.PUBLISHED, pageable);
+        boolean hasFilter = (keyword != null && !keyword.isBlank()) || (tag != null && !tag.isBlank());
+        Page<Til> tils;
+        if (hasFilter) {
+            tils = tilRepository.findByFilters(userId, PostStatus.PUBLISHED, potId, keyword, tag, pageable);
+        } else if (potId != null) {
+            tils = tilRepository.findByUserIdAndPotIdAndStatus(userId, potId, PostStatus.PUBLISHED, pageable);
+        } else {
+            tils = tilRepository.findByUserIdAndStatus(userId, PostStatus.PUBLISHED, pageable);
+        }
 
         return tils.map(TilResponse::from);
     }
