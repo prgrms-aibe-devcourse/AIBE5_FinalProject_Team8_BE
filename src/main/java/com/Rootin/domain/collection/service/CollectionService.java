@@ -1,22 +1,18 @@
 package com.Rootin.domain.collection.service;
 
-import com.Rootin.domain.collection.dto.PlantCollectionItem;
-import com.Rootin.domain.collection.dto.PlantCollectionResponse;
+import com.Rootin.domain.collection.dto.CollectionDexResponse;
+import com.Rootin.domain.collection.dto.DexEntry;
+import com.Rootin.domain.collection.dto.DexSection;
+import com.Rootin.domain.collection.dto.DexStats;
 import com.Rootin.domain.garden.entity.PlantItem;
-import com.Rootin.domain.garden.entity.Pot;
-import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
-import com.Rootin.domain.garden.repository.PotRepository;
-import com.Rootin.domain.garden.repository.WateringLogRepository;
-import com.Rootin.domain.garden.service.LevelCalculator;
 import com.Rootin.domain.plant.entity.Plant;
-import com.Rootin.domain.plant.entity.enums.Grade;
-import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,134 +24,119 @@ public class CollectionService {
 
     private final PlantRepository plantRepository;
     private final PlantItemRepository plantItemRepository;
-    private final PotRepository potRepository;
-    private final WateringLogRepository wateringLogRepository;
-    private final LevelCalculator levelCalculator;
 
-    private static final Map<String, String> SPECIES_MAP = Map.of(
+    private static final DateTimeFormatter LONG_FMT = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
+    private static final String[] STAGE_NAMES = {"씨앗", "새싹", "잎", "개화", "만개"};
+
+    private static final Map<String, String> PLANT_NAME_TO_SPECIES = Map.of(
             "기본 씨앗",  "seed",
-            "달빛씨앗",   "moonlight",
-            "버섯씨앗",   "mushroom"
+            "달빛씨앗",   "moon",
+            "버섯씨앗",   "shroom",
+            "선인장씨앗", "cactus",
+            "불꽃씨앗",   "fire",
+            "얼음씨앗",   "ice",
+            "번개씨앗",   "bolt",
+            "흑장미씨앗", "rose"
     );
 
-    private static final Map<GrowthStage, String> STAGE_KEY = Map.of(
-            GrowthStage.SEED,       "seed",
-            GrowthStage.SPROUT,     "sprout",
-            GrowthStage.MATURE,     "leaf",
-            GrowthStage.BLOOM,      "bloom",
-            GrowthStage.FULL_BLOOM, "full"
+    private record SpeciesMeta(
+            String key,
+            String label,
+            boolean rare,
+            String numRange,
+            String[] monNames
+    ) {}
+
+    private static final List<SpeciesMeta> SPECIES_LIST = List.of(
+            new SpeciesMeta("seed",   "씨앗몬 계열",   false, "001~005",
+                    new String[]{"씨드몬","새싹몬","잎몬","꽃몬","나무왕"}),
+            new SpeciesMeta("shroom", "버섯몬 계열",   false, "006~010",
+                    new String[]{"포자씨","애버섯","버섯몬","독버섯몬","버섯대왕"}),
+            new SpeciesMeta("cactus", "선인장몬 계열", false, "011~015",
+                    new String[]{"가시씨","가시싹","선인장몬","꽃선인장","선인장왕"}),
+            new SpeciesMeta("fire",   "불꽃몬 계열",   false, "016~020",
+                    new String[]{"불씨몬","불싹몬","불꽃몬","화염몬","불꽃왕"}),
+            new SpeciesMeta("ice",    "얼음몬 계열",   false, "021~025",
+                    new String[]{"얼음씨","얼음싹","얼음몬","서리몬","빙하왕"}),
+            new SpeciesMeta("moon",   "달빛씨앗 계열", true,  "026~030",
+                    new String[]{"달빛씨","달빛싹","달빛잎","달빛꽃","달빛왕"}),
+            new SpeciesMeta("bolt",   "번개씨앗 계열", true,  "031~035",
+                    new String[]{"번개씨","번개싹","번개몬","뇌전몬","번개왕"}),
+            new SpeciesMeta("rose",   "흑장미 계열",   true,  "036~040",
+                    new String[]{"흑장미씨","흑장미싹","흑장미몬","흑장미꽃","흑장미왕"})
     );
 
-    private static final int[]    THRESHOLDS  = {200, 500, 800, 1000};
-    private static final String[] STAGE_NAMES = {"새싹", "잎", "개화", "만개"};
+    private static final int TOTAL     = 40;
+    private static final int COMMON_CT = 25;
+    private static final int RARE_CT   = 15;
 
-    private static final DateTimeFormatter SHORT_FMT = DateTimeFormatter.ofPattern("MM.dd");
-    private static final DateTimeFormatter LONG_FMT  = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    public CollectionDexResponse getPlants(Long userId) {
+        List<Plant> allPlants = plantRepository.findAll();
 
-    public PlantCollectionResponse getPlants(Long userId) {
-        Map<Long, Plant> plantMap = plantRepository.findAll().stream()
+        // id → Plant (수확 기록에서 종 판별용)
+        Map<Long, Plant> plantById = allPlants.stream()
                 .collect(Collectors.toMap(Plant::getId, p -> p));
 
-        Map<Long, Pot> potMap = potRepository.findByUserId(userId).stream()
-                .collect(Collectors.toMap(Pot::getId, p -> p));
+        // speciesKey → (stageIndex → imageUrl) : GrowthStage ordinal = stageIndex (SEED=0 ~ FULL_BLOOM=4)
+        Map<String, Map<Integer, String>> imageUrlBySpeciesStage = new HashMap<>();
+        for (Plant plant : allPlants) {
+            String speciesKey = PLANT_NAME_TO_SPECIES.get(plant.getName());
+            if (speciesKey == null || plant.getImageUrl() == null) continue;
+            imageUrlBySpeciesStage
+                    .computeIfAbsent(speciesKey, k -> new HashMap<>())
+                    .put(plant.getGrowthStage().ordinal(), plant.getImageUrl());
+        }
 
-        List<PlantItem> allItems = plantItemRepository.findByUserId(userId);
+        // 수확 완료된 식물들을 species × stageIndex별로 수집 (최초 수확 날짜 보관)
+        List<PlantItem> harvestedItems = plantItemRepository.findByUserIdAndIsHarvestedTrue(userId);
 
-        Map<Long, List<PlantItem>> itemsByPot = allItems.stream()
-                .collect(Collectors.groupingBy(PlantItem::getPotId,
-                        Collectors.collectingAndThen(Collectors.toList(),
-                                list -> list.stream()
-                                        .sorted(Comparator.comparingLong(PlantItem::getId))
-                                        .collect(Collectors.toList()))));
-
-        Set<Long> encounteredPlantIds = new HashSet<>();
-        List<PlantCollectionItem> growing   = new ArrayList<>();
-        List<PlantCollectionItem> harvested = new ArrayList<>();
-
-        List<PlantItem> sortedItems = allItems.stream()
-                .sorted(Comparator.comparingInt(pi -> Boolean.TRUE.equals(pi.getIsHarvested()) ? 1 : 0))
-                .collect(Collectors.toList());
-
-        for (PlantItem item : sortedItems) {
-            Plant plant = plantMap.get(item.getPlantId());
+        // speciesKey → (stageIndex → 최초 harvestedAt)
+        Map<String, Map<Integer, LocalDateTime>> harvestDateBySpeciesStage = new HashMap<>();
+        for (PlantItem item : harvestedItems) {
+            Plant plant = plantById.get(item.getPlantId());
             if (plant == null) continue;
-            encounteredPlantIds.add(item.getPlantId());
-
-            Pot pot = potMap.get(item.getPotId());
-            String rarity  = plant.getGrade() == Grade.RARE ? "rare" : "common";
-            String species = SPECIES_MAP.getOrDefault(plant.getName(), "seed");
-
-            List<PlantItem> potHistory = itemsByPot.getOrDefault(item.getPotId(), List.of());
-            int round = potHistory.indexOf(item) + 1;
-
-            List<WateringLog> logs = wateringLogRepository
-                    .findByPotIdAndWateredAtGreaterThanEqualOrderByWateredAtAsc(
-                            item.getPotId(), item.getCreatedAt());
-            Map<String, String> stageDates = computeStageDates(logs, item);
-
-            GrowthStage stage = levelCalculator.determinePlantGrowthStage(item.getGrowthExp());
-            String currentStageKey = Boolean.TRUE.equals(item.getIsHarvested())
-                    ? "full" : STAGE_KEY.getOrDefault(stage, "seed");
-
-            // 수확된 식물은 수확 당시 레벨(harvestedLevel), 성장 중인 식물은 현재 레벨 사용
-            boolean isHarvested = Boolean.TRUE.equals(item.getIsHarvested());
-            Integer displayLevel = isHarvested
-                    ? item.getHarvestedLevel()
-                    : (pot != null ? pot.getLevel() : null);
-
-            PlantCollectionItem entry = new PlantCollectionItem(
-                    plant.getName(), species, rarity,
-                    isHarvested ? "harvested" : "growing",
-                    currentStageKey,
-                    displayLevel,
-                    pot != null ? pot.getTitle() : null,
-                    round,
-                    item.getCreatedAt().format(LONG_FMT),
-                    item.getHarvestedAt() != null ? item.getHarvestedAt().format(LONG_FMT) : null,
-                    stageDates,
-                    plant.getImageUrl()
-            );
-
-            if (isHarvested) harvested.add(entry);
-            else growing.add(entry);
+            String speciesKey = PLANT_NAME_TO_SPECIES.get(plant.getName());
+            if (speciesKey == null || item.getHarvestedAt() == null) continue;
+            // harvestedStageIndex가 null인 기존 데이터는 growthExp로 추정 (4 = FULL_BLOOM)
+            int stageIndex = item.getHarvestedStageIndex() != null
+                    ? item.getHarvestedStageIndex() : 4;
+            harvestDateBySpeciesStage
+                    .computeIfAbsent(speciesKey, k -> new HashMap<>())
+                    .merge(stageIndex, item.getHarvestedAt(),
+                            (existing, newer) -> existing.isBefore(newer) ? existing : newer);
         }
 
-        List<PlantCollectionItem> locked = plantMap.values().stream()
-                .filter(p -> !encounteredPlantIds.contains(p.getId()))
-                .map(p -> new PlantCollectionItem(
-                        p.getName(), SPECIES_MAP.getOrDefault(p.getName(), "seed"),
-                        p.getGrade() == Grade.RARE ? "rare" : "common",
-                        "locked", null, null, null, null, null, null, null, null))
-                .collect(Collectors.toList());
+        int totalCollected = 0;
+        List<DexSection> sections = new ArrayList<>();
 
-        List<PlantCollectionItem> result = new ArrayList<>();
-        result.addAll(growing);
-        result.addAll(harvested);
-        result.addAll(locked);
-        return new PlantCollectionResponse(result);
-    }
+        for (int si = 0; si < SPECIES_LIST.size(); si++) {
+            SpeciesMeta meta = SPECIES_LIST.get(si);
+            Map<Integer, LocalDateTime> stageDates = harvestDateBySpeciesStage.getOrDefault(meta.key(), Map.of());
+            Map<Integer, String> stageImageUrls = imageUrlBySpeciesStage.getOrDefault(meta.key(), Map.of());
 
-    private Map<String, String> computeStageDates(List<WateringLog> logs, PlantItem item) {
-        Map<String, String> dates = new LinkedHashMap<>();
-        dates.put("씨앗", item.getCreatedAt().format(SHORT_FMT));
+            List<DexEntry> entries = new ArrayList<>();
+            for (int stage = 0; stage < 5; stage++) {
+                boolean collected = stageDates.containsKey(stage);
+                String dexNum = String.format("%03d", si * 5 + stage + 1);
+                String harvestedAt = collected ? stageDates.get(stage).format(LONG_FMT) : null;
+                String imageUrl = stageImageUrls.get(stage);
 
-        int cumExp  = 0;
-        int cap     = item.getGrowthExp();
-        int nextIdx = 0;
-
-        for (WateringLog log : logs) {
-            if (nextIdx >= THRESHOLDS.length || cumExp >= cap) break;
-            int toAdd = Math.min(log.getExpGained(), cap - cumExp);
-            cumExp += toAdd;
-            while (nextIdx < THRESHOLDS.length && cumExp >= THRESHOLDS[nextIdx]) {
-                dates.put(STAGE_NAMES[nextIdx], log.getWateredAt().format(SHORT_FMT));
-                nextIdx++;
+                entries.add(new DexEntry(
+                        dexNum,
+                        stage,
+                        STAGE_NAMES[stage],
+                        collected ? meta.monNames()[stage] : null,
+                        collected,
+                        harvestedAt,
+                        imageUrl
+                ));
+                if (collected) totalCollected++;
             }
+
+            sections.add(new DexSection(meta.key(), meta.label(), meta.rare(), meta.numRange(), entries));
         }
 
-        for (int i = nextIdx; i < THRESHOLDS.length; i++) {
-            dates.put(STAGE_NAMES[i], null);
-        }
-        return dates;
+        return new CollectionDexResponse(new DexStats(TOTAL, COMMON_CT, RARE_CT, totalCollected), sections);
     }
 }

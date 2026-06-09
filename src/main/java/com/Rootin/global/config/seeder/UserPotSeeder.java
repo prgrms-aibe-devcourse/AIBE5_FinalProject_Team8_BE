@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Slf4j
@@ -55,16 +56,24 @@ public class UserPotSeeder {
                 .point(0)
                 .build());
 
-        Plant defaultPlant = plantRepository
+        // ── 식물 마스터 조회 ───────────────────────────────────────────────────
+        Plant seedPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage(PlantMasterSeeder.DEFAULT_PLANT_NAME, Grade.COMMON, GrowthStage.SEED)
                 .orElseThrow();
-        Plant rarePlant = plantRepository
+        Plant moonPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("달빛씨앗", Grade.RARE, GrowthStage.SEED)
-                .orElse(defaultPlant);
-        Plant mushroomPlant = plantRepository
+                .orElse(seedPlant);
+        Plant shroomPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("버섯씨앗", Grade.COMMON, GrowthStage.SEED)
-                .orElse(defaultPlant);
+                .orElse(seedPlant);
+        Plant cactusPlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("선인장씨앗", Grade.COMMON, GrowthStage.SEED)
+                .orElse(seedPlant);
+        Plant boltPlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("번개씨앗", Grade.RARE, GrowthStage.SEED)
+                .orElse(seedPlant);
 
+        // ── 화분 생성 ──────────────────────────────────────────────────────────
         Pot codingPot = potRepository.save(Pot.builder()
                 .userId(user.getId()).title("코딩").description("매일 한 가지씩 배우는 코딩 기록")
                 .level(1).totalExp(0).isDisplayed(true).build());
@@ -74,37 +83,86 @@ public class UserPotSeeder {
         Pot readingPot = potRepository.save(Pot.builder()
                 .userId(user.getId()).title("독서").description("책에서 건진 문장과 생각")
                 .level(1).totalExp(0).isDisplayed(false).build());
+        Pot mathPot = potRepository.save(Pot.builder()
+                .userId(user.getId()).title("수학").description("수학 개념과 풀이 기록")
+                .level(1).totalExp(0).isDisplayed(false).build());
+        Pot fitnessPot = potRepository.save(Pot.builder()
+                .userId(user.getId()).title("운동").description("운동 루틴과 기록")
+                .level(1).totalExp(0).isDisplayed(false).build());
 
         LocalDate today = LocalDate.now();
 
-        // 코딩 라운드1: 12달 전 ~ 6달 전 (수확 완료)
-        PlantItem coding1 = plantItemRepository.save(PlantItem.builder()
-                .userId(user.getId()).potId(codingPot.getId()).plantId(defaultPlant.getId())
-                .isHarvested(true).harvestedLevel(10).growthExp(1000).build());
-        jdbcTemplate.update("UPDATE plant_item SET created_at=?, harvested_at=? WHERE id=?",
+        // ── 도감 해금용 수확 이력 ──────────────────────────────────────────────
+        // CollectionService 로직: 수확 횟수 순서대로 stage 0 → 4 해금
+
+        // [seed] 기본 씨앗 3회 수확 → 씨드몬(0), 새싹몬(1), 잎몬(2) 해금
+        saveHarvested(user, codingPot, seedPlant,
                 today.minusMonths(12).atTime(10, 0),
-                today.minusMonths(6).atTime(20, 0), coding1.getId());
+                today.minusMonths(9).atTime(20, 0));
+        saveHarvested(user, codingPot, seedPlant,
+                today.minusMonths(9).atTime(20, 1),
+                today.minusMonths(5).atTime(20, 0));
+        saveHarvested(user, codingPot, seedPlant,
+                today.minusMonths(5).atTime(20, 1),
+                today.minusMonths(2).atTime(20, 0));
 
-        // 코딩 라운드2: 6달 전 ~ 현재 (새싹 성장 중)
-        PlantItem coding2 = plantItemRepository.save(PlantItem.builder()
-                .userId(user.getId()).potId(codingPot.getId()).plantId(defaultPlant.getId()).build());
+        // [shroom] 버섯씨앗 2회 수확 → 포자씨(0), 애버섯(1) 해금
+        saveHarvested(user, readingPot, shroomPlant,
+                today.minusMonths(10).atTime(10, 0),
+                today.minusMonths(7).atTime(20, 0));
+        saveHarvested(user, readingPot, shroomPlant,
+                today.minusMonths(7).atTime(20, 1),
+                today.minusMonths(3).atTime(20, 0));
+
+        // [cactus] 선인장씨앗 1회 수확 → 가시씨(0) 해금
+        saveHarvested(user, mathPot, cactusPlant,
+                today.minusMonths(8).atTime(10, 0),
+                today.minusMonths(4).atTime(20, 0));
+
+        // [moon] 달빛씨앗 2회 수확 → 달빛씨(0), 달빛싹(1) 해금 (희귀종)
+        saveHarvested(user, englishPot, moonPlant,
+                today.minusMonths(11).atTime(10, 0),
+                today.minusMonths(8).atTime(20, 0));
+        saveHarvested(user, englishPot, moonPlant,
+                today.minusMonths(8).atTime(20, 1),
+                today.minusMonths(4).atTime(20, 0));
+
+        // [bolt] 번개씨앗 1회 수확 → 번개씨(0) 해금 (희귀종)
+        saveHarvested(user, fitnessPot, boltPlant,
+                today.minusMonths(6).atTime(10, 0),
+                today.minusMonths(3).atTime(20, 0));
+
+        // ── 현재 성장 중인 PlantItem ───────────────────────────────────────────
+
+        // seed 4번째 사이클: 새싹 성장 중
+        PlantItem codingActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(codingPot.getId()).plantId(seedPlant.getId()).build());
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
-                today.minusMonths(6).atTime(20, 1), 250, coding2.getId());
+                today.minusMonths(2).atTime(20, 1), 250, codingActive.getId());
 
-        // 영어: 12달 전 ~ 현재 (개화 성장 중)
-        PlantItem english1 = plantItemRepository.save(PlantItem.builder()
-                .userId(user.getId()).potId(englishPot.getId()).plantId(rarePlant.getId()).build());
+        // moon 3번째 사이클: 개화 직전 성장 중
+        PlantItem englishActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(englishPot.getId()).plantId(moonPlant.getId()).build());
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
-                today.minusMonths(12).atTime(10, 0), 850, english1.getId());
+                today.minusMonths(4).atTime(20, 1), 850, englishActive.getId());
 
-        // 독서: 3달 전 ~ 현재 (씨앗 단계)
-        PlantItem reading1 = plantItemRepository.save(PlantItem.builder()
-                .userId(user.getId()).potId(readingPot.getId()).plantId(mushroomPlant.getId()).build());
+        // shroom 3번째 사이클: 씨앗 단계
+        PlantItem readingActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(readingPot.getId()).plantId(shroomPlant.getId()).build());
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
-                today.minusMonths(3).atTime(10, 0), 80, reading1.getId());
+                today.minusMonths(3).atTime(20, 1), 80, readingActive.getId());
 
-        log.info("유저·화분·PlantItem 생성 완료");
+        log.info("유저·화분·PlantItem 생성 완료 — 도감 9/40 해금 (seed×3, shroom×2, cactus×1, moon×2, bolt×1)");
         return Optional.of(new SeedContext(user, codingPot, englishPot, readingPot));
+    }
+
+    private void saveHarvested(User user, Pot pot, Plant plant,
+                               LocalDateTime createdAt, LocalDateTime harvestedAt) {
+        PlantItem item = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(pot.getId()).plantId(plant.getId())
+                .isHarvested(true).harvestedLevel(10).growthExp(1000).harvestedStageIndex(4).build());
+        jdbcTemplate.update("UPDATE plant_item SET created_at=?, harvested_at=? WHERE id=?",
+                createdAt, harvestedAt, item.getId());
     }
 
     /** TilSeeder로 전달할 컨텍스트 */
