@@ -14,6 +14,9 @@ import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
 import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.repository.PotTilCountProjection;
+import com.Rootin.domain.ai.repository.AiResultRepository;
+import com.Rootin.domain.ai.entity.AiResult;
+import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +52,7 @@ public class PotService {
     private final PlantItemRepository plantItemRepository;
     private final PlantRepository plantRepository;
     private final TilRepository tilRepository;
+    private final AiResultRepository aiResultRepository;
     private final LevelCalculator levelCalculator;
 
     /**
@@ -208,5 +212,46 @@ public class PotService {
                 request.getDescription() != null ? request.getDescription().trim() : null);
 
         return PotResponse.from(pot);
+    }
+
+    /**
+     * 특정 화분을 삭제합니다.
+     * 1. 화분 소유권 검증 (삭제 요청한 사용자가 화분의 소유자인지 확인)
+     * 2. 화분에 속한 TIL 기반으로 작성된 AI 분석 결과(AiResult) 조회 및 삭제 처리
+     *    (AiResult 삭제 시 cascade = CascadeType.ALL, orphanRemoval = true 설정에 의해 ai_result_til 중간 테이블 레코드도 자동 제거됨)
+     * 3. 화분에 속한 모든 TIL 포스트 삭제 처리
+     * 4. 화분에 심겨진 모든 식물(PlantItem) 데이터 삭제 처리
+     * 5. 화분(Pot) 데이터 삭제
+     */
+    @Transactional
+    public void deletePot(Long potId, Long userId) {
+        Pot pot = potRepository.findById(potId)
+                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+
+        if (!pot.getUserId().equals(userId)) {
+            throw CustomException.forbidden("해당 화분을 삭제할 권한이 없습니다.");
+        }
+
+        // 1. 해당 화분과 연결된 AI 분석 결과(AiResult) 조회 및 일괄 삭제 처리
+        List<AiResult> aiResults = aiResultRepository.findAllByPotId(potId);
+        if (!aiResults.isEmpty()) {
+            aiResultRepository.deleteAll(aiResults);
+        }
+
+        // 2. 해당 화분에 연결된 TIL 목록 조회 및 삭제 처리
+        List<Til> tils = tilRepository.findByPotId(potId);
+        if (!tils.isEmpty()) {
+            // TIL 삭제 (JPA 상속/조인 구조에 따라 base post 테이블 및 til_tag 테이블은 cascade/자동 삭제됨)
+            tilRepository.deleteAll(tils);
+        }
+
+        // 3. 해당 화분에 연결된 모든 식물 아이템(PlantItem) 삭제 처리
+        List<PlantItem> plantItems = plantItemRepository.findByPotIdOrderByIdAsc(potId);
+        if (!plantItems.isEmpty()) {
+            plantItemRepository.deleteAll(plantItems);
+        }
+
+        // 4. 화분 데이터 삭제
+        potRepository.delete(pot);
     }
 }

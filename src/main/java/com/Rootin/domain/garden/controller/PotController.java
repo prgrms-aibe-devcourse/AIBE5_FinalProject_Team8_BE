@@ -121,8 +121,21 @@ public class PotController {
             @AuthenticationPrincipal JwtUserDetails userDetails,
             @PathVariable Long potId,
             @Valid @RequestBody PotPlantRequest request
-    ) {
+     ) {
         PotPlantResponse response = potPlantService.plant(userDetails.getUserId(), potId, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * DELETE /api/v1/pots/{potId}
+     * 특정 화분을 삭제합니다.
+     */
+    @DeleteMapping("/{potId}")
+    public ResponseEntity<Void> deletePot(
+            @AuthenticationPrincipal JwtUserDetails userDetails,
+            @PathVariable Long potId
+    ) {
+        potService.deletePot(potId, userDetails.getUserId());
+        return ResponseEntity.noContent().build();
     }
 }

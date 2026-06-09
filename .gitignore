@@ -48,3 +48,7 @@ planning.md
 .docs
 .docs/
 .docs/myFolder/
+
+### macOS ###
+.DS_Store
+**/.DS_Store
