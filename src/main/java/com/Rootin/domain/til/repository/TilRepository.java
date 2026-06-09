@@ -17,6 +17,8 @@ public interface TilRepository extends JpaRepository<Til, Long> {
 
     Page<Til> findByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status, Pageable pageable);
 
+    List<Til> findByPotId(Long potId);
+
     @org.springframework.data.jpa.repository.Query("SELECT t.publishedAt FROM Til t WHERE t.user.id = :userId AND t.status = :status ORDER BY t.publishedAt DESC")
     java.util.List<java.time.LocalDateTime> findPublishedAtByUserId(
             @org.springframework.data.repository.query.Param("userId") Long userId,

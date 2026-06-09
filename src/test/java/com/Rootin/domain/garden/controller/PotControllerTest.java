@@ -399,4 +399,51 @@ class PotControllerTest {
                 .andExpect(jsonPath("$.growthStage").value("SEED"))
                 .andExpect(jsonPath("$.growthExp").value(0));
     }
+
+    @Test
+    @DisplayName("화분 삭제 API 호출 시 정상 처리되면 204 No Content를 반환한다")
+    void deletePotSuccess() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+
+        org.mockito.BDDMockito.doNothing().when(potService).deletePot(potId, userId);
+
+        // when & then
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("타인의 화분을 삭제하려고 하면 403 Forbidden을 반환한다")
+    void deletePotForbidden() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+
+        org.mockito.BDDMockito.doThrow(com.Rootin.global.exception.CustomException.forbidden("해당 화분을 삭제할 권한이 없습니다."))
+                .when(potService).deletePot(potId, userId);
+
+        // when & then
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 화분을 삭제하려고 하면 404 Not Found를 반환한다")
+    void deletePotNotFound() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 999L;
+
+        org.mockito.BDDMockito.doThrow(com.Rootin.global.exception.CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId))
+                .when(potService).deletePot(potId, userId);
+
+        // when & then
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isNotFound());
+    }
 }
