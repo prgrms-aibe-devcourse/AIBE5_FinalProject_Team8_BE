@@ -286,7 +286,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(til2, "content", "두 번째 TIL 본문");
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllById(List.of(100L, 101L))).willReturn(List.of(til, til2));
+        given(tilRepository.findAllByIdInAndStatus(List.of(100L, 101L), PostStatus.PUBLISHED)).willReturn(List.of(til, til2));
         given(aiPromptClient.summarizeTil(any())).willReturn(MOCK_SUMMARY_JSON);
 
         AiSummaryResponse response = aiService.summarize(
@@ -305,7 +305,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(otherTil, "user", other);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllById(List.of(100L, 200L))).willReturn(List.of(til, otherTil));
+        given(tilRepository.findAllByIdInAndStatus(List.of(100L, 200L), PostStatus.PUBLISHED)).willReturn(List.of(til, otherTil));
 
         assertThatThrownBy(() -> aiService.summarize(
                 new AiSummaryRequest(10L, List.of(100L, 200L)), 1L))
@@ -320,7 +320,7 @@ class AiServiceTest {
     @DisplayName("tilIds 전부 존재하지 않으면 404 -- OpenAI 미호출")
     void summarize_withTilIds_notFound_404() {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllById(List.of(999L))).willReturn(List.of());
+        given(tilRepository.findAllByIdInAndStatus(List.of(999L), PostStatus.PUBLISHED)).willReturn(List.of());
 
         assertThatThrownBy(() -> aiService.summarize(
                 new AiSummaryRequest(10L, List.of(999L)), 1L))
@@ -340,7 +340,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(owner, "point", totalCost * 2);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllById(List.of(100L))).willReturn(List.of(til));
+        given(tilRepository.findAllByIdInAndStatus(List.of(100L), PostStatus.PUBLISHED)).willReturn(List.of(til));
         given(aiPromptClient.generateQuiz(any(), eq(count))).willReturn(MOCK_QUIZ_JSON);
 
         AiQuizResponse response = aiService.generateQuiz(
@@ -363,7 +363,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(otherTil, "user", other);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllById(List.of(100L, 200L))).willReturn(List.of(til, otherTil));
+        given(tilRepository.findAllByIdInAndStatus(List.of(100L, 200L), PostStatus.PUBLISHED)).willReturn(List.of(til, otherTil));
 
         assertThatThrownBy(() -> aiService.generateQuiz(
                 new AiQuizRequest(10L, count, List.of(100L, 200L)), 1L))
