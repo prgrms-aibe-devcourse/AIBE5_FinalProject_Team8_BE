@@ -93,42 +93,42 @@ public class UserPotSeeder {
         LocalDate today = LocalDate.now();
 
         // ── 도감 해금용 수확 이력 ──────────────────────────────────────────────
-        // CollectionService 로직: 수확 횟수 순서대로 stage 0 → 4 해금
+        // CollectionService 로직: harvestedStageIndex 값으로 해당 stage 점등
 
         // [seed] 기본 씨앗 3회 수확 → 씨드몬(0), 새싹몬(1), 잎몬(2) 해금
-        saveHarvested(user, codingPot, seedPlant,
+        saveHarvested(user, codingPot, seedPlant, 0,
                 today.minusMonths(12).atTime(10, 0),
                 today.minusMonths(9).atTime(20, 0));
-        saveHarvested(user, codingPot, seedPlant,
+        saveHarvested(user, codingPot, seedPlant, 1,
                 today.minusMonths(9).atTime(20, 1),
                 today.minusMonths(5).atTime(20, 0));
-        saveHarvested(user, codingPot, seedPlant,
+        saveHarvested(user, codingPot, seedPlant, 2,
                 today.minusMonths(5).atTime(20, 1),
                 today.minusMonths(2).atTime(20, 0));
 
         // [shroom] 버섯씨앗 2회 수확 → 포자씨(0), 애버섯(1) 해금
-        saveHarvested(user, readingPot, shroomPlant,
+        saveHarvested(user, readingPot, shroomPlant, 0,
                 today.minusMonths(10).atTime(10, 0),
                 today.minusMonths(7).atTime(20, 0));
-        saveHarvested(user, readingPot, shroomPlant,
+        saveHarvested(user, readingPot, shroomPlant, 1,
                 today.minusMonths(7).atTime(20, 1),
                 today.minusMonths(3).atTime(20, 0));
 
         // [cactus] 선인장씨앗 1회 수확 → 가시씨(0) 해금
-        saveHarvested(user, mathPot, cactusPlant,
+        saveHarvested(user, mathPot, cactusPlant, 0,
                 today.minusMonths(8).atTime(10, 0),
                 today.minusMonths(4).atTime(20, 0));
 
         // [moon] 달빛씨앗 2회 수확 → 달빛씨(0), 달빛싹(1) 해금 (희귀종)
-        saveHarvested(user, englishPot, moonPlant,
+        saveHarvested(user, englishPot, moonPlant, 0,
                 today.minusMonths(11).atTime(10, 0),
                 today.minusMonths(8).atTime(20, 0));
-        saveHarvested(user, englishPot, moonPlant,
+        saveHarvested(user, englishPot, moonPlant, 1,
                 today.minusMonths(8).atTime(20, 1),
                 today.minusMonths(4).atTime(20, 0));
 
         // [bolt] 번개씨앗 1회 수확 → 번개씨(0) 해금 (희귀종)
-        saveHarvested(user, fitnessPot, boltPlant,
+        saveHarvested(user, fitnessPot, boltPlant, 0,
                 today.minusMonths(6).atTime(10, 0),
                 today.minusMonths(3).atTime(20, 0));
 
@@ -168,11 +168,11 @@ public class UserPotSeeder {
         return Optional.of(new SeedContext(user, codingPot, englishPot, readingPot, mathPot, fitnessPot));
     }
 
-    private void saveHarvested(User user, Pot pot, Plant plant,
+    private void saveHarvested(User user, Pot pot, Plant plant, int stageIndex,
                                LocalDateTime createdAt, LocalDateTime harvestedAt) {
         PlantItem item = plantItemRepository.save(PlantItem.builder()
                 .userId(user.getId()).potId(pot.getId()).plantId(plant.getId())
-                .isHarvested(true).harvestedLevel(10).growthExp(1000).harvestedStageIndex(4).build());
+                .isHarvested(true).harvestedLevel(10).growthExp(1000).harvestedStageIndex(stageIndex).build());
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, harvested_at=? WHERE id=?",
                 createdAt, harvestedAt, item.getId());
     }
