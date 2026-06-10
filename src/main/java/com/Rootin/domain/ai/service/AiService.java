@@ -148,7 +148,7 @@ public class AiService {
      * - 하나라도 타인 소유이면 403
      */
     private List<Til> resolveTilsByIds(List<Long> tilIds, Long userId, String action) {
-        List<Til> tils = tilRepository.findAllById(tilIds);
+        List<Til> tils = tilRepository.findAllByIdInAndStatus(tilIds, PostStatus.PUBLISHED);
         if (tils.isEmpty()) {
             throw CustomException.notFound(action + "할 TIL이 없습니다.");
         }
