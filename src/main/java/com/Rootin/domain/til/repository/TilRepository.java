@@ -30,6 +30,9 @@ public interface TilRepository extends JpaRepository<Til, Long> {
     // AI 서비스 전용 - 화분 내 전체 TIL 합산용
     List<Til> findByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
 
+    // AI 서비스 전용 - tilIds 선택 시 PUBLISHED 상태 TIL만 조회
+    List<Til> findAllByIdInAndStatus(List<Long> ids, PostStatus status);
+
     @Query(
         value = "SELECT DISTINCT t FROM Til t" +
                 " LEFT JOIN t.tilTags tt LEFT JOIN tt.tag tg" +
