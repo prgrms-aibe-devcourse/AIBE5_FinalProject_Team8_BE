@@ -143,19 +143,18 @@ public class AiService {
     // ----------------------------------------------------------------
 
     /**
-     * tilIds로 TIL을 조회하고, 모두 해당 userId 소유인지 검증한다.
+     * tilIds로 TIL을 조회하고 유효성을 검증한다.
+     * - userId 조건을 DB 레벨에서 적용해 타인의 LONGTEXT가 메모리에 올라오지 않도록 차단
      * - 조회 결과가 비어 있으면 404
-     * - 하나라도 타인 소유이면 403
+     * - 요청한 개수와 조회된 개수가 다르면 400 (존재하지 않거나 타인 소유 TIL 포함)
      */
     private List<Til> resolveTilsByIds(List<Long> tilIds, Long userId, String action) {
-        List<Til> tils = tilRepository.findAllByIdInAndStatus(tilIds, PostStatus.PUBLISHED);
+        List<Til> tils = tilRepository.findAllByIdInAndStatusAndUserId(tilIds, PostStatus.PUBLISHED, userId);
         if (tils.isEmpty()) {
             throw CustomException.notFound(action + "할 TIL이 없습니다.");
         }
-        boolean hasUnauthorized = tils.stream()
-                .anyMatch(t -> !t.getUser().getId().equals(userId));
-        if (hasUnauthorized) {
-            throw CustomException.forbidden("본인의 TIL만 " + action + "할 수 있습니다.");
+        if (tils.size() != tilIds.size()) {
+            throw CustomException.badRequest("존재하지 않거나 접근할 수 없는 TIL이 포함되어 있습니다.");
         }
         return tils;
     }
