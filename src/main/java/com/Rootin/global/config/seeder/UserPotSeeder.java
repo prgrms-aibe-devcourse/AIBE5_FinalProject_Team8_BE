@@ -152,8 +152,20 @@ public class UserPotSeeder {
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
                 today.minusMonths(3).atTime(20, 1), 80, readingActive.getId());
 
+        // cactus 2번째 사이클: 씨앗 단계
+        PlantItem mathActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(mathPot.getId()).plantId(cactusPlant.getId()).build());
+        jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
+                today.minusMonths(4).atTime(20, 1), 150, mathActive.getId());
+
+        // bolt 2번째 사이클: 씨앗 단계
+        PlantItem fitnessActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(fitnessPot.getId()).plantId(boltPlant.getId()).build());
+        jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
+                today.minusMonths(3).atTime(20, 1), 50, fitnessActive.getId());
+
         log.info("유저·화분·PlantItem 생성 완료 — 도감 9/40 해금 (seed×3, shroom×2, cactus×1, moon×2, bolt×1)");
-        return Optional.of(new SeedContext(user, codingPot, englishPot, readingPot));
+        return Optional.of(new SeedContext(user, codingPot, englishPot, readingPot, mathPot, fitnessPot));
     }
 
     private void saveHarvested(User user, Pot pot, Plant plant,
@@ -166,5 +178,5 @@ public class UserPotSeeder {
     }
 
     /** TilSeeder로 전달할 컨텍스트 */
-    public record SeedContext(User user, Pot codingPot, Pot englishPot, Pot readingPot) {}
+    public record SeedContext(User user, Pot codingPot, Pot englishPot, Pot readingPot, Pot mathPot, Pot fitnessPot) {}
 }
