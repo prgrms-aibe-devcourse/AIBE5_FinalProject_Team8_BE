@@ -24,7 +24,7 @@ cloud:
       access-key: ${AWS_ACCESS_KEY_ID:dummy}
       secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
     s3:
-      bucket: ${AWS_S3_BUCKET:rootin-bucket}
+      bucket: ${AWS_S3_BUCKET:team8-rootin-s3}
       endpoint: ${AWS_ENDPOINT:}
 
 

@@ -4,6 +4,7 @@ import com.Rootin.domain.plant.entity.Plant;
 import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
+import com.Rootin.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,9 +17,6 @@ import java.util.List;
 public class PlantMasterSeeder {
 
     static final String DEFAULT_PLANT_NAME = "기본 씨앗";
-
-    private static final String S3_BASE =
-            "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/plants/";
 
     private record PlantSpec(String name, Grade grade, String filePrefix) {}
 
@@ -38,7 +36,12 @@ public class PlantMasterSeeder {
             GrowthStage.BLOOM, GrowthStage.FULL_BLOOM
     };
 
+    private static final String[] STAGE_FILE_NAMES = {
+            "01_seed", "02_sprout", "03_leaf", "04_flower", "05_bloom"
+    };
+
     private final PlantRepository plantRepository;
+    private final S3Service s3Service;
 
     public void seed() {
         boolean exists = plantRepository
@@ -48,7 +51,7 @@ public class PlantMasterSeeder {
 
         for (PlantSpec spec : SPECS) {
             for (int i = 0; i < STAGES.length; i++) {
-                String imageUrl = S3_BASE + spec.filePrefix() + "_" + (i + 1) + ".svg";
+                String imageUrl = s3Service.getFileUrl("plants/" + spec.filePrefix() + "/" + STAGE_FILE_NAMES[i] + ".svg");
                 plantRepository.save(Plant.builder()
                         .name(spec.name())
                         .grade(spec.grade())
