@@ -135,6 +135,17 @@ public class TilSeeder {
             "그리디 증명 - 교환 논법으로 최적성 확인"
     );
 
+    private static final List<String> FITNESS_TITLES = List.of(
+            "스쿼트 자세 교정 — 무릎 정렬 포인트 정리",
+            "인터벌 트레이닝 30분 루틴 기록",
+            "유산소 vs 무산소 운동 비율 실험 후기",
+            "운동 전후 스트레칭 루틴 정리",
+            "데드리프트 허리 부상 없이 치는 법",
+            "3분할 루틴 한 달 후기",
+            "홈트 기구 없이 전신 운동하는 법",
+            "운동 일지 쓰는 법 — 중량·세트·휴식 기록 방법"
+    );
+
     // ── 태그별 TIL 본문 풀 ────────────────────────────────────────────────────
 
     private static final Map<String, List<String>> CONTENTS = Map.of(
@@ -428,6 +439,22 @@ public class TilSeeder {
                     "상태 정의를 말로 먼저 쓴다"는 습관이 생기니까 점화식이 훨씬 빨리 잡힌다.
                     Top-down(메모이제이션)으로 먼저 구현하고 Bottom-up으로 바꾸는 연습을 해야겠다.
                     """
+            ),
+            "운동", List.of(
+                    """
+                    ## 오늘 운동
+                    스쿼트 3세트 × 12회 진행. 무릎이 안으로 꺾이는 문제가 있어서 발 너비를 어깨 1.2배로 벌리고 발끝을 30도 바깥으로 했더니 자세가 안정됐다.
+
+                    ## 느낀 점
+                    폼부터 잡고 중량을 올리는 게 맞다. 욕심 부리다가 허리 다쳤던 기억이 있어서 이번엔 천천히 가기로 했다.
+                    """,
+                    """
+                    ## 오늘 운동
+                    인터벌 트레이닝 — 30초 전력 질주 + 90초 걷기 × 8세트. 심박수 145~165bpm 유지.
+
+                    ## 느낀 점
+                    꾸준히 하니 예전보다 심박수가 빨리 안정권으로 돌아온다. 유산소 능력이 분명히 올라가고 있다.
+                    """
             )
     );
 
@@ -482,7 +509,16 @@ public class TilSeeder {
         // Month -1
         new MonthlyEntry(1, 0, 500, "Java",      2), new MonthlyEntry(1, 0, 720, "React",     5),
         new MonthlyEntry(1, 0, 940, "알고리즘", 10), new MonthlyEntry(1, 1, 400, "영어",      3),
-        new MonthlyEntry(1, 1, 350, "문법",      2), new MonthlyEntry(1, 2, 600, "독서",      6)
+        new MonthlyEntry(1, 1, 350, "문법",      2), new MonthlyEntry(1, 2, 600, "독서",      6),
+        // Math pot (potIdx=3)
+        new MonthlyEntry(8, 3, 600, "알고리즘", 3), new MonthlyEntry(7, 3, 650, "알고리즘", 3),
+        new MonthlyEntry(6, 3, 600, "알고리즘", 2), new MonthlyEntry(5, 3, 700, "알고리즘", 4),
+        new MonthlyEntry(4, 3, 650, "알고리즘", 3), new MonthlyEntry(3, 3, 700, "알고리즘", 4),
+        new MonthlyEntry(2, 3, 700, "알고리즘", 4), new MonthlyEntry(1, 3, 750, "알고리즘", 5),
+        // Fitness pot (potIdx=4)
+        new MonthlyEntry(6, 4, 400, "운동", 3), new MonthlyEntry(5, 4, 420, "운동", 3),
+        new MonthlyEntry(4, 4, 450, "운동", 2), new MonthlyEntry(3, 4, 500, "운동", 3),
+        new MonthlyEntry(2, 4, 450, "운동", 3), new MonthlyEntry(1, 4, 500, "운동", 3)
     );
 
     // ── 이번 달 일별 시드 계획 ────────────────────────────────────────────────
@@ -516,6 +552,17 @@ public class TilSeeder {
         new DailyEntry(0, 400, "독서")
     );
 
+    private static final List<DailyEntry> MATH_DAYS = List.of(
+        new DailyEntry(22, 600, "알고리즘"), new DailyEntry(15, 700, "알고리즘"),
+        new DailyEntry(8,  650, "알고리즘"), new DailyEntry(2,  700, "알고리즘")
+    );
+
+    private static final List<DailyEntry> FITNESS_DAYS = List.of(
+        new DailyEntry(20, 400, "운동"),
+        new DailyEntry(12, 450, "운동"),
+        new DailyEntry(5,  400, "운동")
+    );
+
     // ── 제목/본문 인덱스 순환 카운터 ─────────────────────────────────────────
     private final Map<String, Integer> titleIdx = new java.util.HashMap<>();
     private final Map<String, Integer> contentIdx = new java.util.HashMap<>();
@@ -525,10 +572,12 @@ public class TilSeeder {
         Pot codingPot  = ctx.codingPot();
         Pot englishPot = ctx.englishPot();
         Pot readingPot = ctx.readingPot();
+        Pot mathPot    = ctx.mathPot();
+        Pot fitnessPot = ctx.fitnessPot();
 
-        Pot[] pots = {codingPot, englishPot, readingPot};
+        Pot[] pots = {codingPot, englishPot, readingPot, mathPot, fitnessPot};
         LocalDate today = LocalDate.now();
-        int[] potExp = {0, 0, 0};
+        int[] potExp = {0, 0, 0, 0, 0};
 
         // ── 태그 초기화 ───────────────────────────────────────────────────
         Map<String, Tag> tags = Map.of(
@@ -538,7 +587,8 @@ public class TilSeeder {
                 "영어",    getOrCreateTag("영어"),
                 "문법",    getOrCreateTag("문법"),
                 "독서",    getOrCreateTag("독서"),
-                "알고리즘", getOrCreateTag("알고리즘")
+                "알고리즘", getOrCreateTag("알고리즘"),
+                "운동",    getOrCreateTag("운동")
         );
 
         // ── 월별 데이터 ────────────────────────────────────────────────────
@@ -595,6 +645,30 @@ public class TilSeeder {
                     today.minusDays(d.daysAgo()).atTime(19, 0));
         }
 
+        // ── 이번 달 수학 ──────────────────────────────────────────────────
+        int curMathExp = 0;
+        for (DailyEntry d : MATH_DAYS) {
+            int exp   = calcExp(d.charCount());
+            int point = exp / 10;
+            int before = potExp[3] + curMathExp;
+            curMathExp += exp;
+            saveTil(user, mathPot, tags.get(d.tagKey()), d.charCount(), exp, point,
+                    0, 1.0, before, before + exp,
+                    today.minusDays(d.daysAgo()).atTime(18, 0));
+        }
+
+        // ── 이번 달 운동 ──────────────────────────────────────────────────
+        int curFitnessExp = 0;
+        for (DailyEntry d : FITNESS_DAYS) {
+            int exp   = calcExp(d.charCount());
+            int point = exp / 10;
+            int before = potExp[4] + curFitnessExp;
+            curFitnessExp += exp;
+            saveTil(user, fitnessPot, tags.get(d.tagKey()), d.charCount(), exp, point,
+                    0, 1.0, before, before + exp,
+                    today.minusDays(d.daysAgo()).atTime(17, 0));
+        }
+
         // ── 임시저장 초안 ─────────────────────────────────────────────────
         tilRepository.save(Til.createDraft(user,
                 "React Query 캐싱 전략 정리 중",
@@ -610,15 +684,21 @@ public class TilSeeder {
         int codingTotal  = potExp[0] + curCodingExp;
         int englishTotal = potExp[1] + curEnglishExp;
         int readingTotal = potExp[2] + curReadingExp;
+        int mathTotal    = potExp[3] + curMathExp;
+        int fitnessTotal = potExp[4] + curFitnessExp;
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
                 codingTotal,  calcLevel(codingTotal),  codingPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
                 englishTotal, calcLevel(englishTotal), englishPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
                 readingTotal, calcLevel(readingTotal), readingPot.getId());
+        jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
+                mathTotal,    calcLevel(mathTotal),    mathPot.getId());
+        jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
+                fitnessTotal, calcLevel(fitnessTotal), fitnessPot.getId());
 
         // ── 유저 최종 포인트 ─────────────────────────────────────────────
-        int earned = (codingTotal + englishTotal + readingTotal) / 10;
+        int earned = (codingTotal + englishTotal + readingTotal + mathTotal + fitnessTotal) / 10;
         int used   = 50 + 30 + 50;
         jdbcTemplate.update("UPDATE users SET point=? WHERE id=?",
                 Math.max(earned - used, 0), user.getId());
@@ -670,6 +750,7 @@ public class TilSeeder {
             case "문법"    -> GRAMMAR_TITLES;
             case "독서"    -> READING_TITLES;
             case "알고리즘" -> ALGO_TITLES;
+            case "운동"    -> FITNESS_TITLES;
             default        -> List.of(tagKey + " 학습 정리");
         };
         int idx = titleIdx.getOrDefault(tagKey, 0) % pool.size();
