@@ -73,7 +73,7 @@ class AiControllerTest {
 
         mockMvc.perform(post("/api/v1/ai/summary").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L))))
+                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary").value("핵심 요약 내용"))
                 .andExpect(jsonPath("$.keyPoints[0]").value("포인트1"))
@@ -98,7 +98,7 @@ class AiControllerTest {
 
         mockMvc.perform(post("/api/v1/ai/summary").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L))))
+                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L, null))))
                 .andExpect(status().isPaymentRequired());
     }
 
@@ -110,7 +110,7 @@ class AiControllerTest {
 
         mockMvc.perform(post("/api/v1/ai/summary").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L))))
+                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L, null))))
                 .andExpect(status().isForbidden());
     }
 
@@ -121,7 +121,7 @@ class AiControllerTest {
                 new AiSummaryResponse("요약", List.of(), 0, 0));
         mockMvc.perform(post("/api/v1/ai/summary").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L))))
+                        .content(objectMapper.writeValueAsString(new AiSummaryRequest(1L, null))))
                 .andExpect(status().isOk());
     }
 
@@ -144,7 +144,7 @@ class AiControllerTest {
 
         mockMvc.perform(post("/api/v1/ai/quiz").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, count))))
+                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, count, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quizzes[0].question").value("질문1"))
                 .andExpect(jsonPath("$.quizzes[0].answer").value("정답1"))
@@ -179,7 +179,7 @@ class AiControllerTest {
 
         mockMvc.perform(post("/api/v1/ai/quiz").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3))))
+                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3, null))))
                 .andExpect(status().isPaymentRequired());
     }
 
@@ -190,7 +190,7 @@ class AiControllerTest {
                 new AiQuizResponse(List.of(), 0, 0));
         mockMvc.perform(post("/api/v1/ai/quiz").with(csrf()).with(user(mockUserDetails))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3))))
+                        .content(objectMapper.writeValueAsString(new AiQuizRequest(1L, 3, null))))
                 .andExpect(status().isOk());
     }
 }

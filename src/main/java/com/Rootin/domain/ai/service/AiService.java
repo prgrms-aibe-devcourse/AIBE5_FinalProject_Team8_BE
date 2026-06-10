@@ -43,12 +43,9 @@ public class AiService {
 
     /**
      * TIL 요약 요청
-     * 1. 포인트 잔액 확인 (부족 시 402)
-     * 2. 화분 조회 + 소유자 검증
-     * 3. 화분 내 TIL 목록 조회 (게시된 것만) — 없으면 404
-     * 4. TIL 내용 합산 → OpenAI 요약 호출
-     * 5. 포인트 차감 + PointLog 저장
-     * 6. 응답 반환
+     * [tilIds 없음] 기존 로직: 화분 소유 검증 -> 화분 내 전체 PUBLISHED TIL 사용 (하위 호환)
+     * [tilIds 있음] 선택 로직: tilIds로 TIL 조회 -> 소유 검증(403) -> 빈 결과(404)
+     * 공통: 포인트 확인(402) -> 합산 -> OpenAI -> 포인트 차감 + PointLog
      */
     @Transactional
     public AiSummaryResponse summarize(AiSummaryRequest request, Long userId) {
@@ -60,18 +57,20 @@ public class AiService {
                     "포인트가 부족합니다. (필요: " + SUMMARY_POINT_COST + "P, 보유: " + user.getPoint() + "P)");
         }
 
-        Pot pot = potRepository.findById(request.potId())
-                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
-
-        if (!pot.getUserId().equals(user.getId())) {
-            throw CustomException.forbidden("본인의 화분만 요약할 수 있습니다.");
-        }
-
-        List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
-                user.getId(), request.potId(), PostStatus.PUBLISHED);
-
-        if (tils.isEmpty()) {
-            throw CustomException.notFound("요약할 TIL이 없습니다.");
+        List<Til> tils;
+        if (request.tilIds() != null && !request.tilIds().isEmpty()) {
+            tils = resolveTilsByIds(request.tilIds(), userId, "요약");
+        } else {
+            Pot pot = potRepository.findById(request.potId())
+                    .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+            if (!pot.getUserId().equals(user.getId())) {
+                throw CustomException.forbidden("본인의 화분만 요약할 수 있습니다.");
+            }
+            tils = tilRepository.findByUserIdAndPotIdAndStatus(
+                    user.getId(), request.potId(), PostStatus.PUBLISHED);
+            if (tils.isEmpty()) {
+                throw CustomException.notFound("요약할 TIL이 없습니다.");
+            }
         }
 
         String combinedContent = combineContents(tils);
@@ -95,13 +94,9 @@ public class AiService {
 
     /**
      * 복습 문제 생성 요청
-     * 1. 총 비용 계산 (count × 문항당 비용)
-     * 2. 포인트 잔액 확인 (부족 시 402)
-     * 3. 화분 조회 + 소유자 검증
-     * 4. 화분 내 TIL 목록 조회 — 없으면 404
-     * 5. TIL 내용 합산 → OpenAI 퀴즈 호출
-     * 6. 포인트 차감 + PointLog 저장
-     * 7. 응답 반환
+     * [tilIds 없음] 기존 로직: 화분 소유 검증 -> 화분 내 전체 PUBLISHED TIL 사용 (하위 호환)
+     * [tilIds 있음] 선택 로직: tilIds로 TIL 조회 -> 소유 검증(403) -> 빈 결과(404)
+     * 공통: 포인트 확인(402) -> 합산 -> OpenAI -> 포인트 차감 + PointLog
      */
     @Transactional
     public AiQuizResponse generateQuiz(AiQuizRequest request, Long userId) {
@@ -115,18 +110,20 @@ public class AiService {
                     "포인트가 부족합니다. (필요: " + totalCost + "P, 보유: " + user.getPoint() + "P)");
         }
 
-        Pot pot = potRepository.findById(request.potId())
-                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
-
-        if (!pot.getUserId().equals(user.getId())) {
-            throw CustomException.forbidden("본인의 화분으로만 복습 문제를 생성할 수 있습니다.");
-        }
-
-        List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
-                user.getId(), request.potId(), PostStatus.PUBLISHED);
-
-        if (tils.isEmpty()) {
-            throw CustomException.notFound("문제를 생성할 TIL이 없습니다.");
+        List<Til> tils;
+        if (request.tilIds() != null && !request.tilIds().isEmpty()) {
+            tils = resolveTilsByIds(request.tilIds(), userId, "퀴즈 생성");
+        } else {
+            Pot pot = potRepository.findById(request.potId())
+                    .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+            if (!pot.getUserId().equals(user.getId())) {
+                throw CustomException.forbidden("본인의 화분으로만 복습 문제를 생성할 수 있습니다.");
+            }
+            tils = tilRepository.findByUserIdAndPotIdAndStatus(
+                    user.getId(), request.potId(), PostStatus.PUBLISHED);
+            if (tils.isEmpty()) {
+                throw CustomException.notFound("문제를 생성할 TIL이 없습니다.");
+            }
         }
 
         String combinedContent = combineContents(tils);
@@ -143,7 +140,24 @@ public class AiService {
         return new AiQuizResponse(quizzes, totalCost, user.getPoint());
     }
 
-    // ─── 내부 헬퍼 ────────────────────────────────────────────────────
+    // ----------------------------------------------------------------
+
+    /**
+     * tilIds로 TIL을 조회하고 유효성을 검증한다.
+     * - userId 조건을 DB 레벨에서 적용해 타인의 LONGTEXT가 메모리에 올라오지 않도록 차단
+     * - 조회 결과가 비어 있으면 404
+     * - 요청한 개수와 조회된 개수가 다르면 400 (존재하지 않거나 타인 소유 TIL 포함)
+     */
+    private List<Til> resolveTilsByIds(List<Long> tilIds, Long userId, String action) {
+        List<Til> tils = tilRepository.findAllByIdInAndStatusAndUserId(tilIds, PostStatus.PUBLISHED, userId);
+        if (tils.isEmpty()) {
+            throw CustomException.notFound(action + "할 TIL이 없습니다.");
+        }
+        if (tils.size() != tilIds.size()) {
+            throw CustomException.badRequest("존재하지 않거나 접근할 수 없는 TIL이 포함되어 있습니다.");
+        }
+        return tils;
+    }
 
     /** 여러 TIL 내용을 구분자로 합산하여 하나의 문자열로 반환 */
     private String combineContents(List<Til> tils) {
