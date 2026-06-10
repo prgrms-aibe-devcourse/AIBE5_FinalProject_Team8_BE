@@ -30,8 +30,13 @@ public interface TilRepository extends JpaRepository<Til, Long> {
     // AI 서비스 전용 - 화분 내 전체 TIL 합산용
     List<Til> findByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
 
-    // AI 서비스 전용 - tilIds 선택 시 PUBLISHED 상태 TIL만 조회
-    List<Til> findAllByIdInAndStatus(List<Long> ids, PostStatus status);
+    // AI 서비스 전용 - tilIds 선택 시 본인 소유 + PUBLISHED TIL만 DB 레벨에서 필터
+    @Query("SELECT t FROM Til t WHERE t.id IN :ids AND t.status = :status AND t.user.id = :userId")
+    List<Til> findAllByIdInAndStatusAndUserId(
+            @Param("ids") List<Long> ids,
+            @Param("status") PostStatus status,
+            @Param("userId") Long userId
+    );
 
     @Query(
         value = "SELECT DISTINCT t FROM Til t" +
@@ -64,6 +69,4 @@ public interface TilRepository extends JpaRepository<Til, Long> {
     long countByUserIdAndStatus(Long userId, PostStatus status);
 
     long countByUserIdAndStatusAndPublishedAtBetween(Long userId, PostStatus status, LocalDateTime from, LocalDateTime to);
-
-    List<Til> findByUserIdAndStatusAndPublishedAtBetween(Long userId, PostStatus status, LocalDateTime from, LocalDateTime to);
 }
