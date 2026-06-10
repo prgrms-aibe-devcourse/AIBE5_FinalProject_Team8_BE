@@ -286,7 +286,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(til2, "content", "두 번째 TIL 본문");
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllByIdInAndStatus(List.of(100L, 101L), PostStatus.PUBLISHED)).willReturn(List.of(til, til2));
+        given(tilRepository.findAllByIdInAndStatusAndUserId(List.of(100L, 101L), PostStatus.PUBLISHED, 1L)).willReturn(List.of(til, til2));
         given(aiPromptClient.summarizeTil(any())).willReturn(MOCK_SUMMARY_JSON);
 
         AiSummaryResponse response = aiService.summarize(
@@ -298,19 +298,16 @@ class AiServiceTest {
     }
 
     @Test
-    @DisplayName("tilIds에 타인 TIL 포함 시 403 -- OpenAI 미호출")
-    void summarize_withTilIds_containsOtherUserTil_403() {
-        Til otherTil = new Til();
-        ReflectionTestUtils.setField(otherTil, "id", 200L);
-        ReflectionTestUtils.setField(otherTil, "user", other);
-
+    @DisplayName("tilIds에 타인 TIL 포함 시 400 -- DB 레벨 필터로 size 불일치 감지, OpenAI 미호출")
+    void summarize_withTilIds_containsOtherUserTil_400() {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllByIdInAndStatus(List.of(100L, 200L), PostStatus.PUBLISHED)).willReturn(List.of(til, otherTil));
+        // userId 조건으로 DB에서 타인 TIL 제외 → size 불일치 → 400
+        given(tilRepository.findAllByIdInAndStatusAndUserId(List.of(100L, 200L), PostStatus.PUBLISHED, 1L)).willReturn(List.of(til));
 
         assertThatThrownBy(() -> aiService.summarize(
                 new AiSummaryRequest(10L, List.of(100L, 200L)), 1L))
                 .isInstanceOf(CustomException.class)
-                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 
         verify(aiPromptClient, never()).summarizeTil(any());
         verify(pointLogRepository, never()).save(any());
@@ -320,7 +317,7 @@ class AiServiceTest {
     @DisplayName("tilIds 전부 존재하지 않으면 404 -- OpenAI 미호출")
     void summarize_withTilIds_notFound_404() {
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllByIdInAndStatus(List.of(999L), PostStatus.PUBLISHED)).willReturn(List.of());
+        given(tilRepository.findAllByIdInAndStatusAndUserId(List.of(999L), PostStatus.PUBLISHED, 1L)).willReturn(List.of());
 
         assertThatThrownBy(() -> aiService.summarize(
                 new AiSummaryRequest(10L, List.of(999L)), 1L))
@@ -340,7 +337,7 @@ class AiServiceTest {
         ReflectionTestUtils.setField(owner, "point", totalCost * 2);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllByIdInAndStatus(List.of(100L), PostStatus.PUBLISHED)).willReturn(List.of(til));
+        given(tilRepository.findAllByIdInAndStatusAndUserId(List.of(100L), PostStatus.PUBLISHED, 1L)).willReturn(List.of(til));
         given(aiPromptClient.generateQuiz(any(), eq(count))).willReturn(MOCK_QUIZ_JSON);
 
         AiQuizResponse response = aiService.generateQuiz(
@@ -352,23 +349,20 @@ class AiServiceTest {
     }
 
     @Test
-    @DisplayName("tilIds에 타인 TIL 포함 시 퀴즈 403 -- OpenAI 미호출")
-    void generateQuiz_withTilIds_containsOtherUserTil_403() {
+    @DisplayName("tilIds에 타인 TIL 포함 시 퀴즈 400 -- DB 레벨 필터로 size 불일치 감지, OpenAI 미호출")
+    void generateQuiz_withTilIds_containsOtherUserTil_400() {
         int count = 2;
         int totalCost = count * AiPolicy.QUIZ_POINT_COST_PER_QUESTION;
         ReflectionTestUtils.setField(owner, "point", totalCost * 2);
 
-        Til otherTil = new Til();
-        ReflectionTestUtils.setField(otherTil, "id", 200L);
-        ReflectionTestUtils.setField(otherTil, "user", other);
-
         given(userRepository.findById(1L)).willReturn(Optional.of(owner));
-        given(tilRepository.findAllByIdInAndStatus(List.of(100L, 200L), PostStatus.PUBLISHED)).willReturn(List.of(til, otherTil));
+        // userId 조건으로 DB에서 타인 TIL 제외 → size 불일치 → 400
+        given(tilRepository.findAllByIdInAndStatusAndUserId(List.of(100L, 200L), PostStatus.PUBLISHED, 1L)).willReturn(List.of(til));
 
         assertThatThrownBy(() -> aiService.generateQuiz(
                 new AiQuizRequest(10L, count, List.of(100L, 200L)), 1L))
                 .isInstanceOf(CustomException.class)
-                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 
         verify(aiPromptClient, never()).generateQuiz(any(), anyInt());
         verify(pointLogRepository, never()).save(any());
