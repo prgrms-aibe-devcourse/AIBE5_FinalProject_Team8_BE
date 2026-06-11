@@ -26,6 +26,8 @@ import com.Rootin.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +71,9 @@ class ExperienceServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager em;
 
     private User testUser;
     private User otherUser;
@@ -130,40 +135,38 @@ class ExperienceServiceTest {
     }
 
     @Test
-    @DisplayName("기본 물주기 처리 시 경험치와 포인트가 정상 연산되어 반영되고 이력이 남는다")
+    @DisplayName("기본 물주기 처리 시 경험치가 정상 연산되어 반영되고 이력이 남는다 (포인트는 오늘의 목표에서만 지급)")
     void applyWateringSuccess() {
         // given
-        // 실제 데이터 무결성 검증을 통과하기 위해 테스트용 TIL을 DB에 먼저 저장합니다.
         Til testTil = Til.create(testUser, "자바 공부방 TIL", "내용", testPot);
         tilRepository.save(testTil);
 
-        int contentLength = 500; // 기본 경험치 100점 예상 (500 * 0.2)
-        int streakDays = 0;      // 보너스 0% -> 최종 100 Exp, 10 Point 예상
+        int contentLength = 500; // 기본 경험치 100점 예상 (500 * 0.2), 스트릭 0일 -> 배율 1.0
 
         // when
         experienceService.applyWatering(testUser.getId(), testPot, contentLength, testTil.getId());
 
         // then
-        // 1. 화분 경험치 증가 및 레벨업 검증 (100 Exp 쌓였으므로 2레벨 도달 예상, 첫 작성은 0일 스트릭 적용됨)
+        // 1. 화분 경험치 증가 및 레벨업 검증 (100 Exp -> 2레벨)
         Pot updatedPot = potRepository.findById(testPot.getId()).orElseThrow();
         assertThat(updatedPot.getTotalExp()).isEqualTo(100);
         assertThat(updatedPot.getLevel()).isEqualTo(2);
 
-        // 1-2. 식물 경험치 증가 검증 (100 Exp)
+        // 2. 식물 경험치 증가 검증
         PlantItem updatedPlantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(testPot.getId()).orElseThrow();
         assertThat(updatedPlantItem.getGrowthExp()).isEqualTo(100);
 
-        // 2. 유저 포인트 적립 검증 (100 Exp의 10% = 10 P)
+        // 3. 포인트는 오늘의 목표(DashboardService)에서만 지급 — TIL 작성 시 user.point 변화 없음
         User updatedUser = userRepository.findById(testUser.getId()).orElseThrow();
-        assertThat(updatedUser.getPoint()).isEqualTo(10);
+        assertThat(updatedUser.getPoint()).isEqualTo(0);
 
-        // 3. 물주기 이력 저장 상태 및 세부 필드 검증
+        // 4. 물주기 이력 저장 상태 및 세부 필드 검증
         List<WateringLog> logs = wateringLogRepository.findByPotId(testPot.getId());
         assertThat(logs).hasSize(1);
         WateringLog log = logs.get(0);
         assertThat(log.getUserId()).isEqualTo(testUser.getId());
         assertThat(log.getExpGained()).isEqualTo(100);
-        assertThat(log.getPointGained()).isEqualTo(10);
+        assertThat(log.getPointGained()).isEqualTo(0); // 포인트는 퀘스트에서 지급
         assertThat(log.getContentLength()).isEqualTo(500);
         assertThat(log.getStreakDays()).isEqualTo(0);
         assertThat(log.getAppliedMultiplier()).isEqualTo(1.0);
@@ -172,13 +175,9 @@ class ExperienceServiceTest {
         assertThat(log.getBeforeTotalExp()).isEqualTo(0);
         assertThat(log.getAfterTotalExp()).isEqualTo(100);
 
-        // 4. 포인트 적립 상세 이력(PointLog) 저장 상태 및 필드 검증
+        // 5. TIL 작성으로 인한 PointLog 없음
         List<PointLog> pointLogs = pointLogRepository.findAll();
-        assertThat(pointLogs).hasSize(1);
-        PointLog pointLog = pointLogs.get(0);
-        assertThat(pointLog.getUser().getId()).isEqualTo(testUser.getId());
-        assertThat(pointLog.getReason()).isEqualTo(PointLogReason.TIL_WRITE);
-        assertThat(pointLog.getAmount()).isEqualTo(10);
+        assertThat(pointLogs).isEmpty();
     }
 
     @Test
@@ -199,6 +198,15 @@ class ExperienceServiceTest {
         tilRepository.save(oldTil3);
         jdbcTemplate.update("UPDATE til SET published_at = ? WHERE post_id = ?", now.minusDays(3), oldTil3.getId());
 
+        // jdbcTemplate으로 변경한 published_at이 JPA L1 캐시에 의해 무시되지 않도록
+        // 캐시를 플러시 후 초기화합니다. 이후 JPQL 쿼리는 DB에서 신선한 값을 읽습니다.
+        em.flush();
+        em.clear();
+
+        // em.clear() 후 testPot가 detached 상태가 되므로 re-fetch하여 관리 상태로 복원합니다.
+        // detached 엔티티는 JPA dirty checking 대상이 아니라 서비스 내 pot.addExp() 변경이 DB에 반영되지 않습니다.
+        testPot = potRepository.findById(testPot.getId()).orElseThrow();
+
         // 실제 데이터 정합성 검사를 통과하기 위해 오늘 날짜로 발행되는 실제 TIL 포스트를 생성합니다.
         Til todayTil = Til.create(testUser, "오늘의 공부 내용", "내용", testPot);
         tilRepository.save(todayTil);
@@ -208,6 +216,11 @@ class ExperienceServiceTest {
 
         // when
         experienceService.applyWatering(testUser.getId(), testPot, contentLength, todayTil.getId());
+
+        // 서비스가 변경한 pot dirty 상태를 DB에 강제 반영 후 캐시를 초기화합니다.
+        // L1 캐시 hit/miss 여부와 관계없이 DB 기준으로 확인하여 환경 차이에 의한 플레이키 테스트를 방지합니다.
+        em.flush();
+        em.clear();
 
         // then
         Pot updatedPot = potRepository.findById(testPot.getId()).orElseThrow();

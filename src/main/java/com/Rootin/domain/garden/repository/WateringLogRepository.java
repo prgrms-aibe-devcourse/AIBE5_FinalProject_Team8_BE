@@ -48,8 +48,15 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
     // 성장 이력 차트용 - 최근 30건
     List<WateringLog> findTop30ByUserIdOrderByWateredAtDesc(Long userId);
 
-    // 활동 캘린더용 - 기간별 물주기 이력
+    // 활동 캘린더용 - 기간별 물주기 이력 (inclusive BETWEEN)
     List<WateringLog> findByUserIdAndWateredAtBetween(
+            Long userId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
+    // 퀘스트용 - 반열린 구간 [from, to) 조회. datetime(6) microsecond 누락 방지
+    List<WateringLog> findByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(
             Long userId,
             LocalDateTime from,
             LocalDateTime to

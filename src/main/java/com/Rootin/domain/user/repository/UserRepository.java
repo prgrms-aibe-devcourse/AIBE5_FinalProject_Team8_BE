@@ -5,6 +5,7 @@ import com.Rootin.domain.user.entity.ENUM.Provider;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,6 +27,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
     boolean existsByNickname(String nickname);
+
+    /** 포인트를 원자적으로 증감 — 동시 요청 시 lost update 방지 */
+    @Modifying
+    @Query("UPDATE User u SET u.point = u.point + :amount WHERE u.id = :userId")
+    void incrementPoint(@Param("userId") Long userId, @Param("amount") int amount);
 
     List<User> findByIsDeletedTrueAndDeletedAtBefore(LocalDateTime cutoff);
 }

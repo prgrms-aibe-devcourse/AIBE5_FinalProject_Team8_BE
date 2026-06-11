@@ -14,6 +14,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
 
 # 테스트 시 OpenAI 호출 차단 (더미 키 사용)
 openai:
