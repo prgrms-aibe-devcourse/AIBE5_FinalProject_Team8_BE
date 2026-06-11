@@ -70,4 +70,25 @@ public class PointLog {
         this.amount = amount;
         this.awardedDate = awardedDate;
     }
+
+    /**
+     * QUEST 계열 포인트 지급 전용 팩토리 메서드.
+     * awardedDate 를 반드시 지정하도록 강제하여 (user_id, reason, awarded_date) 유니크 제약이 올바르게 동작함을 보장합니다.
+     *
+     * @param user        수령 유저 (프록시 허용)
+     * @param reason      QUEST_Q1 / QUEST_Q2 / QUEST_Q3 중 하나
+     * @param amount      지급 포인트 (양수)
+     * @param awardedDate 지급 날짜 (오늘, non-null)
+     */
+    public static PointLog forQuest(User user, PointLogReason reason, int amount, LocalDate awardedDate) {
+        if (awardedDate == null) {
+            throw new IllegalArgumentException("QUEST 계열 PointLog는 awardedDate가 필수입니다.");
+        }
+        return PointLog.builder()
+                .user(user)
+                .reason(reason)
+                .amount(amount)
+                .awardedDate(awardedDate)
+                .build();
+    }
 }
