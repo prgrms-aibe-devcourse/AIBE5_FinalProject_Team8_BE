@@ -253,13 +253,8 @@ public class PotService {
             tilRepository.deleteAll(tils);
         }
 
-<<<<<<< HEAD
-        // 3. 해당 화분에 연결된 모든 식물 아이템(PlantItem) 삭제 처리
-        List<PlantItem> plantItems = plantItemRepository.findActivePlantItemsByPotId(potId);
-=======
         // 3. 해당 화분에 연결된 활성 식물 아이템(isHarvested=false/null)만 삭제 — 수확 완료 항목은 도감 보존
-        List<PlantItem> plantItems = plantItemRepository.findByPotIdOrderByIdAsc(potId);
->>>>>>> 84317f7 (docs: 화분 삭제 로직 주석 수정)
+        List<PlantItem> plantItems = plantItemRepository.findActivePlantItemsByPotId(potId);
         if (!plantItems.isEmpty()) {
             plantItemRepository.deleteAll(plantItems);
         }
