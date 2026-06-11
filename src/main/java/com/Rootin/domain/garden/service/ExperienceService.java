@@ -97,12 +97,12 @@ public class ExperienceService {
         int streakDays = levelCalculator.calculatePreviousStreak(publishedTimes);
         log.info("조회된 이전 연속 작성일 수 (Streak Days): {}일", streakDays);
 
-        // 5. 경험치 및 포인트 획득량 계산.
+        // 5. 경험치 획득량 계산.
         // 순수 계산은 LevelCalculator에 위임하여, 이 서비스는 "조회-검증-상태변경-저장" 흐름에 집중합니다.
+        // 포인트는 TIL 작성 시 지급하지 않으며, DashboardService의 퀘스트 달성 시점에 지급됩니다.
         int gainedExp = levelCalculator.calculateExperience(contentLength, streakDays);
-        int gainedPoint = levelCalculator.calculatePoints(gainedExp);
         double appliedMultiplier = levelCalculator.calculateStreakMultiplier(streakDays);
-        log.info("획득 경험치: {} Exp (글자 수: {}, 배율: {}x), 적립 포인트: {} P", gainedExp, contentLength, appliedMultiplier, gainedPoint);
+        log.info("획득 경험치: {} Exp (글자 수: {}, 배율: {}x)", gainedExp, contentLength, appliedMultiplier);
 
         // 6. 화분 경험치 가산 및 레벨 계산.
         // WateringLog에 전/후 상태를 남겨야 하므로 변경 전 값을 먼저 백업합니다.
