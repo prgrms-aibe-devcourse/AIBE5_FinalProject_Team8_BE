@@ -62,6 +62,7 @@ public class HarvestService {
                 harvestedPlant.getName(),
                 harvestedPlant.getGrade() == Grade.RARE ? "희귀" : "일반",
                 pot.getLevel(),
+                stageIndex,
                 nextPlant.getName(),
                 nextPlant.getGrade() == Grade.RARE ? "희귀" : "일반"
         );
