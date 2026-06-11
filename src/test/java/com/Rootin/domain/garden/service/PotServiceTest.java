@@ -457,6 +457,46 @@ class PotServiceTest {
     }
 
     @Test
+    @DisplayName("화분 삭제 시 수확 완료(isHarvested=true)된 PlantItem은 삭제되지 않고 도감 기록이 보존된다")
+    void deletePotPreservesHarvestedPlantItems() {
+        // given
+        User user = User.builder()
+                .email("harvestpreserve@rootin.com")
+                .nickname("수확보존자")
+                .build();
+        userRepository.save(user);
+
+        PotResponse createdPot = potService.createPot(
+                user.getId(),
+                PotCreateRequest.builder().title("도감보존 화분").build()
+        );
+        Long potId = createdPot.getId();
+
+        Plant defaultPlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("기본 씨앗", Grade.COMMON, GrowthStage.SEED)
+                .orElseThrow();
+
+        // 수확 완료된 PlantItem 직접 저장 (도감 기록)
+        PlantItem harvestedItem = PlantItem.builder()
+                .userId(user.getId())
+                .potId(potId)
+                .plantId(defaultPlant.getId())
+                .isHarvested(true)
+                .harvestedAt(java.time.LocalDateTime.now().minusDays(1))
+                .harvestedLevel(2)
+                .harvestedStageIndex(3)
+                .build();
+        PlantItem saved = plantItemRepository.save(harvestedItem);
+
+        // when
+        potService.deletePot(potId, user.getId());
+
+        // then — 화분은 삭제되고, 수확 완료 PlantItem(도감 기록)은 보존
+        assertThat(potRepository.findById(potId)).isEmpty();
+        assertThat(plantItemRepository.findById(saved.getId())).isPresent();
+    }
+
+    @Test
     @DisplayName("타인의 화분을 삭제하려고 시도하면 FORBIDDEN 예외가 발생한다")
     void deletePotForbidden() {
         // given

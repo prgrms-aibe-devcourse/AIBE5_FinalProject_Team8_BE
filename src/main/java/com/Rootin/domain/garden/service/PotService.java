@@ -228,7 +228,7 @@ public class PotService {
      * 2. 화분에 속한 TIL 기반으로 작성된 AI 분석 결과(AiResult) 조회 및 삭제 처리
      *    (AiResult 삭제 시 cascade = CascadeType.ALL, orphanRemoval = true 설정에 의해 ai_result_til 중간 테이블 레코드도 자동 제거됨)
      * 3. 화분에 속한 모든 TIL 포스트 삭제 처리
-     * 4. 화분에 심겨진 모든 식물(PlantItem) 데이터 삭제 처리
+     * 4. 화분에 심겨진 활성 식물(isHarvested=false) 삭제 처리 — 수확 완료 항목은 도감 기록 보존을 위해 제외
      * 5. 화분(Pot) 데이터 삭제
      */
     @Transactional
@@ -253,8 +253,8 @@ public class PotService {
             tilRepository.deleteAll(tils);
         }
 
-        // 3. 해당 화분에 연결된 모든 식물 아이템(PlantItem) 삭제 처리
-        List<PlantItem> plantItems = plantItemRepository.findByPotIdOrderByIdAsc(potId);
+        // 3. 해당 화분에 연결된 활성 식물 아이템(isHarvested=false/null)만 삭제 — 수확 완료 항목은 도감 보존
+        List<PlantItem> plantItems = plantItemRepository.findActivePlantItemsByPotId(potId);
         if (!plantItems.isEmpty()) {
             plantItemRepository.deleteAll(plantItems);
         }
