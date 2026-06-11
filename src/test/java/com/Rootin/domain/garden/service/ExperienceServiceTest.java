@@ -217,6 +217,11 @@ class ExperienceServiceTest {
         // when
         experienceService.applyWatering(testUser.getId(), testPot, contentLength, todayTil.getId());
 
+        // 서비스가 변경한 pot dirty 상태를 DB에 강제 반영 후 캐시를 초기화합니다.
+        // L1 캐시 hit/miss 여부와 관계없이 DB 기준으로 확인하여 환경 차이에 의한 플레이키 테스트를 방지합니다.
+        em.flush();
+        em.clear();
+
         // then
         Pot updatedPot = potRepository.findById(testPot.getId()).orElseThrow();
         assertThat(updatedPot.getTotalExp()).isEqualTo(115);
