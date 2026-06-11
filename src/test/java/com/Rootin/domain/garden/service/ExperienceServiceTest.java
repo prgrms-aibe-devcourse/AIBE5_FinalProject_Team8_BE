@@ -26,6 +26,8 @@ import com.Rootin.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +71,9 @@ class ExperienceServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager em;
 
     private User testUser;
     private User otherUser;
@@ -192,6 +197,11 @@ class ExperienceServiceTest {
         Til oldTil3 = Til.create(testUser, "3일전 TIL", "내용", testPot);
         tilRepository.save(oldTil3);
         jdbcTemplate.update("UPDATE til SET published_at = ? WHERE post_id = ?", now.minusDays(3), oldTil3.getId());
+
+        // jdbcTemplate으로 변경한 published_at이 JPA L1 캐시에 의해 무시되지 않도록
+        // 캐시를 플러시 후 초기화합니다. 이후 JPQL 쿼리는 DB에서 신선한 값을 읽습니다.
+        em.flush();
+        em.clear();
 
         // 실제 데이터 정합성 검사를 통과하기 위해 오늘 날짜로 발행되는 실제 TIL 포스트를 생성합니다.
         Til todayTil = Til.create(testUser, "오늘의 공부 내용", "내용", testPot);
