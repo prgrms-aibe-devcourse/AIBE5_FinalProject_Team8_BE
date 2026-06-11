@@ -254,7 +254,7 @@ public class PotService {
         }
 
         // 3. 해당 화분에 연결된 모든 식물 아이템(PlantItem) 삭제 처리
-        List<PlantItem> plantItems = plantItemRepository.findByPotIdOrderByIdAsc(potId);
+        List<PlantItem> plantItems = plantItemRepository.findActivePlantItemsByPotId(potId);
         if (!plantItems.isEmpty()) {
             plantItemRepository.deleteAll(plantItems);
         }
