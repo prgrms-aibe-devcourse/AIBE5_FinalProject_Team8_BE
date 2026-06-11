@@ -25,4 +25,20 @@ public interface TilTagRepository extends JpaRepository<TilTag, Long> {
             @Param("status") PostStatus status,
             @Param("from") LocalDateTime from
     );
+
+    // 퀘스트 Q2용 - 오늘 발행된 TIL에 붙은 태그 수 반환
+    @Query("""
+        SELECT COUNT(tt) FROM TilTag tt
+        JOIN tt.til t
+        WHERE t.user.id = :userId
+        AND t.status = :status
+        AND t.publishedAt >= :from
+        AND t.publishedAt <= :to
+    """)
+    long countByUserTodayTil(
+            @Param("userId") Long userId,
+            @Param("status") PostStatus status,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }
