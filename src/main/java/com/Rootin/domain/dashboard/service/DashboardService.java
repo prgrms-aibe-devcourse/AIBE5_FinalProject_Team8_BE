@@ -203,27 +203,33 @@ public class DashboardService {
 
     private void awardQuestPoints(Long userId, boolean q1, boolean q2, boolean q3,
                                    LocalDateTime from, LocalDateTime to) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+        // 달성된 퀘스트가 없으면 DB 조회 없이 early return
+        if (!q1 && !q2 && !q3) return;
 
         // 오늘 이미 지급된 퀘스트 reason을 1번 쿼리로 조회 후 메모리에서 중복 체크
         Set<PointLogReason> awardedToday = pointLogRepository.findReasonsByUserIdAndCreatedAtBetween(userId, from, to);
 
-        awardIfNew(user, q1, PointLogReason.QUEST_Q1, 50, awardedToday);
-        awardIfNew(user, q2, PointLogReason.QUEST_Q2, 30, awardedToday);
-        awardIfNew(user, q3, PointLogReason.QUEST_Q3, 20, awardedToday);
+        // User 풀 로딩 없이 프록시 참조만 사용 (PointLog FK 저장용)
+        User userRef = userRepository.getReferenceById(userId);
+        LocalDate today = from.toLocalDate();
+
+        awardIfNew(userId, userRef, q1, PointLogReason.QUEST_Q1, 50, awardedToday, today);
+        awardIfNew(userId, userRef, q2, PointLogReason.QUEST_Q2, 30, awardedToday, today);
+        awardIfNew(userId, userRef, q3, PointLogReason.QUEST_Q3, 20, awardedToday, today);
     }
 
-    private void awardIfNew(User user, boolean done, PointLogReason reason, int point,
-                             Set<PointLogReason> awardedToday) {
+    private void awardIfNew(Long userId, User userRef, boolean done, PointLogReason reason,
+                             int point, Set<PointLogReason> awardedToday, LocalDate awardedDate) {
         if (!done) return;
         if (awardedToday.contains(reason)) return;
 
-        user.addPoint(point);
+        // 원자적 UPDATE — 동시 요청 시 lost update 방지
+        userRepository.incrementPoint(userId, point);
         pointLogRepository.save(PointLog.builder()
-                .user(user)
+                .user(userRef)
                 .reason(reason)
                 .amount(point)
+                .awardedDate(awardedDate)
                 .build());
     }
 
