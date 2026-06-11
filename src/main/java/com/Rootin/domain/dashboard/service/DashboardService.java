@@ -206,15 +206,18 @@ public class DashboardService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
-        awardIfNew(user, q1, PointLogReason.QUEST_Q1, 50, from, to);
-        awardIfNew(user, q2, PointLogReason.QUEST_Q2, 30, from, to);
-        awardIfNew(user, q3, PointLogReason.QUEST_Q3, 20, from, to);
+        // 오늘 이미 지급된 퀘스트 reason을 1번 쿼리로 조회 후 메모리에서 중복 체크
+        Set<PointLogReason> awardedToday = pointLogRepository.findReasonsByUserIdAndCreatedAtBetween(userId, from, to);
+
+        awardIfNew(user, q1, PointLogReason.QUEST_Q1, 50, awardedToday);
+        awardIfNew(user, q2, PointLogReason.QUEST_Q2, 30, awardedToday);
+        awardIfNew(user, q3, PointLogReason.QUEST_Q3, 20, awardedToday);
     }
 
     private void awardIfNew(User user, boolean done, PointLogReason reason, int point,
-                             LocalDateTime from, LocalDateTime to) {
+                             Set<PointLogReason> awardedToday) {
         if (!done) return;
-        if (pointLogRepository.existsByUserIdAndReasonAndCreatedAtBetween(user.getId(), reason, from, to)) return;
+        if (awardedToday.contains(reason)) return;
 
         user.addPoint(point);
         pointLogRepository.save(PointLog.builder()
