@@ -23,6 +23,7 @@ public class DatabaseSeeder {
     public void seed() {
         log.info("=== DB 시드 데이터 검사 시작 ===");
         plantMasterSeeder.seed();
+        userPotSeeder.fixDuplicateActivePlantItems();
         userPotSeeder.seed().ifPresent(tilSeeder::seed);
         log.info("=== DB 시드 데이터 완료 ===");
     }

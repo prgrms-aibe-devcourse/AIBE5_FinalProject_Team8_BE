@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -62,16 +63,16 @@ public class UserPotSeeder {
                 .orElseThrow();
         Plant moonPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("달빛씨앗", Grade.RARE, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 달빛씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
         Plant shroomPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("버섯씨앗", Grade.COMMON, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 버섯씨앗 (COMMON/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
         Plant cactusPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("선인장씨앗", Grade.COMMON, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 선인장씨앗 (COMMON/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
         Plant boltPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("번개씨앗", Grade.RARE, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 번개씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
 
         // ── 화분 생성 ──────────────────────────────────────────────────────────
         Pot codingPot = potRepository.save(Pot.builder()
@@ -175,6 +176,30 @@ public class UserPotSeeder {
                 .isHarvested(true).harvestedLevel(10).growthExp(1000).harvestedStageIndex(stageIndex).build());
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, harvested_at=? WHERE id=?",
                 createdAt, harvestedAt, item.getId());
+    }
+
+    /**
+     * 화분별 활성 PlantItem(isHarvested=false)이 두 개 이상인 경우 낮은 ID를 삭제합니다.
+     * boltPlant fallback 등 시드 데이터 오염으로 발생한 중복 데이터를 정리합니다.
+     */
+    public void fixDuplicateActivePlantItems() {
+        List<PlantItem> allActive = plantItemRepository.findByUserIdAndIsHarvestedFalse(
+                userRepository.findByEmail(TEST_EMAIL).map(u -> u.getId()).orElse(null)
+        );
+        if (allActive == null || allActive.isEmpty()) return;
+
+        java.util.Map<Long, List<PlantItem>> byPot = allActive.stream()
+                .collect(java.util.stream.Collectors.groupingBy(PlantItem::getPotId));
+
+        byPot.forEach((potId, items) -> {
+            if (items.size() <= 1) return;
+            // id 내림차순 정렬 후 첫 번째(가장 높은 ID)만 남기고 나머지 삭제
+            items.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+            List<PlantItem> toDelete = items.subList(1, items.size());
+            plantItemRepository.deleteAll(toDelete);
+            log.warn("[데이터 정합성 수정] 화분 ID {} 에서 중복 활성 PlantItem {} 개 삭제 (보존 ID: {})",
+                    potId, toDelete.size(), items.get(0).getId());
+        });
     }
 
     /** TilSeeder로 전달할 컨텍스트 */
