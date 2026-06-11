@@ -203,6 +203,10 @@ class ExperienceServiceTest {
         em.flush();
         em.clear();
 
+        // em.clear() 후 testPot가 detached 상태가 되므로 re-fetch하여 관리 상태로 복원합니다.
+        // detached 엔티티는 JPA dirty checking 대상이 아니라 서비스 내 pot.addExp() 변경이 DB에 반영되지 않습니다.
+        testPot = potRepository.findById(testPot.getId()).orElseThrow();
+
         // 실제 데이터 정합성 검사를 통과하기 위해 오늘 날짜로 발행되는 실제 TIL 포스트를 생성합니다.
         Til todayTil = Til.create(testUser, "오늘의 공부 내용", "내용", testPot);
         tilRepository.save(todayTil);
