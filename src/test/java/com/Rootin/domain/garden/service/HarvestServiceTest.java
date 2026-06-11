@@ -96,6 +96,7 @@ class HarvestServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.harvestedPlantName()).isEqualTo("일반 씨앗");
         assertThat(response.harvestedLevel()).isEqualTo(3); // testPot.level
+        assertThat(response.harvestedStageIndex()).isEqualTo(4);
 
         // Assert — 수확된 PlantItem 상태 검증
         PlantItem harvested = plantItemRepository.findById(activePlant.getId()).orElseThrow();
@@ -121,8 +122,9 @@ class HarvestServiceTest {
                 .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
                 .growthExp(850).isHarvested(false).build());
 
-        harvestService.harvest(testUser.getId(), testPot.getId());
+        HarvestResponse response = harvestService.harvest(testUser.getId(), testPot.getId());
 
+        assertThat(response.harvestedStageIndex()).isEqualTo(3);
         // 수확 후 findByPotIdAndIsHarvestedFalse는 새로 심어진 씨앗을 반환하므로
         // 수확된 항목은 findByUserIdAndIsHarvestedTrue로 별도 조회합니다.
         PlantItem harvestedItem = plantItemRepository
@@ -143,8 +145,9 @@ class HarvestServiceTest {
                 .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
                 .growthExp(300).isHarvested(false).build());
 
-        harvestService.harvest(testUser.getId(), testPot.getId());
+        HarvestResponse response = harvestService.harvest(testUser.getId(), testPot.getId());
 
+        assertThat(response.harvestedStageIndex()).isEqualTo(1);
         PlantItem harvestedItem = plantItemRepository
                 .findByUserIdAndIsHarvestedTrue(testUser.getId()).stream()
                 .findFirst().orElseThrow();
@@ -163,8 +166,9 @@ class HarvestServiceTest {
                 .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
                 .growthExp(50).isHarvested(false).build());
 
-        harvestService.harvest(testUser.getId(), testPot.getId());
+        HarvestResponse response = harvestService.harvest(testUser.getId(), testPot.getId());
 
+        assertThat(response.harvestedStageIndex()).isEqualTo(0);
         PlantItem harvestedItem = plantItemRepository
                 .findByUserIdAndIsHarvestedTrue(testUser.getId()).stream()
                 .findFirst().orElseThrow();
