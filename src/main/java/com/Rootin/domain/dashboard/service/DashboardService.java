@@ -1,6 +1,9 @@
 package com.Rootin.domain.dashboard.service;
 
 import com.Rootin.domain.dashboard.dto.*;
+import com.Rootin.domain.gamification.entity.PointLog;
+import com.Rootin.domain.gamification.entity.enums.PointLogReason;
+import com.Rootin.domain.gamification.repository.PointLogRepository;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PotRepository;
@@ -12,6 +15,7 @@ import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.til.repository.TilTagRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
+import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +37,7 @@ public class DashboardService {
     private final TilTagRepository tilTagRepository;
     private final PotRepository potRepository;
     private final UserRepository userRepository;
+    private final PointLogRepository pointLogRepository;
     private final LevelCalculator levelCalculator;
 
     public GrassGraphResponse getGrassGraph(Long userId, int months) {
@@ -162,6 +167,7 @@ public class DashboardService {
         return new InterestsResponse(interests);
     }
 
+    @Transactional
     public QuestResponse getQuests(Long userId) {
         LocalDate today = LocalDate.now();
         LocalDateTime todayStart = today.atStartOfDay();
@@ -172,30 +178,50 @@ public class DashboardService {
         // Q1: 오늘 TIL >= 1개
         boolean q1 = !todayLogs.isEmpty();
 
-        // Q2: 연속 기록 2일 이상
-        List<LocalDateTime> publishedTimes = tilRepository.findPublishedAtByUserId(userId, PostStatus.PUBLISHED);
-        boolean q2 = levelCalculator.calculateStreak(publishedTimes) >= 2;
+        // Q2: 오늘 TIL에 태그 >= 1개
+        long todayTagCount = tilTagRepository.countByUserTodayTil(userId, PostStatus.PUBLISHED, todayStart, todayEnd);
+        boolean q2 = todayTagCount >= 1;
 
-        // Q3: 오늘 총 글자 수 >= 500
+        // Q3: 오늘 총 글자 수 >= 200
         int todayCharCount = todayLogs.stream().mapToInt(WateringLog::getContentLength).sum();
-        boolean q3 = todayCharCount >= 500;
+        boolean q3 = todayCharCount >= 200;
 
-        // Q4: 주말이면 TIL >= 1개, 평일이면 자동 달성
-        DayOfWeek dow = today.getDayOfWeek();
-        boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
-        boolean q4 = !isWeekend || q1;
+        // 달성된 퀘스트에 대해 오늘 첫 달성이면 포인트 지급
+        awardQuestPoints(userId, q1, q2, q3, todayStart, todayEnd);
 
         List<QuestDto> quests = List.of(
                 new QuestDto("Q1", "TIL 1개 작성하기", q1, 50),
-                new QuestDto("Q2", "연속 기록 이어가기", q2, 30),
-                new QuestDto("Q3", "500자 이상 작성", q3, 20),
-                new QuestDto("Q4", "주말에도 한 줄 기록", q4, 10)
+                new QuestDto("Q2", "TIL에 태그 달기", q2, 30),
+                new QuestDto("Q3", "200자 이상 작성", q3, 20)
         );
 
         int earnedToday = quests.stream().filter(QuestDto::done).mapToInt(QuestDto::point).sum();
         int totalToday  = quests.stream().mapToInt(QuestDto::point).sum();
 
         return new QuestResponse(quests, earnedToday, totalToday);
+    }
+
+    private void awardQuestPoints(Long userId, boolean q1, boolean q2, boolean q3,
+                                   LocalDateTime from, LocalDateTime to) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+
+        awardIfNew(user, q1, PointLogReason.QUEST_Q1, 50, from, to);
+        awardIfNew(user, q2, PointLogReason.QUEST_Q2, 30, from, to);
+        awardIfNew(user, q3, PointLogReason.QUEST_Q3, 20, from, to);
+    }
+
+    private void awardIfNew(User user, boolean done, PointLogReason reason, int point,
+                             LocalDateTime from, LocalDateTime to) {
+        if (!done) return;
+        if (pointLogRepository.existsByUserIdAndReasonAndCreatedAtBetween(user.getId(), reason, from, to)) return;
+
+        user.addPoint(point);
+        pointLogRepository.save(PointLog.builder()
+                .user(user)
+                .reason(reason)
+                .amount(point)
+                .build());
     }
 
     private int calculateMaxStreak(Set<LocalDate> dateSet) {
