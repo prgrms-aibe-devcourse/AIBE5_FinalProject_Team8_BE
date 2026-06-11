@@ -1,6 +1,5 @@
-package com.Rootin.global.config;
+package com.Rootin.global.s3;
 
-import com.Rootin.global.s3.S3Properties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
