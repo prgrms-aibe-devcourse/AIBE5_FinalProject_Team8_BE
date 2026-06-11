@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 public interface PointLogRepository extends JpaRepository<PointLog, Long> {
 
@@ -24,12 +25,13 @@ public interface PointLogRepository extends JpaRepository<PointLog, Long> {
             @Param("to") LocalDateTime to
             );
 
-    // MT-01 오늘의 목표 - 하루 1회 중복 지급 방지용
-    boolean existsByUserIdAndReasonAndCreatedAtBetween(
-            Long userId,
-            PointLogReason reason,
-            LocalDateTime from,
-            LocalDateTime to
+    // MT-01 오늘의 목표 - 오늘 지급된 퀘스트 reason 목록 단건 조회 (중복 지급 방지용)
+    @Query("SELECT pl.reason FROM PointLog pl " +
+            "WHERE pl.user.id = :userId AND pl.createdAt BETWEEN :from AND :to")
+    Set<PointLogReason> findReasonsByUserIdAndCreatedAtBetween(
+            @Param("userId") Long userId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
     );
 
     // MT-02 포인트 현황 - 총 적립 포인트 (양수 합산)
