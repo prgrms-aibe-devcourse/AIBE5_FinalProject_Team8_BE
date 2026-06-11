@@ -62,16 +62,16 @@ public class UserPotSeeder {
                 .orElseThrow();
         Plant moonPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("달빛씨앗", Grade.RARE, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 달빛씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
         Plant shroomPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("버섯씨앗", Grade.COMMON, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 버섯씨앗 (COMMON/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
         Plant cactusPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("선인장씨앗", Grade.COMMON, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 선인장씨앗 (COMMON/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
         Plant boltPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("번개씨앗", Grade.RARE, GrowthStage.SEED)
-                .orElse(seedPlant);
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 번개씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
 
         // ── 화분 생성 ──────────────────────────────────────────────────────────
         Pot codingPot = potRepository.save(Pot.builder()

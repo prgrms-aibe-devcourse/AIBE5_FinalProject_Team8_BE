@@ -17,11 +17,13 @@ public class DatabaseSeeder {
     private final PlantMasterSeeder plantMasterSeeder;
     private final UserPotSeeder userPotSeeder;
     private final TilSeeder tilSeeder;
+    private final SchemaSeeder schemaSeeder;
 
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seed() {
         log.info("=== DB 시드 데이터 검사 시작 ===");
+        schemaSeeder.ensureUniqueActivePlantPerPot();
         plantMasterSeeder.seed();
         userPotSeeder.seed().ifPresent(tilSeeder::seed);
         log.info("=== DB 시드 데이터 완료 ===");
