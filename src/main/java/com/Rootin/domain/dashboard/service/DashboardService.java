@@ -169,17 +169,19 @@ public class DashboardService {
 
     @Transactional
     public QuestResponse getQuests(Long userId) {
-        LocalDate today = LocalDate.now();
-        LocalDateTime todayStart = today.atStartOfDay();
-        LocalDateTime todayEnd   = today.atTime(23, 59, 59);
+        LocalDate today        = LocalDate.now();
+        LocalDateTime todayStart    = today.atStartOfDay();
+        // 반열린 구간 [todayStart, tomorrowStart) — datetime(6) microsecond 누락 방지
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
-        List<WateringLog> todayLogs = wateringLogRepository.findByUserIdAndWateredAtBetween(userId, todayStart, todayEnd);
+        List<WateringLog> todayLogs = wateringLogRepository
+                .findByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(userId, todayStart, tomorrowStart);
 
         // Q1: 오늘 TIL >= 1개
         boolean q1 = !todayLogs.isEmpty();
 
         // Q2: 오늘 TIL에 태그 >= 1개
-        long todayTagCount = tilTagRepository.countByUserTodayTil(userId, PostStatus.PUBLISHED, todayStart, todayEnd);
+        long todayTagCount = tilTagRepository.countByUserTodayTil(userId, PostStatus.PUBLISHED, todayStart, tomorrowStart);
         boolean q2 = todayTagCount >= 1;
 
         // Q3: 오늘 총 글자 수 >= 200
@@ -187,7 +189,7 @@ public class DashboardService {
         boolean q3 = todayCharCount >= 200;
 
         // 달성된 퀘스트에 대해 오늘 첫 달성이면 포인트 지급
-        awardQuestPoints(userId, q1, q2, q3, todayStart, todayEnd);
+        awardQuestPoints(userId, q1, q2, q3, today);
 
         List<QuestDto> quests = List.of(
                 new QuestDto("Q1", "TIL 1개 작성하기", q1, 50),
@@ -201,17 +203,19 @@ public class DashboardService {
         return new QuestResponse(quests, earnedToday, totalToday);
     }
 
-    private void awardQuestPoints(Long userId, boolean q1, boolean q2, boolean q3,
-                                   LocalDateTime from, LocalDateTime to) {
+    private static final Set<PointLogReason> QUEST_REASONS =
+            Set.of(PointLogReason.QUEST_Q1, PointLogReason.QUEST_Q2, PointLogReason.QUEST_Q3);
+
+    private void awardQuestPoints(Long userId, boolean q1, boolean q2, boolean q3, LocalDate today) {
         // 달성된 퀘스트가 없으면 DB 조회 없이 early return
         if (!q1 && !q2 && !q3) return;
 
-        // 오늘 이미 지급된 퀘스트 reason을 1번 쿼리로 조회 후 메모리에서 중복 체크
-        Set<PointLogReason> awardedToday = pointLogRepository.findReasonsByUserIdAndCreatedAtBetween(userId, from, to);
+        // awardedDate 기준으로 오늘 이미 지급된 퀘스트 reason 조회 (createdAt BETWEEN 대신)
+        Set<PointLogReason> awardedToday =
+                pointLogRepository.findQuestReasonsByUserIdAndAwardedDate(userId, today, QUEST_REASONS);
 
         // User 풀 로딩 없이 프록시 참조만 사용 (PointLog FK 저장용)
         User userRef = userRepository.getReferenceById(userId);
-        LocalDate today = from.toLocalDate();
 
         awardIfNew(userId, userRef, q1, PointLogReason.QUEST_Q1, 50, awardedToday, today);
         awardIfNew(userId, userRef, q2, PointLogReason.QUEST_Q2, 30, awardedToday, today);
@@ -225,12 +229,7 @@ public class DashboardService {
 
         // 원자적 UPDATE — 동시 요청 시 lost update 방지
         userRepository.incrementPoint(userId, point);
-        pointLogRepository.save(PointLog.builder()
-                .user(userRef)
-                .reason(reason)
-                .amount(point)
-                .awardedDate(awardedDate)
-                .build());
+        pointLogRepository.save(PointLog.forQuest(userRef, reason, point, awardedDate));
     }
 
     private int calculateMaxStreak(Set<LocalDate> dateSet) {
