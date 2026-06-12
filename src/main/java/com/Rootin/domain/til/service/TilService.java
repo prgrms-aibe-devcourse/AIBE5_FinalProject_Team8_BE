@@ -1,7 +1,9 @@
 package com.Rootin.domain.til.service;
 
+import com.Rootin.domain.ai.repository.AiResultTilRepository;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.garden.service.ExperienceService;
 import com.Rootin.domain.til.dto.request.DraftSaveRequest;
 import com.Rootin.domain.til.dto.request.TilCreateRequest;
@@ -32,6 +34,8 @@ public class TilService {
     private final UserRepository userRepository;
     private final PotRepository potRepository;
     private final ExperienceService experienceService;
+    private final AiResultTilRepository aiResultTilRepository;
+    private final WateringLogRepository wateringLogRepository;
 
     @Transactional
     public TilResponse create(Long userId, TilCreateRequest request) {
@@ -101,6 +105,11 @@ public class TilService {
     public void delete(Long tilId, Long userId) {
         Til til = getTilOrThrow(tilId);
         validateOwner(til, userId);
+        // FK 참조 테이블을 먼저 정리한 뒤 TIL 삭제
+        // - ai_result_til: 중간 테이블만 제거, ai_results 레코드는 유지
+        // - watering_log: TIL에 귀속된 물주기 이력 제거 (경험치 중복 방지 unique 제약 해소)
+        aiResultTilRepository.deleteByTilId(tilId);
+        wateringLogRepository.deleteByPostId(tilId);
         tilRepository.delete(til);
     }
 
