@@ -20,11 +20,10 @@ public class DashboardController {
 
     @GetMapping("/grass")
     public ResponseEntity<ApiResponse<GrassGraphResponse>> getGrassGraph(
-            @AuthenticationPrincipal JwtUserDetails userDetails,
-            @RequestParam(defaultValue = "3") int months
+            @AuthenticationPrincipal JwtUserDetails userDetails
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getGrassGraph(userDetails.getUserId(), months)));
+                dashboardService.getGrassGraph(userDetails.getUserId())));
     }
 
     @GetMapping("/weekly")
