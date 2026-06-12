@@ -103,6 +103,7 @@ class TilServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
 
         verifyNoInteractions(aiResultTilRepository, wateringLogRepository);
+        verify(tilRepository, never()).delete(any());
     }
 
     @Test
@@ -115,6 +116,7 @@ class TilServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         verifyNoInteractions(aiResultTilRepository, wateringLogRepository);
+        verify(tilRepository, never()).delete(any());
     }
 
 }
