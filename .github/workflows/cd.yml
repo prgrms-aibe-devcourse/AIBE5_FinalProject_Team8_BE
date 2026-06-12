@@ -48,3 +48,15 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/rootin-be:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/rootin-be:${{ github.sha }}
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/rootin
+            docker compose -f docker-compose.yml pull be
+            docker compose -f docker-compose.yml up -d --no-deps be
+            docker image prune -f

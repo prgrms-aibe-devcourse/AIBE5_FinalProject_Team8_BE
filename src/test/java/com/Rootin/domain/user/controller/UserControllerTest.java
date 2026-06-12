@@ -1,6 +1,5 @@
 package com.Rootin.domain.user.controller;
 
-import com.Rootin.domain.user.dto.PresignedUrlResponse;
 import com.Rootin.domain.user.dto.UserMeResponse;
 import com.Rootin.domain.user.dto.UserUpdateRequest;
 import com.Rootin.domain.user.entity.User;

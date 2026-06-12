@@ -1,0 +1,8 @@
+build/
+.gradle/
+.idea/
+*.iml
+out/
+src/test/
+.env
+.docs/
