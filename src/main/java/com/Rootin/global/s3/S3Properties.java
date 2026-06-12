@@ -4,6 +4,10 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+// ───────── Application의 Cloud.aws 설정값 ───────────────────────────
+// 설정(리전, 버킷, 키, 엔드포인트)을 담는 그릇
+// 비어있는 칸은 S3 Config에서 IAM Role을 사용
+
 @ConfigurationProperties(prefix = "cloud.aws")
 @Getter
 @Setter

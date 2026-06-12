@@ -195,4 +195,15 @@ public class PotService {
 
         return PotResponse.from(pot);
     }
+
+    // S3에서 사용하기 위한 Validation
+    public void validateOwnership(Long userId, Long potId) {
+        Pot pot = potRepository.findById(potId)
+                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+
+        if (!pot.getUserId().equals(userId)) {
+            throw CustomException.forbidden("해당 화분에 접근할 권한이 없습니다.");
+        }
+    }
+
 }
