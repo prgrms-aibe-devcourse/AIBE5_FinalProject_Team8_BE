@@ -40,9 +40,9 @@ public class DashboardService {
     private final PointLogRepository pointLogRepository;
     private final LevelCalculator levelCalculator;
 
-    public GrassGraphResponse getGrassGraph(Long userId, int months) {
+    public GrassGraphResponse getGrassGraph(Long userId) {
         LocalDate today = LocalDate.now();
-        LocalDateTime from = today.minusMonths(months).atStartOfDay();
+        LocalDateTime from = today.minusYears(1).atStartOfDay();
         LocalDateTime to   = today.atTime(23, 59, 59);
         List<WateringLog> logs = wateringLogRepository.findByUserIdAndWateredAtBetween(userId, from, to);
 
@@ -64,7 +64,7 @@ public class DashboardService {
         int currentStreak = levelCalculator.calculateStreak(publishedTimes);
         int maxStreak = calculateMaxStreak(byDate.keySet());
 
-        return new GrassGraphResponse(months, cells, currentStreak, maxStreak);
+        return new GrassGraphResponse(cells, currentStreak, maxStreak);
     }
 
     public WeeklyStatsResponse getWeeklyStats(Long userId) {

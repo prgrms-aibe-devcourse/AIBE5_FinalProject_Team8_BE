@@ -2,9 +2,11 @@ package com.Rootin.domain.garden.repository;
 
 import com.Rootin.domain.garden.entity.WateringLog;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +32,12 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
      * @return 이미 존재하면 true, 없으면 false
      */
     boolean existsByPostId(Long postId);
+
+    // TIL 삭제 시 연관 물주기 로그 일괄 제거
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM WateringLog w WHERE w.postId = :postId")
+    void deleteByPostId(@Param("postId") Long postId);
 
     /**
      * 특정 사용자가 소유한 특정 화분의 물주기 로그 중 가장 최근에 물을 준 로그 1건을 안전하게 조회합니다.
