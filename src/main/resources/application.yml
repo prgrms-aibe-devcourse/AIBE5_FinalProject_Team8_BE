@@ -27,8 +27,8 @@ cloud:
       access-key: ${AWS_ACCESS_KEY_ID:}
       secret-key: ${AWS_SECRET_ACCESS_KEY:}
     s3:
-      bucket: ${AWS_S3_BUCKET:demo}
-      endpoint: ${AWS_ENDPOINT:}
+      bucket: ${AWS_S3_BUCKET:team8-rootin-s3}
+      endpoint: ${AWS_S3_ENDPOINT:}
 
 
 # Actuator (Docker Health)
@@ -77,7 +77,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
