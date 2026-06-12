@@ -147,6 +147,8 @@ public class TilService {
         Til til = tilRepository.findFirstByUserIdAndPotIdAndStatus(userId, potId, PostStatus.DRAFT)
                 .orElseThrow(() -> CustomException.notFound("임시저장된 TIL이 없습니다."));
         validateOwner(til, userId);
+        // DRAFT 상태 TIL은 watering_log·ai_result_til 레코드가 생성되지 않으므로 별도 FK 정리 불필요.
+        // 향후 AI 분석 또는 물주기가 DRAFT 단계까지 확장될 경우 delete()와 동일한 패턴 적용 필요.
         tilRepository.delete(til);
     }
 
