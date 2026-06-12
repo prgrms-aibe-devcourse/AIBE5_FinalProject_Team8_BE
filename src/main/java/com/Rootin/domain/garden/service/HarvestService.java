@@ -40,13 +40,11 @@ public class HarvestService {
         PlantItem current = plantItemRepository.findByPotIdAndIsHarvestedFalse(potId)
                 .orElseThrow(() -> CustomException.notFound("수확할 식물이 없습니다."));
 
-        // 3. 만개 단계(경험치 1000) 달성 여부를 검증합니다.
-        if (!levelCalculator.canHarvestPlant(current.getGrowthExp())) {
-            throw CustomException.badRequest("아직 수확할 수 없습니다. 식물이 만개(경험치 1000) 단계에 도달해야 합니다.");
-        }
+        // 3. 수확 시점의 성장 단계(0=씨앗 ~ 4=만개)를 계산합니다.
+        int stageIndex = levelCalculator.determinePlantGrowthStage(current.getGrowthExp()).ordinal();
 
         // 4. 수확 처리 (경험치 중복 연산을 피하고 화분에 저장된 최신 레벨 정보를 직접 활용하여 상태를 연동합니다)
-        current.harvest(pot.getLevel());
+        current.harvest(pot.getLevel(), stageIndex);
 
         Plant harvestedPlant = plantRepository.findById(current.getPlantId())
                 .orElseThrow(() -> CustomException.notFound("식물 마스터 데이터를 찾을 수 없습니다."));
@@ -64,6 +62,7 @@ public class HarvestService {
                 harvestedPlant.getName(),
                 harvestedPlant.getGrade() == Grade.RARE ? "희귀" : "일반",
                 pot.getLevel(),
+                stageIndex,
                 nextPlant.getName(),
                 nextPlant.getGrade() == Grade.RARE ? "희귀" : "일반"
         );

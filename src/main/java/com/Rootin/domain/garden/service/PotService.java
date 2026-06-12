@@ -8,10 +8,17 @@ import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.plant.entity.Plant;
 import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
+import com.Rootin.domain.til.entity.PostStatus;
+import com.Rootin.domain.til.repository.PotTilCountProjection;
+import com.Rootin.domain.ai.repository.AiResultRepository;
+import com.Rootin.domain.ai.entity.AiResult;
+import com.Rootin.domain.til.entity.Til;
+import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +52,9 @@ public class PotService {
     private final PotRepository potRepository;
     private final PlantItemRepository plantItemRepository;
     private final PlantRepository plantRepository;
+    private final TilRepository tilRepository;
+    private final AiResultRepository aiResultRepository;
+    private final WateringLogRepository wateringLogRepository;
     private final LevelCalculator levelCalculator;
 
     /**
@@ -92,7 +103,7 @@ public class PotService {
     /**
      * 특정 사용자가 보유한 모든 화분 목록을 요약 정보(PotSummaryResponse) DTO 목록으로 조회합니다.
      * 목록 화면에 필요한 화분의 경험치/레벨, 그리고 심겨진 식물의 이름 및 현재 성장 단계를 계산하여 제공합니다.
-     * [성능 튜닝]: IN 절 쿼리와 메모리 내 Map 조립을 통해 2N+1번 발생하는 DB 조회를 단 3번으로 최적화하여 N+1 성능 이슈를 예방합니다.
+     * [성능 튜닝]: IN 절 쿼리와 메모리 내 Map 조립을 통해 2N+1번 발생하는 DB 조회를 단 5번으로 최적화하여 N+1 성능 이슈를 예방합니다.
      *
      * @param userId 사용자 ID
      * @return 요약된 화분 정보 목록
@@ -127,7 +138,20 @@ public class PotService {
                     .collect(Collectors.toMap(Plant::getId, java.util.function.Function.identity()));
         }
 
-        // 3. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
+        // 3. 화분 ID 목록으로 PUBLISHED TIL 수를 화분별로 벌크 집계합니다. (쿼리 1회)
+        Map<Long, Integer> tilCountMap = tilRepository.countByPotIdInAndStatus(potIds, PostStatus.PUBLISHED)
+                .stream()
+                .collect(Collectors.toMap(
+                        PotTilCountProjection::getPotId,
+                        proj -> proj.getTilCount().intValue()
+                ));
+
+        // 4. 오늘 물을 준 화분 ID 목록을 조회합니다. (오늘 00:00:00 ~ 내일 00:00:00 기준)
+        java.util.Set<Long> wateredPotIds = new java.util.HashSet<>(
+                wateringLogRepository.findWateredPotIdsToday(userId, potIds)
+        );
+
+        // 5. 수집한 Map을 바탕으로 메모리 상에서 화분 정보와 식물 이름을 매핑하여 최종 DTO를 변환 반환합니다.
         final java.util.Map<Long, Plant> finalPlantMap = plantMap;
         return pots.stream()
                 .map(pot -> {
@@ -160,7 +184,9 @@ public class PotService {
                             // 방지하기 위해 Boolean.TRUE.equals()를 사용하여 안전하게 기본값 false로 언박싱 변환합니다.
                             Boolean.TRUE.equals(pot.getIsDisplayed()),
                             plantName,
-                            growthStage
+                            growthStage,
+                            tilCountMap.getOrDefault(pot.getId(), 0),
+                            wateredPotIds.contains(pot.getId())
                     );
                 })
                 .collect(Collectors.toList());
@@ -206,4 +232,45 @@ public class PotService {
         }
     }
 
+
+    /**
+     * 특정 화분을 삭제합니다.
+     * 1. 화분 소유권 검증 (삭제 요청한 사용자가 화분의 소유자인지 확인)
+     * 2. 화분에 속한 TIL 기반으로 작성된 AI 분석 결과(AiResult) 조회 및 삭제 처리
+     *    (AiResult 삭제 시 cascade = CascadeType.ALL, orphanRemoval = true 설정에 의해 ai_result_til 중간 테이블 레코드도 자동 제거됨)
+     * 3. 화분에 속한 모든 TIL 포스트 삭제 처리
+     * 4. 화분에 심겨진 활성 식물(isHarvested=false) 삭제 처리 — 수확 완료 항목은 도감 기록 보존을 위해 제외
+     * 5. 화분(Pot) 데이터 삭제
+     */
+    @Transactional
+    public void deletePot(Long potId, Long userId) {
+        Pot pot = potRepository.findById(potId)
+                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+
+        if (!pot.getUserId().equals(userId)) {
+            throw CustomException.forbidden("해당 화분을 삭제할 권한이 없습니다.");
+        }
+
+        // 1. 해당 화분과 연결된 AI 분석 결과(AiResult) 조회 및 일괄 삭제 처리
+        List<AiResult> aiResults = aiResultRepository.findAllByPotId(potId);
+        if (!aiResults.isEmpty()) {
+            aiResultRepository.deleteAll(aiResults);
+        }
+
+        // 2. 해당 화분에 연결된 TIL 목록 조회 및 삭제 처리
+        List<Til> tils = tilRepository.findByPotId(potId);
+        if (!tils.isEmpty()) {
+            // TIL 삭제 (JPA 상속/조인 구조에 따라 base post 테이블 및 til_tag 테이블은 cascade/자동 삭제됨)
+            tilRepository.deleteAll(tils);
+        }
+
+        // 3. 해당 화분에 연결된 활성 식물 아이템(isHarvested=false/null)만 삭제 — 수확 완료 항목은 도감 보존
+        List<PlantItem> plantItems = plantItemRepository.findActivePlantItemsByPotId(potId);
+        if (!plantItems.isEmpty()) {
+            plantItemRepository.deleteAll(plantItems);
+        }
+
+        // 4. 화분 데이터 삭제
+        potRepository.delete(pot);
+    }
 }

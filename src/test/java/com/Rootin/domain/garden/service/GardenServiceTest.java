@@ -5,6 +5,7 @@ import com.Rootin.domain.garden.dto.GardenResponse;
 import com.Rootin.domain.garden.dto.LayoutUpdateDto;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.plant.entity.Plant;
@@ -46,6 +47,9 @@ class GardenServiceTest {
 
     @Autowired
     private PlantRepository plantRepository;
+
+    @Autowired
+    private com.Rootin.domain.garden.repository.WateringLogRepository wateringLogRepository;
 
     private User testUser;
     private User otherUser;
@@ -144,12 +148,42 @@ class GardenServiceTest {
         assertThat(response.getPots().get(0).getPlantName()).isEqualTo("씨앗몬");
         assertThat(response.getPots().get(0).getGrowthStage()).isEqualTo(GrowthStage.SPROUT);
         assertThat(response.getPots().get(0).getImageUrl()).isEqualTo("sprout_image"); // "sprout_image" 매핑 검증
+        assertThat(response.getPots().get(0).getWateredToday()).isFalse(); // 기본 오늘 물준 적 없음 검증
 
         // 2. 수확한 식물(1000 exp -> FULL_BLOOM 단계)의 이미지 매핑 검증
         assertThat(response.getHarvestedPlants()).hasSize(1);
         assertThat(response.getHarvestedPlants().get(0).getId()).isEqualTo(harvestedPlantItem.getId());
         assertThat(response.getHarvestedPlants().get(0).getImageUrl()).isEqualTo("full_bloom_image"); // "full_bloom_image" 매핑 검증
         assertThat(response.getHarvestedPlants().get(0).getPositionX()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("사용자의 정원 정보 조회 시 오늘 물을 준 화분은 wateredToday = true로 반환된다")
+    void getGardenWithWateredToday() {
+        // given
+        // 오늘 물주기 로그 생성
+        WateringLog todayLog = WateringLog.builder()
+                .userId(testUser.getId())
+                .potId(testPot.getId())
+                .postId(2001L)
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(50)
+                .streakDays(1)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build();
+        wateringLogRepository.save(todayLog);
+
+        // when
+        GardenResponse response = gardenService.getGarden(testUser.getId());
+
+        // then
+        assertThat(response.getPots()).hasSize(1);
+        assertThat(response.getPots().get(0).getWateredToday()).isTrue();
     }
 
     @Test

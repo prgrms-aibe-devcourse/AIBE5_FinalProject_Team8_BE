@@ -1,8 +1,5 @@
 package com.Rootin.domain.garden.service;
 
-import com.Rootin.domain.gamification.entity.PointLog;
-import com.Rootin.domain.gamification.entity.enums.PointLogReason;
-import com.Rootin.domain.gamification.repository.PointLogRepository;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
@@ -38,7 +35,6 @@ public class ExperienceService {
 
     private final UserRepository userRepository;
     private final WateringLogRepository wateringLogRepository;
-    private final PointLogRepository pointLogRepository;
     private final TilRepository tilRepository;
     private final LevelCalculator levelCalculator;
     private final PlantItemRepository plantItemRepository;
@@ -101,12 +97,12 @@ public class ExperienceService {
         int streakDays = levelCalculator.calculatePreviousStreak(publishedTimes);
         log.info("조회된 이전 연속 작성일 수 (Streak Days): {}일", streakDays);
 
-        // 5. 경험치 및 포인트 획득량 계산.
+        // 5. 경험치 획득량 계산.
         // 순수 계산은 LevelCalculator에 위임하여, 이 서비스는 "조회-검증-상태변경-저장" 흐름에 집중합니다.
+        // 포인트는 TIL 작성 시 지급하지 않으며, DashboardService의 퀘스트 달성 시점에 지급됩니다.
         int gainedExp = levelCalculator.calculateExperience(contentLength, streakDays);
-        int gainedPoint = levelCalculator.calculatePoints(gainedExp);
         double appliedMultiplier = levelCalculator.calculateStreakMultiplier(streakDays);
-        log.info("획득 경험치: {} Exp (글자 수: {}, 배율: {}x), 적립 포인트: {} P", gainedExp, contentLength, appliedMultiplier, gainedPoint);
+        log.info("획득 경험치: {} Exp (글자 수: {}, 배율: {}x)", gainedExp, contentLength, appliedMultiplier);
 
         // 6. 화분 경험치 가산 및 레벨 계산.
         // WateringLog에 전/후 상태를 남겨야 하므로 변경 전 값을 먼저 백업합니다.
@@ -127,26 +123,15 @@ public class ExperienceService {
         plantItem.increaseGrowthExp(gainedExp);
         log.info("식물 경험치 변동: {} Exp -> {} Exp (획득 경험치: {})", beforePlantExp, plantItem.getGrowthExp(), gainedExp);
 
-        // 7. 유저 포인트 가산 및 포인트 변동 이력(PointLog) 저장.
-        // User.point는 현재 총액이고, PointLog는 "왜 포인트가 늘었는지"를 추적하기 위한 감사 로그입니다.
-        user.addPoint(gainedPoint);
-        if (gainedPoint > 0) {
-            PointLog pointLog = PointLog.builder()
-                    .user(user)
-                    .reason(PointLogReason.TIL_WRITE)
-                    .amount(gainedPoint)
-                    .build();
-            pointLogRepository.save(pointLog);
-        }
-
-        // 8. 물주기 상세 이력(WateringLog) 저장.
+        // 7. 물주기 상세 이력(WateringLog) 저장.
+        // 포인트는 오늘의 목표(퀘스트) 달성 시 DashboardService에서 지급됩니다.
         // 대시보드의 최근 물주기 시각, 운영 중 정산 검증, 사용자 성장 히스토리 분석에 쓰입니다.
         WateringLog wateringLog = WateringLog.builder()
                 .userId(userId)
                 .potId(pot.getId())
                 .postId(tilId)
                 .expGained(gainedExp)
-                .pointGained(gainedPoint)
+                .pointGained(0)
                 .contentLength(contentLength)
                 .streakDays(streakDays)
                 .appliedMultiplier(appliedMultiplier)

@@ -329,6 +329,81 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    // ─── PATCH /api/v1/users/me/password ─────────────────────────────────
+
+    @Test
+    @DisplayName("비밀번호 변경 성공 → 200")
+    void changePassword_success() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        willDoNothing().given(userService).changePassword(eq(1L), any());
+
+        String body = objectMapper.writeValueAsString(
+                new TestPasswordChangeRequest("currentPw123!", "newPw123!", "newPw123!"));
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/users/me/password")
+                        .with(user(jwtUserDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 — confirmPassword 불일치 → 400 (@AssertTrue 검증)")
+    void changePassword_confirmMismatch() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        String body = objectMapper.writeValueAsString(
+                new TestPasswordChangeRequest("currentPw123!", "newPw123!", "differentPw123!"));
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/users/me/password")
+                        .with(user(jwtUserDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 — newPassword 8자 미만 → 400")
+    void changePassword_newPasswordTooShort() throws Exception {
+        // given
+        JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                1L, "test@rootin.com",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        String body = objectMapper.writeValueAsString(
+                new TestPasswordChangeRequest("currentPw123!", "short", "short"));
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/users/me/password")
+                        .with(user(jwtUserDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 — 비인증 요청 → 400")
+    void changePassword_unauthenticated() throws Exception {
+        String body = objectMapper.writeValueAsString(
+                new TestPasswordChangeRequest("currentPw123!", "newPw123!", "newPw123!"));
+
+        mockMvc.perform(patch("/api/v1/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
     // ─── 테스트용 내부 DTO (UserUpdateRequest는 @NoArgsConstructor만 있어 직렬화용) ───
     record TestUserUpdateRequest(String nickname, String bio) {}
+    record TestPasswordChangeRequest(String currentPassword, String newPassword, String confirmPassword) {}
 }

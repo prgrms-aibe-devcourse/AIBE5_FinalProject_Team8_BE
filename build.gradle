@@ -120,6 +120,9 @@ task stopTestDb(type: Exec) {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// CI(Ubuntu) 기본 타임존이 UTC이므로 로컬(KST)과 동일한 환경으로 고정합니다.
+	// LocalDate.now() 등 타임존 의존 코드가 환경에 따라 다르게 동작하는 flaky test를 방지합니다.
+	jvmArgs '-Duser.timezone=Asia/Seoul'
 	dependsOn startTestDb
 	finalizedBy stopTestDb
 }

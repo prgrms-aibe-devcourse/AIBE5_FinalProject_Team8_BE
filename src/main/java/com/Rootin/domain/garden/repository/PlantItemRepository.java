@@ -34,6 +34,7 @@ public interface PlantItemRepository extends JpaRepository<PlantItem, Long> {
             SELECT pi FROM PlantItem pi
             WHERE pi.potId IN :potIds
               AND (pi.isHarvested = false OR pi.isHarvested IS NULL)
+            ORDER BY pi.id ASC
             """)
     List<PlantItem> findByPotIdInAndIsHarvestedFalse(@org.springframework.data.repository.query.Param("potIds") List<Long> potIds);
 

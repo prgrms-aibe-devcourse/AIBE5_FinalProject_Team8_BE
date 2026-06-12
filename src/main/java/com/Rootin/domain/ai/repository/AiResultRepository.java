@@ -26,4 +26,7 @@ public interface AiResultRepository extends JpaRepository<AiResult, Long> {
               )
             """)
     List<AiResult> findAllByUserAndPotId(@Param("user") User user, @Param("potId") Long potId);
+
+    @Query("SELECT DISTINCT ar FROM AiResult ar JOIN ar.aiResultTils art WHERE art.til.pot.id = :potId")
+    List<AiResult> findAllByPotId(@Param("potId") Long potId);
 }

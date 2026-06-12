@@ -54,8 +54,11 @@ public class PlantItem extends BaseEntity {
     @Column(name = "harvested_at")
     private LocalDateTime harvestedAt;
 
+    @Column(name = "harvested_stage_index")
+    private Integer harvestedStageIndex;
+
     @Builder
-    public PlantItem(Long userId, Long potId, Long plantId, Integer growthExp, Integer harvestedLevel, Boolean isHarvested, Boolean isDisplayed, Integer positionX, Integer positionY, LocalDateTime harvestedAt) {
+    public PlantItem(Long userId, Long potId, Long plantId, Integer growthExp, Integer harvestedLevel, Boolean isHarvested, Boolean isDisplayed, Integer positionX, Integer positionY, LocalDateTime harvestedAt, Integer harvestedStageIndex) {
         this.userId = userId;
         this.potId = potId;
         this.plantId = plantId;
@@ -66,6 +69,7 @@ public class PlantItem extends BaseEntity {
         this.positionX = positionX;
         this.positionY = positionY;
         this.harvestedAt = harvestedAt;
+        this.harvestedStageIndex = harvestedStageIndex;
     }
 
     /**
@@ -77,10 +81,11 @@ public class PlantItem extends BaseEntity {
         this.growthExp += gainedExp;
     }
 
-    public void harvest(int potLevel) {
+    public void harvest(int potLevel, int stageIndex) {
         this.isHarvested = true;
         this.harvestedAt = java.time.LocalDateTime.now();
         this.harvestedLevel = potLevel;
+        this.harvestedStageIndex = stageIndex;
     }
 
     public void updateLayout(Boolean isDisplayed, Integer positionX, Integer positionY) {

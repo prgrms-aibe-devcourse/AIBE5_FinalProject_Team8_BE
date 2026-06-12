@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -119,6 +121,27 @@ class PotControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "12345678901, 소개글",
+            "자바화분, 12345678901234567890123456"
+    })
+    @DisplayName("화분 생성 API 호출 시 제목 또는 소개글 길이 검증에 실패하면 400 Bad Request 에러를 반환한다")
+    void createPotLengthValidationFail(String title, String description) throws Exception {
+        // given
+        PotCreateRequest request = PotCreateRequest.builder()
+                .title(title)
+                .description(description)
+                .build();
+
+        // when & then
+        mockMvc.perform(post("/api/v1/pots")
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     @DisplayName("로그인한 유저의 화분 목록을 조회하면 200 OK와 리스트를 반환한다")
     void getPotsSuccess() throws Exception {
@@ -132,7 +155,9 @@ class PotControllerTest {
                 0,
                 true,
                 "기본 씨앗",
-                GrowthStage.SEED
+                GrowthStage.SEED,
+                0,
+                false
         );
 
         given(potService.getPots(userId)).willReturn(List.of(response));
@@ -143,7 +168,8 @@ class PotControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("자바 화분"))
                 .andExpect(jsonPath("$[0].plantName").value("기본 씨앗"))
-                .andExpect(jsonPath("$[0].growthStage").value("SEED"));
+                .andExpect(jsonPath("$[0].growthStage").value("SEED"))
+                .andExpect(jsonPath("$[0].wateredToday").value(false));
     }
 
     @Test
@@ -193,6 +219,27 @@ class PotControllerTest {
                   "description": "수정된 소개글"
                 }
                 """;
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "12345678901, 수정된 소개글",
+            "수정화분, 12345678901234567890123456"
+    })
+    @DisplayName("화분 수정 API 호출 시 제목 또는 소개글 길이 검증에 실패하면 400 Bad Request 에러를 반환한다")
+    void updatePotLengthValidationFail(String title, String description) throws Exception {
+        // given
+        Long potId = 10L;
+        String requestJson = objectMapper.writeValueAsString(
+                java.util.Map.of("title", title, "description", description)
+        );
 
         // when & then
         mockMvc.perform(patch("/api/v1/pots/{potId}", potId)
@@ -353,5 +400,52 @@ class PotControllerTest {
                 .andExpect(jsonPath("$.rarity").value("rare"))
                 .andExpect(jsonPath("$.growthStage").value("SEED"))
                 .andExpect(jsonPath("$.growthExp").value(0));
+    }
+
+    @Test
+    @DisplayName("화분 삭제 API 호출 시 정상 처리되면 204 No Content를 반환한다")
+    void deletePotSuccess() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+
+        org.mockito.BDDMockito.doNothing().when(potService).deletePot(potId, userId);
+
+        // when & then
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("타인의 화분을 삭제하려고 하면 403 Forbidden을 반환한다")
+    void deletePotForbidden() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 10L;
+
+        org.mockito.BDDMockito.doThrow(com.Rootin.global.exception.CustomException.forbidden("해당 화분을 삭제할 권한이 없습니다."))
+                .when(potService).deletePot(potId, userId);
+
+        // when & then
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 화분을 삭제하려고 하면 404 Not Found를 반환한다")
+    void deletePotNotFound() throws Exception {
+        // given
+        Long userId = 1L;
+        Long potId = 999L;
+
+        org.mockito.BDDMockito.doThrow(com.Rootin.global.exception.CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId))
+                .when(potService).deletePot(potId, userId);
+
+        // when & then
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/pots/{potId}", potId)
+                        .with(user(userDetails)))
+                .andExpect(status().isNotFound());
     }
 }

@@ -36,6 +36,7 @@ public class Post {
     private String title;
 
     @Lob
+    @Basic(fetch = FetchType.EAGER)
     @Column(columnDefinition = "LONGTEXT")
     private String content;
 

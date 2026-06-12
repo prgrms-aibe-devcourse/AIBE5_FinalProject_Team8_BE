@@ -18,6 +18,9 @@ import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
+import com.Rootin.domain.ai.entity.AiResult;
+import com.Rootin.domain.ai.entity.AiResultTil;
+import com.Rootin.domain.ai.repository.AiResultRepository;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.annotation.IntegrationTest;
 import com.Rootin.global.exception.CustomException;
@@ -29,6 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -60,6 +65,12 @@ class PotServiceTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AiResultRepository aiResultRepository;
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -161,13 +172,74 @@ class PotServiceTest {
     }
 
     @Test
+    @DisplayName("사용자의 화분 목록 조회 시 오늘 물을 준 화분은 wateredToday = true로 반환된다")
+    void getPotsSummaryWithWateredToday() {
+        // given
+        Long userId = 200L;
+        PotCreateRequest req1 = PotCreateRequest.builder().title("오늘 물준 화분").build();
+        PotCreateRequest req2 = PotCreateRequest.builder().title("오늘 물안준 화분").build();
+
+        PotResponse pot1 = potService.createPot(userId, req1);
+        PotResponse pot2 = potService.createPot(userId, req2);
+
+        // 오늘 물주기 로그 생성
+        WateringLog todayLog = WateringLog.builder()
+                .userId(userId)
+                .potId(pot1.getId())
+                .postId(1001L)
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(50)
+                .streakDays(1)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build();
+        wateringLogRepository.save(todayLog);
+
+        // 어제 물주기 로그 생성 (pot2에 어제 물준 기록이 있지만 오늘 물준건 아님)
+        WateringLog yesterdayLog = WateringLog.builder()
+                .userId(userId)
+                .potId(pot2.getId())
+                .postId(1002L)
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(50)
+                .streakDays(1)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build();
+        WateringLog savedYesterdayLog = wateringLogRepository.save(yesterdayLog);
+        jdbcTemplate.update("UPDATE watering_log SET watered_at = ? WHERE id = ?",
+                java.time.LocalDateTime.now().minusDays(1),
+                savedYesterdayLog.getId()
+        );
+
+        // when
+        List<PotSummaryResponse> pots = potService.getPots(userId);
+
+        // then
+        assertThat(pots).hasSize(2);
+        PotSummaryResponse firstPot = pots.stream().filter(p -> p.id().equals(pot1.getId())).findFirst().orElseThrow();
+        PotSummaryResponse secondPot = pots.stream().filter(p -> p.id().equals(pot2.getId())).findFirst().orElseThrow();
+
+        assertThat(firstPot.wateredToday()).isTrue();
+        assertThat(secondPot.wateredToday()).isFalse();
+    }
+
+    @Test
     @DisplayName("중복 활성 PlantItem 데이터가 있어도 목록과 대시보드 조회는 실패하지 않는다")
     void gardenViewsDoNotFailWhenDuplicatedActivePlantItemsExist() {
         // given
         Long userId = 101L;
         PotResponse createdPot = potService.createPot(
                 userId,
-                PotCreateRequest.builder().title("중복 데이터 방어 화분").build()
+                PotCreateRequest.builder().title("중복방어화분").build()
         );
 
         Plant defaultPlant = plantRepository
@@ -184,6 +256,41 @@ class PotServiceTest {
         assertThatCode(() -> potService.getPots(userId)).doesNotThrowAnyException();
         assertThatCode(() -> gardenDashboardService.getGardenDashboard(createdPot.getId(), userId))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("화분 목록 조회 시 화분별 PUBLISHED TIL 개수(tilCount)가 정확히 집계된다")
+    void getPotsIncludesTilCount() {
+        // given
+        User user = User.builder()
+                .email("tilcount@rootin.com")
+                .nickname("틸카운터")
+                .build();
+        userRepository.save(user);
+        Long userId = user.getId();
+
+        PotResponse pot1 = potService.createPot(userId, PotCreateRequest.builder().title("화분A").build());
+        PotResponse pot2 = potService.createPot(userId, PotCreateRequest.builder().title("화분B").build());
+
+        Pot potEntity1 = potRepository.findById(pot1.getId()).orElseThrow();
+        Pot potEntity2 = potRepository.findById(pot2.getId()).orElseThrow();
+
+        // 화분A에 PUBLISHED TIL 2건 저장
+        Til til1 = Til.create(user, "제목1", "내용1", potEntity1);
+        Til til2 = Til.create(user, "제목2", "내용2", potEntity1);
+        tilRepository.save(til1);
+        tilRepository.save(til2);
+
+        // 화분B에는 TIL 없음
+
+        // when
+        List<PotSummaryResponse> result = potService.getPots(userId);
+        Map<Long, Integer> tilCountById = result.stream()
+                .collect(Collectors.toMap(PotSummaryResponse::id, PotSummaryResponse::tilCount));
+
+        // then
+        assertThat(tilCountById.get(pot1.getId())).isEqualTo(2);
+        assertThat(tilCountById.get(pot2.getId())).isEqualTo(0);
     }
 
     @Test
@@ -255,5 +362,163 @@ class PotServiceTest {
         // 심긴 식물 정보 검증 (계산된 성장 단계인 SEED로 매핑)
         assertThat(dashboard.plant().name()).isEqualTo("기본 씨앗");
         assertThat(dashboard.plant().growthStage()).isEqualTo(GrowthStage.SEED);
+    }
+
+    @Test
+    @DisplayName("화분 삭제 요청 시 소유자 검증을 거쳐 화분, 관련 TIL, PlantItem, AiResult, AiResultTil이 모두 정상 삭제되며, WateringLog는 보존된다")
+    void deletePotSuccess() {
+        // given
+        User user = User.builder()
+                .email("potdelete@rootin.com")
+                .nickname("화분삭제자")
+                .build();
+        userRepository.save(user);
+
+        // 화분 생성 (내부적으로 PlantItem 한 개 자동 생성)
+        PotResponse createdPot = potService.createPot(user.getId(), PotCreateRequest.builder().title("삭제대상 화분").build());
+        Pot potEntity = potRepository.findById(createdPot.getId()).orElseThrow();
+
+        // 추가 TIL 및 AI 분석 결과 매핑 데이터 설정
+        Til til = Til.create(user, "삭제할 TIL 제목", "삭제할 TIL 내용", potEntity);
+        tilRepository.save(til);
+
+        AiResult aiResult = AiResult.builder()
+                .user(user)
+                .resultContent("AI 분석 내용")
+                .toolType(com.Rootin.domain.ai.entity.enums.ToolType.SUMMARY)
+                .build();
+        aiResultRepository.save(aiResult);
+
+        AiResultTil aiResultTil = AiResultTil.builder()
+                .aiResult(aiResult)
+                .til(til)
+                .userId(user.getId())
+                .build();
+        // JPA/Hibernate를 통해 aiResult 내부 컬렉션에도 매핑 추가
+        aiResult.getAiResultTils().add(aiResultTil);
+        aiResultRepository.save(aiResult);
+
+        // 물주기 로그 설정 (보존 여부 검증용)
+        WateringLog wateringLog = WateringLog.builder()
+                .userId(user.getId())
+                .potId(potEntity.getId())
+                .postId(til.getId())
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(50)
+                .streakDays(2)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build();
+        wateringLogRepository.save(wateringLog);
+
+        // 삭제 전 데이터가 정상적으로 존재하는지 확인
+        assertThat(potRepository.findById(potEntity.getId())).isPresent();
+        assertThat(plantItemRepository.findByPotIdOrderByIdAsc(potEntity.getId())).isNotEmpty();
+        assertThat(tilRepository.findByPotId(potEntity.getId())).isNotEmpty();
+        assertThat(aiResultRepository.findById(aiResult.getId())).isPresent();
+        assertThat(wateringLogRepository.findById(wateringLog.getId())).isPresent();
+
+        // 중간 테이블(ai_result_til) 매핑 존재 여부 DB 직접 쿼리로 확인
+        Integer beforeAiResultTilCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_result_til WHERE post_id = ?",
+                Integer.class,
+                til.getId()
+        );
+        assertThat(beforeAiResultTilCount).isEqualTo(1);
+
+        // when
+        potService.deletePot(potEntity.getId(), user.getId());
+
+        // then
+        // 1. 화분 데이터 삭제 확인
+        assertThat(potRepository.findById(potEntity.getId())).isEmpty();
+
+        // 2. 해당 화분과 연계된 TIL 포스트 삭제 확인
+        assertThat(tilRepository.findByPotId(potEntity.getId())).isEmpty();
+
+        // 3. 해당 화분과 연계된 식물 아이템(PlantItem) 삭제 확인
+        assertThat(plantItemRepository.findByPotIdOrderByIdAsc(potEntity.getId())).isEmpty();
+
+        // 4. 해당 화분과 연계된 AI 결과(AiResult) 및 매핑 테이블(AiResultTil) 삭제 확인
+        assertThat(aiResultRepository.findById(aiResult.getId())).isEmpty();
+        Integer afterAiResultTilCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_result_til WHERE post_id = ?",
+                Integer.class,
+                til.getId()
+        );
+        assertThat(afterAiResultTilCount).isEqualTo(0);
+
+        // 5. 물주기 로그(WateringLog)는 삭제되지 않고 보존되는지 확인 (보존 정책 검증)
+        assertThat(wateringLogRepository.findById(wateringLog.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("화분 삭제 시 수확 완료(isHarvested=true)된 PlantItem은 삭제되지 않고 도감 기록이 보존된다")
+    void deletePotPreservesHarvestedPlantItems() {
+        // given
+        User user = User.builder()
+                .email("harvestpreserve@rootin.com")
+                .nickname("수확보존자")
+                .build();
+        userRepository.save(user);
+
+        PotResponse createdPot = potService.createPot(
+                user.getId(),
+                PotCreateRequest.builder().title("도감보존 화분").build()
+        );
+        Long potId = createdPot.getId();
+
+        Plant defaultPlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("기본 씨앗", Grade.COMMON, GrowthStage.SEED)
+                .orElseThrow();
+
+        // 수확 완료된 PlantItem 직접 저장 (도감 기록)
+        PlantItem harvestedItem = PlantItem.builder()
+                .userId(user.getId())
+                .potId(potId)
+                .plantId(defaultPlant.getId())
+                .isHarvested(true)
+                .harvestedAt(java.time.LocalDateTime.now().minusDays(1))
+                .harvestedLevel(2)
+                .harvestedStageIndex(3)
+                .build();
+        PlantItem saved = plantItemRepository.save(harvestedItem);
+
+        // when
+        potService.deletePot(potId, user.getId());
+
+        // then — 화분은 삭제되고, 수확 완료 PlantItem(도감 기록)은 보존
+        assertThat(potRepository.findById(potId)).isEmpty();
+        assertThat(plantItemRepository.findById(saved.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("타인의 화분을 삭제하려고 시도하면 FORBIDDEN 예외가 발생한다")
+    void deletePotForbidden() {
+        // given
+        User owner = User.builder().email("owner@rootin.com").nickname("화분주인").build();
+        User attacker = User.builder().email("attacker@rootin.com").nickname("공격자").build();
+        userRepository.save(owner);
+        userRepository.save(attacker);
+
+        PotResponse createdPot = potService.createPot(owner.getId(), PotCreateRequest.builder().title("주인화분").build());
+
+        // when & then
+        Assertions.assertThrows(CustomException.class, () -> {
+            potService.deletePot(createdPot.getId(), attacker.getId());
+        });
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 화분을 삭제하려고 시도하면 NOT_FOUND 예외가 발생한다")
+    void deletePotNotFound() {
+        // when & then
+        Assertions.assertThrows(CustomException.class, () -> {
+            potService.deletePot(9999L, 1L);
+        });
     }
 }
