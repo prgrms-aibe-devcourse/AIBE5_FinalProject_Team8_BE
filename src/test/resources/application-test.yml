@@ -17,6 +17,11 @@ spring:
         jdbc:
           time_zone: Asia/Seoul
 
+jwt:
+  secret: "test-secret-key-for-ci-must-be-at-least-32-bytes-long-dummy"
+  access-token-expiration: 1800000
+  refresh-token-expiration: 1209600000
+
 # 테스트 시 OpenAI 호출 차단 (더미 키 사용)
 openai:
   api-key: test-dummy-key
