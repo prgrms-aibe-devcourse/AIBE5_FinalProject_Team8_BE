@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +34,7 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
     boolean existsByPostId(Long postId);
 
     // TIL 삭제 시 연관 물주기 로그 일괄 제거
+    @Transactional
     @Modifying
     @Query("DELETE FROM WateringLog w WHERE w.postId = :postId")
     void deleteByPostId(@Param("postId") Long postId);
