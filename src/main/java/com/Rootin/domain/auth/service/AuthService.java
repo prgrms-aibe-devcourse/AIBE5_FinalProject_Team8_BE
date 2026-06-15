@@ -18,6 +18,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -33,11 +34,17 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    // nickname 생성 관련 상수
+    private static final int NICKNAME_MAX_LENGTH = 20;    // Google name truncate 최대 길이
+    private static final int SUB_PREFIX_LENGTH   = 8;     // name 없을 때 user_sub앞8자리
+    private static final int SUB_SUFFIX_LENGTH   = 4;     // 중복 fallback 시 sub앞4자리
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final RestTemplate restTemplate;
 
     // =====================================================================
     // 1. 이메일 회원가입 — POST /api/v1/auth/signup
@@ -163,6 +170,15 @@ public class AuthService {
         if (email == null || sub == null) {
             throw CustomException.badRequest("유효하지 않은 Google ID Token입니다.");
         }
+        // tokeninfo REST → String "true"/"false", JWT payload → Boolean. 양쪽 모두 방어
+        Object rawVerified = googleUser.get("email_verified");
+        if (!Boolean.TRUE.equals(rawVerified) && !"true".equals(rawVerified)) {
+            throw CustomException.badRequest("이메일 인증이 완료되지 않은 Google 계정입니다.");
+        }
+
+        // Google 프로필 정보 (신규 가입 시에만 사용)
+        String googleName = (String) googleUser.get("name");
+        String googlePicture = (String) googleUser.get("picture");
 
         // 2. 기존 사용자 조회 (비관적 락 — 동시 재가입 요청 방지)
         boolean isNewUser = false;
@@ -181,16 +197,24 @@ public class AuthService {
                 throw CustomException.badRequest("이미 다른 방식으로 가입된 이메일입니다.");
             }
 
+            String nickname = generateUniqueNickname(googleName, sub);
+
             isNewUser = true;
             user = User.builder()
                     .email(email)
-                    .nickname("user_" + sub.substring(0, Math.min(sub.length(), 8))) // 임시 닉네임 (온보딩에서 변경)
+                    .nickname(nickname)
+                    .profileImage(googlePicture) // Google 프로필 이미지 URL (없으면 null)
                     .role(Role.USER)
                     .provider(Provider.GOOGLE)
                     .providerId(sub)
                     .point(0)
                     .build();
-            userRepository.save(user);
+            try {
+                userRepository.save(user);
+            } catch (DataIntegrityViolationException e) {
+                // nickname/email/providerId 중 하나의 unique 제약 위반 (동시 요청 레이스 컨디션)
+                throw CustomException.badRequest("가입 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+            }
         }
 
         // 4. 기존 Refresh Token 삭제 후 새 토큰 발급
@@ -329,6 +353,36 @@ public class AuthService {
     }
 
     /**
+     * Google name 기반 고유 닉네임 생성
+     *
+     * 우선순위:
+     *   1. googleName (최대 NICKNAME_MAX_LENGTH자 truncate)
+     *   2. 중복 시 → baseNickname + "_" + sub앞 SUB_SUFFIX_LENGTH자
+     *   3. 2도 중복 시 → "user_" + sub 전체 (Google sub는 고유값이므로 최종 보장)
+     *   name이 없으면 "user_" + sub앞 SUB_PREFIX_LENGTH자를 base로 사용.
+     */
+    private String generateUniqueNickname(String googleName, String sub) {
+        String baseNickname = (googleName != null && !googleName.isBlank())
+                ? googleName.substring(0, Math.min(googleName.length(), NICKNAME_MAX_LENGTH))
+                : "user_" + sub.substring(0, Math.min(sub.length(), SUB_PREFIX_LENGTH));
+
+        if (!userRepository.existsByNickname(baseNickname)) {
+            return baseNickname;
+        }
+
+        // baseNickname max 20자 + "_" + 4자 = max 25자 → 50자 컬럼 이내 보장됨
+        String fallback = baseNickname + "_" + sub.substring(0, Math.min(sub.length(), SUB_SUFFIX_LENGTH));
+        if (!userRepository.existsByNickname(fallback)) {
+            return fallback;
+        }
+
+        // sub 앞자리는 발급 시기 기반으로 겹칠 수 있으므로 뒷 14자리 사용 → max 19자 (20자 이내)
+        String subTail = sub.substring(Math.max(0, sub.length() - 14));
+        String subNickname = "user_" + subTail;
+        return subNickname.substring(0, Math.min(subNickname.length(), NICKNAME_MAX_LENGTH));
+    }
+
+    /**
      * Google ID Token 검증
      *
      * Google의 tokeninfo 엔드포인트에 idToken을 보내서 검증한다.
@@ -341,7 +395,6 @@ public class AuthService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> verifyGoogleToken(String idToken) {
         try {
-            RestTemplate restTemplate = new RestTemplate();
             String url = "https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken;
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response == null) {
