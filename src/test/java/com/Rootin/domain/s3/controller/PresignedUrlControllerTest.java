@@ -91,12 +91,10 @@ class PresignedUrlControllerTest {
     @DisplayName("image/png, image/webp contentType도 정상 처리되어 200 OK를 반환한다")
     void getPresignedUrl_supportedContentTypes_success(String contentType) throws Exception {
         PresignedUrlRequest request = buildRequest(contentType, POT_ID);
-        String fakePresigned = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/til-images/1/10/uuid?X-Amz-Signature=abc";
-        String fakeImage = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/til-images/1/10/uuid";
 
         doNothing().when(potService).validateOwnership(USER_ID, POT_ID);
-        given(s3Service.generatePresignedPutUrl(anyString(), eq(contentType))).willReturn(fakePresigned);
-        given(s3Service.getFileUrl(anyString())).willReturn(fakeImage);
+        given(s3Service.generatePresignedPutUrl(anyString(), eq(contentType))).willReturn(PRESIGNED_URL);
+        given(s3Service.getFileUrl(anyString())).willReturn(IMAGE_URL);
 
         mockMvc.perform(post("/tils/image/presigned-url")
                         .with(user(userDetails))
