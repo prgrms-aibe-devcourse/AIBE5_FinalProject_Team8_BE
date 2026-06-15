@@ -212,8 +212,8 @@ public class AuthService {
             try {
                 userRepository.save(user);
             } catch (DataIntegrityViolationException e) {
-                // 동시 가입 요청으로 nickname unique 충돌 시 재시도 유도
-                throw CustomException.badRequest("닉네임 생성 중 충돌이 발생했습니다. 다시 시도해주세요.");
+                // nickname/email/providerId 중 하나의 unique 제약 위반 (동시 요청 레이스 컨디션)
+                throw CustomException.badRequest("가입 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
             }
         }
 
@@ -376,8 +376,9 @@ public class AuthService {
             return fallback;
         }
 
-        // sub는 Google 고유값이므로 중복 불가. UserUpdateRequest @Size(max=20) 맞춰 truncate
-        String subNickname = "user_" + sub;
+        // sub 앞자리는 발급 시기 기반으로 겹칠 수 있으므로 뒷 14자리 사용 → max 19자 (20자 이내)
+        String subTail = sub.substring(Math.max(0, sub.length() - 14));
+        String subNickname = "user_" + subTail;
         return subNickname.substring(0, Math.min(subNickname.length(), NICKNAME_MAX_LENGTH));
     }
 
