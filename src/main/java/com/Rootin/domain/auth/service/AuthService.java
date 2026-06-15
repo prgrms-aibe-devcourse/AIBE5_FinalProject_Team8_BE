@@ -33,6 +33,11 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    // nickname 생성 관련 상수
+    private static final int NICKNAME_MAX_LENGTH = 20;    // Google name truncate 최대 길이
+    private static final int SUB_PREFIX_LENGTH   = 8;     // name 없을 때 user_sub앞8자리
+    private static final int SUB_SUFFIX_LENGTH   = 4;     // 중복 fallback 시 sub앞4자리
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
@@ -190,21 +195,7 @@ public class AuthService {
                 throw CustomException.badRequest("이미 다른 방식으로 가입된 이메일입니다.");
             }
 
-            // nickname: Google name 기반 (최대 20자 truncate), 중복 시 name_sub앞4자리 fallback
-            // fallback도 중복이면 sub 전체로 고유 보장, 없으면 user_sub앞8자리
-            String baseNickname = (googleName != null && !googleName.isBlank())
-                    ? googleName.substring(0, Math.min(googleName.length(), 20))
-                    : "user_" + sub.substring(0, Math.min(sub.length(), 8));
-            String nickname;
-            if (!userRepository.existsByNickname(baseNickname)) {
-                nickname = baseNickname;
-            } else {
-                // baseNickname max 20자 + "_" + 4자 = max 25자 → 50자 컬럼 이내 보장됨
-                String fallback = baseNickname + "_" + sub.substring(0, Math.min(sub.length(), 4));
-                nickname = userRepository.existsByNickname(fallback)
-                        ? "user_" + sub  // sub는 Google 고유값이므로 중복 불가
-                        : fallback;
-            }
+            String nickname = generateUniqueNickname(googleName, sub);
 
             isNewUser = true;
             user = User.builder()
@@ -352,6 +343,33 @@ public class AuthService {
     private void deleteUserAndTokens(User user) {
         refreshTokenRepository.deleteByUserId(user.getId());
         userRepository.delete(user);
+    }
+
+    /**
+     * Google name 기반 고유 닉네임 생성
+     *
+     * 우선순위:
+     *   1. googleName (최대 NICKNAME_MAX_LENGTH자 truncate)
+     *   2. 중복 시 → baseNickname + "_" + sub앞 SUB_SUFFIX_LENGTH자
+     *   3. 2도 중복 시 → "user_" + sub 전체 (Google sub는 고유값이므로 최종 보장)
+     *   name이 없으면 "user_" + sub앞 SUB_PREFIX_LENGTH자를 base로 사용.
+     */
+    private String generateUniqueNickname(String googleName, String sub) {
+        String baseNickname = (googleName != null && !googleName.isBlank())
+                ? googleName.substring(0, Math.min(googleName.length(), NICKNAME_MAX_LENGTH))
+                : "user_" + sub.substring(0, Math.min(sub.length(), SUB_PREFIX_LENGTH));
+
+        if (!userRepository.existsByNickname(baseNickname)) {
+            return baseNickname;
+        }
+
+        // baseNickname max 20자 + "_" + 4자 = max 25자 → 50자 컬럼 이내 보장됨
+        String fallback = baseNickname + "_" + sub.substring(0, Math.min(sub.length(), SUB_SUFFIX_LENGTH));
+        if (!userRepository.existsByNickname(fallback)) {
+            return fallback;
+        }
+
+        return "user_" + sub; // sub는 Google 고유값이므로 중복 불가
     }
 
     /**
