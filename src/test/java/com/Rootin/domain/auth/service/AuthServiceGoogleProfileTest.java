@@ -253,6 +253,42 @@ class AuthServiceGoogleProfileTest {
                 .hasMessageContaining("이메일 인증이 완료되지 않은");
     }
 
+    @Test
+    @DisplayName("email_verified가 Boolean true이면 정상 가입된다")
+    void emailVerifiedAsBoolean_success() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("sub", GOOGLE_SUB);
+        response.put("email", GOOGLE_EMAIL);
+        response.put("email_verified", Boolean.TRUE); // Boolean 타입
+        response.put("name", GOOGLE_NAME);
+        response.put("picture", GOOGLE_PICTURE);
+        mockGoogleTokenInfo(response);
+
+        given(userRepository.findByProviderAndProviderIdWithLock(Provider.GOOGLE, GOOGLE_SUB)).willReturn(Optional.empty());
+        given(userRepository.existsByEmail(GOOGLE_EMAIL)).willReturn(false);
+        given(userRepository.existsByNickname(GOOGLE_NAME)).willReturn(false);
+        stubNewUserSave(GOOGLE_NAME, GOOGLE_PICTURE);
+
+        TokenResponse result = authService.googleLogin(buildRequest());
+        assertThat(result.getIsNewUser()).isTrue();
+    }
+
+    @Test
+    @DisplayName("email_verified가 Boolean false이면 예외가 발생한다")
+    void emailVerifiedAsBooleanFalse_throwsException() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("sub", GOOGLE_SUB);
+        response.put("email", GOOGLE_EMAIL);
+        response.put("email_verified", Boolean.FALSE); // Boolean 타입
+        response.put("name", GOOGLE_NAME);
+        response.put("picture", GOOGLE_PICTURE);
+        mockGoogleTokenInfo(response);
+
+        assertThatThrownBy(() -> authService.googleLogin(buildRequest()))
+                .isInstanceOf(Exception.class)
+                .hasMessageContaining("이메일 인증이 완료되지 않은");
+    }
+
     // =====================================================================
     // 기존 유저 재로그인 — 프로필 업데이트 없음
     // =====================================================================
