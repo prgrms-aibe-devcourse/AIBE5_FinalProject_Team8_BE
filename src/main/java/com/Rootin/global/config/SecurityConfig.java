@@ -52,7 +52,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/test", "/h2-console/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll() // Test/매트릭 수집도구들
 
                         // 사용자 인증을 발급해주는 API 경로
                         .requestMatchers(
@@ -141,7 +141,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of(Arrays.asList("https://rootin.duckdns.org"))); // List로 하지말고 제대로 사이트 도메인을 명시하는게 좋음
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

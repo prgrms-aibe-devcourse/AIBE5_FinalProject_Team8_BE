@@ -67,6 +67,9 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.testcontainers:junit-jupiter'
 	testImplementation 'org.testcontainers:mysql'
+
+	// Metrics Collection (Prometheus)
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 }
 
 // ─── 테스트용 MySQL 컨테이너 생명주기 태스크 ─────────────────────────────────
