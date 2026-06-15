@@ -141,7 +141,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of(Arrays.asList("https://rootin.duckdns.org"))); // List로 하지말고 제대로 사이트 도메인을 명시하는게 좋음
+        configuration.setAllowedHeaders(List.of("https://rootin.duckdns.org")); // List로 하지말고 제대로 사이트 도메인을 명시하는게 좋음
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
