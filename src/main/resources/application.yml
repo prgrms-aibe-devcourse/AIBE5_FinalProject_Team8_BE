@@ -77,7 +77,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update # 추후에 vailation으로 변경해야함
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
