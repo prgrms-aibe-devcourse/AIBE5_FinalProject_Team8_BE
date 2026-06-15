@@ -171,7 +171,7 @@ class AuthServiceGoogleProfileTest {
     }
 
     @Test
-    @DisplayName("nickname과 fallback 모두 중복이면 user_sub 전체값으로 설정된다")
+    @DisplayName("nickname과 fallback 모두 중복이면 user_sub뒷14자리로 설정된다")
     void newUser_nicknameBothDuplicate_fallbackToSub() {
         mockGoogleTokenInfo(buildGoogleResponse(GOOGLE_NAME, GOOGLE_PICTURE));
         given(userRepository.findByProviderAndProviderIdWithLock(Provider.GOOGLE, GOOGLE_SUB)).willReturn(Optional.empty());
@@ -180,13 +180,18 @@ class AuthServiceGoogleProfileTest {
 
         String fallback = GOOGLE_NAME + "_" + GOOGLE_SUB.substring(0, 4);
         given(userRepository.existsByNickname(fallback)).willReturn(true); // 2차 중복
-        stubNewUserSave("user_" + GOOGLE_SUB, GOOGLE_PICTURE);
+
+        // sub 뒷 14자리 사용: "123456789012345".substring(1) = "23456789012345"
+        String subTail = GOOGLE_SUB.substring(Math.max(0, GOOGLE_SUB.length() - 14));
+        String expectedNickname = "user_" + subTail;
+        stubNewUserSave(expectedNickname, GOOGLE_PICTURE);
 
         authService.googleLogin(buildRequest());
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getNickname()).isEqualTo("user_" + GOOGLE_SUB);
+        assertThat(captor.getValue().getNickname()).isEqualTo(expectedNickname);
+        assertThat(captor.getValue().getNickname().length()).isLessThanOrEqualTo(20);
     }
 
     // =====================================================================
