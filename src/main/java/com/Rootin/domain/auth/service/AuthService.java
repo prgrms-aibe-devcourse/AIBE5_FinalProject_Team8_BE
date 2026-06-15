@@ -18,6 +18,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -166,11 +167,12 @@ public class AuthService {
         Map<String, Object> googleUser = verifyGoogleToken(request.getIdToken());
         String email = (String) googleUser.get("email");
         String sub = (String) googleUser.get("sub"); // Google 고유 사용자 ID
-        String emailVerified = (String) googleUser.get("email_verified");
         if (email == null || sub == null) {
             throw CustomException.badRequest("유효하지 않은 Google ID Token입니다.");
         }
-        if (!"true".equals(emailVerified)) {
+        // tokeninfo REST → String "true"/"false", JWT payload → Boolean. 양쪽 모두 방어
+        Object rawVerified = googleUser.get("email_verified");
+        if (!Boolean.TRUE.equals(rawVerified) && !"true".equals(rawVerified)) {
             throw CustomException.badRequest("이메일 인증이 완료되지 않은 Google 계정입니다.");
         }
 
@@ -207,7 +209,12 @@ public class AuthService {
                     .providerId(sub)
                     .point(0)
                     .build();
-            userRepository.save(user);
+            try {
+                userRepository.save(user);
+            } catch (DataIntegrityViolationException e) {
+                // 동시 가입 요청으로 nickname unique 충돌 시 재시도 유도
+                throw CustomException.badRequest("닉네임 생성 중 충돌이 발생했습니다. 다시 시도해주세요.");
+            }
         }
 
         // 4. 기존 Refresh Token 삭제 후 새 토큰 발급
@@ -369,7 +376,9 @@ public class AuthService {
             return fallback;
         }
 
-        return "user_" + sub; // sub는 Google 고유값이므로 중복 불가
+        // sub는 Google 고유값이므로 중복 불가. UserUpdateRequest @Size(max=20) 맞춰 truncate
+        String subNickname = "user_" + sub;
+        return subNickname.substring(0, Math.min(subNickname.length(), NICKNAME_MAX_LENGTH));
     }
 
     /**
