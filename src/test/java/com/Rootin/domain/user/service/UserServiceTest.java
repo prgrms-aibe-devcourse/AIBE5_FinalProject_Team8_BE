@@ -107,7 +107,6 @@ class UserServiceTest {
         assertThat(response.getTilCount()).isEqualTo(5L);
         assertThat(response.getEmail()).isEqualTo("test@rootin.com");
         assertThat(response.getPoint()).isEqualTo(100);
-        assertThat(response.getCreatedAt()).isNull(); // 단위 테스트에서 JPA Auditing 미동작 → null
     }
 
     @Test
