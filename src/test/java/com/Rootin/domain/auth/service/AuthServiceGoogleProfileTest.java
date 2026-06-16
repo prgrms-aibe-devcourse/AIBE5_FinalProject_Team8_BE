@@ -63,7 +63,7 @@ class AuthServiceGoogleProfileTest {
         given(jwtTokenProvider.createAccessToken(any(), anyString(), anyString())).willReturn("access-token");
         given(jwtTokenProvider.createRefreshToken(anyString())).willReturn("refresh-token");
         given(jwtTokenProvider.getAccessTokenExpirationInSeconds()).willReturn(3600L);
-        given(jwtTokenProvider.getRefreshTokenExpirationDays()).willReturn(14L);
+        given(jwtTokenProvider.getRefreshTokenExpirationInSeconds()).willReturn(14L * 24 * 60 * 60);
     }
 
     /** Google tokeninfo API 응답 stubbing 헬퍼 */

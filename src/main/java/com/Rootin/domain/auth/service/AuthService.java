@@ -10,6 +10,7 @@ import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
 import com.Rootin.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
@@ -34,6 +37,8 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    private static final int MAX_REFRESH_TOKEN_ROTATION_TRACE_DEPTH = 5;
+
     // nickname 생성 관련 상수
     private static final int NICKNAME_MAX_LENGTH = 20;    // Google name truncate 최대 길이
     private static final int SUB_PREFIX_LENGTH   = 8;     // name 없을 때 user_sub앞8자리
@@ -45,6 +50,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final RestTemplate restTemplate;
+
+    @Value("${auth.refresh-token.grace-seconds:30}")
+    private long refreshTokenRotationGraceSeconds;
 
     // =====================================================================
     // 1. 이메일 회원가입 — POST /api/v1/auth/signup
@@ -63,7 +71,7 @@ public class AuthService {
      *   7. TokenResponse 반환
      *
      * @param request 회원가입 요청 (email, password, nickname)
-     * @return TokenResponse (accessToken, refreshToken, accessTokenExpiresIn)
+     * @return TokenResponse (accessToken, refreshToken, accessTokenExpiresIn, refreshTokenExpiresIn)
      */
     @Transactional
     public TokenResponse signup(SignupRequest request) {
@@ -232,33 +240,38 @@ public class AuthService {
      * 처리 흐름:
      *   1. 클라이언트가 보낸 Refresh Token으로 DB 조회
      *   2. 토큰 만료 여부 확인
-     *   3. 연결된 User 정보로 새 Access Token 발급
-     *   4. 기존 Refresh Token은 유지 (Refresh Token Rotation 미적용)
+     *   3. 사용 중인 Refresh Token을 새 Refresh Token으로 회전
+     *   4. 동시 재발급 요청을 위해 기존 토큰은 짧은 유예 시간 동안만 같은 대체 토큰으로 응답
      *
      * Refresh Token이 없거나 만료되었으면 → 재로그인 필요 (예외 발생)
      *
      * @param refreshTokenValue 클라이언트가 보낸 Refresh Token 문자열
-     * @return TokenResponse (새 Access Token + 기존 Refresh Token)
+     * @return TokenResponse (새 Access Token + 회전된 Refresh Token + 만료까지 남은 시간)
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public TokenResponse reissue(String refreshTokenValue) {
         if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
             throw CustomException.badRequest("Refresh Token은 필수입니다.");
         }
 
         // 1. DB에서 Refresh Token 조회
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(refreshTokenValue)
                 .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
 
-        // 2. 만료 확인
-        if (refreshToken.isExpired()) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 2. 이미 회전된 토큰은 Grace Period 안에서만 같은 대체 토큰으로 재응답한다.
+        if (refreshToken.isRotated()) {
+            return reissueFromRotatedToken(refreshToken, now);
+        }
+
+        // 3. 만료 확인
+        if (refreshToken.isExpired(now)) {
             throw new CustomException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해 주세요.");
         }
 
-        // 3. 연결된 User로 Access Token만 재발급하고 Refresh Token은 그대로 유지한다.
-        //    동시 요청이 들어와도 기존 Refresh Token이 삭제되지 않아 FE의 재시도 흐름이 안정적으로 동작한다.
-        User user = refreshToken.getUser();
-        return issueAccessTokenWithExistingRefreshToken(user, refreshTokenValue);
+        // 4. 정상 토큰은 새 Refresh Token으로 회전한다.
+        return rotateRefreshToken(refreshToken, now);
     }
 
     // =====================================================================
@@ -316,15 +329,17 @@ public class AuthService {
                 user.getRole().name()
         );
 
+        LocalDateTime now = LocalDateTime.now();
+
         // Refresh Token 생성 — email만 포함 (최소 정보)
         String refreshTokenValue = jwtTokenProvider.createRefreshToken(user.getEmail());
+        LocalDateTime refreshTokenExpiresAt = now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationInSeconds());
 
         // Refresh Token을 DB에 저장 (재발급/로그아웃 시 조회/삭제용)
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .token(refreshTokenValue)
-                .expiresAt(java.time.LocalDateTime.now()
-                        .plusDays(jwtTokenProvider.getRefreshTokenExpirationDays()))
+                .expiresAt(refreshTokenExpiresAt)
                 .build();
         refreshTokenRepository.save(refreshToken);
 
@@ -333,15 +348,81 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshTokenValue)
                 .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpirationInSeconds())
+                .refreshTokenExpiresIn(calculateRefreshTokenExpiresIn(refreshTokenExpiresAt, now))
                 .isNewUser(isNewUser)
                 .build();
     }
 
-    /**
-     * 기존 Refresh Token을 유지한 채 Access Token만 재발급한다.
-     * 새로고침 연타나 여러 API의 동시 401 응답 상황에서 Refresh Token 삭제 경쟁을 만들지 않기 위함이다.
-     */
-    private TokenResponse issueAccessTokenWithExistingRefreshToken(User user, String refreshTokenValue) {
+    private TokenResponse rotateRefreshToken(RefreshToken refreshToken, LocalDateTime now) {
+        User user = refreshToken.getUser();
+        String replacementTokenValue = jwtTokenProvider.createRefreshToken(user.getEmail());
+        LocalDateTime replacementTokenExpiresAt = now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationInSeconds());
+
+        RefreshToken replacementToken = RefreshToken.builder()
+                .user(user)
+                .token(replacementTokenValue)
+                .expiresAt(replacementTokenExpiresAt)
+                .build();
+
+        refreshToken.rotateTo(
+                replacementTokenValue,
+                now,
+                now.plusSeconds(refreshTokenRotationGraceSeconds)
+        );
+        refreshTokenRepository.save(refreshToken);
+        refreshTokenRepository.save(replacementToken);
+
+        return issueAccessTokenWithRefreshToken(
+                user,
+                replacementTokenValue,
+                calculateRefreshTokenExpiresIn(replacementTokenExpiresAt, now)
+        );
+    }
+
+    private TokenResponse reissueFromRotatedToken(RefreshToken rotatedToken, LocalDateTime now) {
+        if (!rotatedToken.isWithinGracePeriod(now) || rotatedToken.getReplacementToken() == null) {
+            throw new CustomException(HttpStatus.UNAUTHORIZED, "이미 사용된 Refresh Token입니다. 다시 로그인해 주세요.");
+        }
+
+        RefreshToken replacementToken = resolveActiveReplacementToken(rotatedToken.getReplacementToken(), now);
+
+        return issueAccessTokenWithRefreshToken(
+                replacementToken.getUser(),
+                replacementToken.getToken(),
+                calculateRefreshTokenExpiresIn(replacementToken.getExpiresAt(), now)
+        );
+    }
+
+    private RefreshToken resolveActiveReplacementToken(String token, LocalDateTime now) {
+        String currentToken = token;
+
+        for (int depth = 0; depth < MAX_REFRESH_TOKEN_ROTATION_TRACE_DEPTH; depth++) {
+            RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(currentToken)
+                    .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
+
+            if (refreshToken.isExpired(now)) {
+                throw new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다.");
+            }
+
+            if (!refreshToken.isRotated()) {
+                return refreshToken;
+            }
+
+            if (!refreshToken.isWithinGracePeriod(now) || refreshToken.getReplacementToken() == null) {
+                throw new CustomException(HttpStatus.UNAUTHORIZED, "이미 사용된 Refresh Token입니다. 다시 로그인해 주세요.");
+            }
+
+            currentToken = refreshToken.getReplacementToken();
+        }
+
+        throw new CustomException(HttpStatus.UNAUTHORIZED, "Refresh Token 재발급 상태가 올바르지 않습니다.");
+    }
+
+    private TokenResponse issueAccessTokenWithRefreshToken(
+            User user,
+            String refreshTokenValue,
+            long refreshTokenExpiresIn
+    ) {
         String accessToken = jwtTokenProvider.createAccessToken(
                 user.getId(),
                 user.getEmail(),
@@ -352,7 +433,12 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshTokenValue)
                 .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpirationInSeconds())
+                .refreshTokenExpiresIn(refreshTokenExpiresIn)
                 .build();
+    }
+
+    private long calculateRefreshTokenExpiresIn(LocalDateTime expiresAt, LocalDateTime now) {
+        return Math.max(0, Duration.between(now, expiresAt).getSeconds());
     }
 
     /**

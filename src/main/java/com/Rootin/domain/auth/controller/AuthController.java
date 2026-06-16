@@ -45,7 +45,7 @@ public class AuthController {
      *
      * 인증 필요: ❌
      * 요청: { email, password, nickname }
-     * 응답: { accessToken, refreshToken, accessTokenExpiresIn }
+     * 응답: { accessToken, refreshToken, accessTokenExpiresIn, refreshTokenExpiresIn }
      * 상태코드: 201 Created
      *
      * @Valid가 SignupRequest의 유효성 검사 어노테이션을 실행한다.
@@ -70,7 +70,7 @@ public class AuthController {
      *
      * 인증 필요: ❌
      * 요청: { email, password }
-     * 응답: { accessToken, refreshToken, accessTokenExpiresIn }
+     * 응답: { accessToken, refreshToken, accessTokenExpiresIn, refreshTokenExpiresIn }
      * 상태코드: 200 OK
      *
      * 비밀번호 불일치 시 AuthService에서 BadCredentialsException 발생 → 401
@@ -92,7 +92,7 @@ public class AuthController {
      *
      * 인증 필요: ❌
      * 요청: { idToken }
-     * 응답: { accessToken, refreshToken, accessTokenExpiresIn, isNewUser }
+     * 응답: { accessToken, refreshToken, accessTokenExpiresIn, refreshTokenExpiresIn, isNewUser }
      * 상태코드: 200 OK
      *
      * isNewUser=true → 프론트에서 온보딩(닉네임 설정) 화면으로 분기
@@ -115,7 +115,7 @@ public class AuthController {
      *
      * 인증 필요: ❌ (Access Token이 만료된 상태에서 호출하므로)
      * 요청: { refreshToken }
-     * 응답: { accessToken, refreshToken, accessTokenExpiresIn }
+     * 응답: { accessToken, refreshToken, accessTokenExpiresIn, refreshTokenExpiresIn }
      * 상태코드: 200 OK
      *
      * Refresh Token이 만료되었거나 DB에 없으면 → 401 (재로그인 필요)

@@ -146,10 +146,10 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Refresh Token 만료 일수 반환 — RefreshToken 엔티티 생성용
+     * Refresh Token 만료 시간(초) 반환 — 응답 및 RefreshToken 엔티티 생성용
      */
-    public long getRefreshTokenExpirationDays() {
-        return refreshTokenExpiration / (1000 * 60 * 60 * 24);
+    public long getRefreshTokenExpirationInSeconds() {
+        return refreshTokenExpiration / 1000;
     }
 
     private Claims getClaims(String token) {
