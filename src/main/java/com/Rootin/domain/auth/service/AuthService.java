@@ -238,7 +238,7 @@ public class AuthService {
      * Refresh Token이 없거나 만료되었으면 → 재로그인 필요 (예외 발생)
      *
      * @param refreshTokenValue 클라이언트가 보낸 Refresh Token 문자열
-     * @return TokenResponse (새 accessToken + 기존 refreshToken)
+     * @return TokenResponse (새 Access Token + 기존 Refresh Token)
      */
     @Transactional
     public TokenResponse reissue(String refreshTokenValue) {
@@ -252,17 +252,13 @@ public class AuthService {
 
         // 2. 만료 확인
         if (refreshToken.isExpired()) {
-            // 만료된 토큰은 삭제하고 재로그인 유도
-            refreshTokenRepository.delete(refreshToken);
             throw new CustomException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해 주세요.");
         }
 
-        // 3. 기존 Refresh Token 삭제 (Rotation: 재사용 불가)
-        refreshTokenRepository.delete(refreshToken);
-
-        // 4. 연결된 User로 Access Token + Refresh Token 모두 재발급
+        // 3. 연결된 User로 Access Token만 재발급하고 Refresh Token은 그대로 유지한다.
+        //    동시 요청이 들어와도 기존 Refresh Token이 삭제되지 않아 FE의 재시도 흐름이 안정적으로 동작한다.
         User user = refreshToken.getUser();
-        return issueTokens(user, null);
+        return issueAccessTokenWithExistingRefreshToken(user, refreshTokenValue);
     }
 
     // =====================================================================
@@ -338,6 +334,24 @@ public class AuthService {
                 .refreshToken(refreshTokenValue)
                 .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpirationInSeconds())
                 .isNewUser(isNewUser)
+                .build();
+    }
+
+    /**
+     * 기존 Refresh Token을 유지한 채 Access Token만 재발급한다.
+     * 새로고침 연타나 여러 API의 동시 401 응답 상황에서 Refresh Token 삭제 경쟁을 만들지 않기 위함이다.
+     */
+    private TokenResponse issueAccessTokenWithExistingRefreshToken(User user, String refreshTokenValue) {
+        String accessToken = jwtTokenProvider.createAccessToken(
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name()
+        );
+
+        return TokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshTokenValue)
+                .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpirationInSeconds())
                 .build();
     }
 
