@@ -1,6 +1,7 @@
 package com.Rootin.domain.user.dto;
 
 import com.Rootin.domain.user.entity.User;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -20,6 +21,7 @@ public class UserMeResponse {
     private int point;
     private String provider;
     private long tilCount;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
 
     public static UserMeResponse of(User user, long tilCount) {
