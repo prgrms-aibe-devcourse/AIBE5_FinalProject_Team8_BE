@@ -20,6 +20,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -71,7 +72,17 @@ class UserControllerTest {
                 1L, "test@rootin.com",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
-        UserMeResponse response = UserMeResponse.of(mockUser, 7L);
+        LocalDateTime fixedCreatedAt = LocalDateTime.of(2025, 1, 15, 10, 30, 0);
+        UserMeResponse response = UserMeResponse.builder()
+                .id(null)
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .profileImageUrl("https://cdn.rootin.com/profile/1.jpg")
+                .point(100)
+                .provider("LOCAL")
+                .tilCount(7L)
+                .createdAt(fixedCreatedAt)
+                .build();
         given(userService.getUserMe(1L)).willReturn(response);
 
         // when & then
@@ -84,7 +95,9 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.profileImageUrl").value("https://cdn.rootin.com/profile/1.jpg"))
                 .andExpect(jsonPath("$.data.point").value(100))
                 .andExpect(jsonPath("$.data.provider").value("LOCAL"))
-                .andExpect(jsonPath("$.data.tilCount").value(7));
+                .andExpect(jsonPath("$.data.tilCount").value(7))
+                .andExpect(jsonPath("$.data.createdAt").isString())
+                .andExpect(jsonPath("$.data.createdAt").value("2025-01-15T10:30:00"));
     }
 
     @Test
