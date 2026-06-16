@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -106,6 +107,31 @@ class UserServiceTest {
         assertThat(response.getTilCount()).isEqualTo(5L);
         assertThat(response.getEmail()).isEqualTo("test@rootin.com");
         assertThat(response.getPoint()).isEqualTo(100);
+        assertThat(response.getCreatedAt()).isNull(); // 단위 테스트에서 JPA Auditing 미동작 → null
+    }
+
+    @Test
+    @DisplayName("내 정보 조회 성공 — createdAt 포함 반환")
+    void getUserMe_createdAt_included() {
+        // given
+        User user = User.builder()
+                .email("test@rootin.com")
+                .nickname("루틴이")
+                .role(Role.USER)
+                .provider(Provider.LOCAL)
+                .build();
+
+        LocalDateTime expectedCreatedAt = LocalDateTime.of(2025, 1, 1, 0, 0);
+        ReflectionTestUtils.setField(user, "createdAt", expectedCreatedAt);
+
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(0L);
+
+        // when
+        UserMeResponse response = userService.getUserMe(1L);
+
+        // then
+        assertThat(response.getCreatedAt()).isEqualTo(expectedCreatedAt);
     }
 
     @Test
