@@ -72,6 +72,15 @@ public class UserPotSeeder {
         Plant boltPlant = plantRepository
                 .findFirstByNameAndGradeAndGrowthStage("번개씨앗", Grade.RARE, GrowthStage.SEED)
                 .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 번개씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
+        Plant firePlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("불꽃씨앗", Grade.COMMON, GrowthStage.SEED)
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 불꽃씨앗 (COMMON/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
+        Plant icePlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("얼음씨앗", Grade.COMMON, GrowthStage.SEED)
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 얼음씨앗 (COMMON/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
+        Plant rosePlant = plantRepository
+                .findFirstByNameAndGradeAndGrowthStage("흑장미씨앗", Grade.RARE, GrowthStage.SEED)
+                .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 흑장미씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
 
         // ── 화분 생성 ──────────────────────────────────────────────────────────
         Pot codingPot = potRepository.save(Pot.builder()
@@ -88,6 +97,15 @@ public class UserPotSeeder {
                 .level(1).totalExp(0).isDisplayed(false).build());
         Pot fitnessPot = potRepository.save(Pot.builder()
                 .userId(user.getId()).title("운동").description("운동 루틴과 기록")
+                .level(1).totalExp(0).isDisplayed(false).build());
+        Pot firePot = potRepository.save(Pot.builder()
+                .userId(user.getId()).title("요리").description("요리 레시피와 도전 기록")
+                .level(1).totalExp(0).isDisplayed(false).build());
+        Pot icePot = potRepository.save(Pot.builder()
+                .userId(user.getId()).title("명상").description("매일 5분 마음 정리")
+                .level(1).totalExp(0).isDisplayed(false).build());
+        Pot rosePot = potRepository.save(Pot.builder()
+                .userId(user.getId()).title("그림").description("그림 연습 기록")
                 .level(1).totalExp(0).isDisplayed(false).build());
 
         LocalDate today = LocalDate.now();
@@ -132,6 +150,24 @@ public class UserPotSeeder {
                 today.minusMonths(6).atTime(10, 0),
                 today.minusMonths(3).atTime(20, 0));
 
+        // [fire] 불꽃씨앗 1회 수확 → 불꽃씨(0) 해금
+        saveHarvested(user, firePot, firePlant, 0,
+                today.minusMonths(7).atTime(10, 0),
+                today.minusMonths(4).atTime(20, 0));
+
+        // [ice] 얼음씨앗 2회 수확 → 얼음씨(0), 얼음싹(1) 해금
+        saveHarvested(user, icePot, icePlant, 0,
+                today.minusMonths(9).atTime(10, 0),
+                today.minusMonths(6).atTime(20, 0));
+        saveHarvested(user, icePot, icePlant, 1,
+                today.minusMonths(6).atTime(20, 1),
+                today.minusMonths(2).atTime(20, 0));
+
+        // [rose] 흑장미씨앗 1회 수확 → 흑장미씨(0) 해금 (희귀종)
+        saveHarvested(user, rosePot, rosePlant, 0,
+                today.minusMonths(5).atTime(10, 0),
+                today.minusMonths(1).atTime(20, 0));
+
         // ── 현재 성장 중인 PlantItem ───────────────────────────────────────────
 
         // seed 4번째 사이클: 새싹 성장 중
@@ -164,8 +200,26 @@ public class UserPotSeeder {
         jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
                 today.minusMonths(3).atTime(20, 1), 50, fitnessActive.getId());
 
-        log.info("유저·화분·PlantItem 생성 완료 — 도감 9/40 해금 (seed×3, shroom×2, cactus×1, moon×2, bolt×1)");
-        return Optional.of(new SeedContext(user, codingPot, englishPot, readingPot, mathPot, fitnessPot));
+        // fire 2번째 사이클: 새싹 성장 중
+        PlantItem fireActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(firePot.getId()).plantId(firePlant.getId()).build());
+        jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
+                today.minusMonths(4).atTime(20, 1), 200, fireActive.getId());
+
+        // ice 3번째 사이클: 씨앗 단계
+        PlantItem iceActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(icePot.getId()).plantId(icePlant.getId()).build());
+        jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
+                today.minusMonths(2).atTime(20, 1), 30, iceActive.getId());
+
+        // rose 2번째 사이클: 씨앗 단계 (희귀종)
+        PlantItem roseActive = plantItemRepository.save(PlantItem.builder()
+                .userId(user.getId()).potId(rosePot.getId()).plantId(rosePlant.getId()).build());
+        jdbcTemplate.update("UPDATE plant_item SET created_at=?, growth_exp=? WHERE id=?",
+                today.minusMonths(1).atTime(20, 1), 10, roseActive.getId());
+
+        log.info("유저·화분·PlantItem 생성 완료 — 도감 13/40 해금 (seed×3, shroom×2, cactus×1, moon×2, bolt×1, fire×1, ice×2, rose×1)");
+        return Optional.of(new SeedContext(user, codingPot, englishPot, readingPot, mathPot, fitnessPot, firePot, icePot, rosePot));
     }
 
     private void saveHarvested(User user, Pot pot, Plant plant, int stageIndex,
@@ -178,5 +232,6 @@ public class UserPotSeeder {
     }
 
     /** TilSeeder로 전달할 컨텍스트 */
-    public record SeedContext(User user, Pot codingPot, Pot englishPot, Pot readingPot, Pot mathPot, Pot fitnessPot) {}
+    public record SeedContext(User user, Pot codingPot, Pot englishPot, Pot readingPot, Pot mathPot, Pot fitnessPot,
+                              Pot firePot, Pot icePot, Pot rosePot) {}
 }
