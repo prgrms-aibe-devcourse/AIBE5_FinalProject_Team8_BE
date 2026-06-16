@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -68,21 +69,14 @@ class UserControllerTest {
                 .provider(Provider.LOCAL)
                 .build();
 
+        LocalDateTime fixedCreatedAt = LocalDateTime.of(2025, 1, 15, 10, 30, 0);
+        ReflectionTestUtils.setField(mockUser, "createdAt", fixedCreatedAt);
+
         JwtUserDetails jwtUserDetails = new JwtUserDetails(
                 1L, "test@rootin.com",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
-        LocalDateTime fixedCreatedAt = LocalDateTime.of(2025, 1, 15, 10, 30, 0);
-        UserMeResponse response = UserMeResponse.builder()
-                .id(null)
-                .email("test@rootin.com")
-                .nickname("루틴이")
-                .profileImageUrl("https://cdn.rootin.com/profile/1.jpg")
-                .point(100)
-                .provider("LOCAL")
-                .tilCount(7L)
-                .createdAt(fixedCreatedAt)
-                .build();
+        UserMeResponse response = UserMeResponse.of(mockUser, 7L);
         given(userService.getUserMe(1L)).willReturn(response);
 
         // when & then
