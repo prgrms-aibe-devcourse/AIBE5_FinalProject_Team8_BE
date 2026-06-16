@@ -67,6 +67,4 @@ public interface TilRepository extends JpaRepository<Til, Long> {
     List<PotTilCountProjection> countByPotIdInAndStatus(@Param("potIds") List<Long> potIds, @Param("status") PostStatus status);
 
     long countByUserIdAndStatus(Long userId, PostStatus status);
-
-    long countByUserIdAndStatusAndPublishedAtBetween(Long userId, PostStatus status, LocalDateTime from, LocalDateTime to);
 }
