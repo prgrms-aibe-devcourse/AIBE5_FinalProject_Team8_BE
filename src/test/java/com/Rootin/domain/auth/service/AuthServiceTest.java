@@ -18,6 +18,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,7 +26,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,6 +54,7 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuthenticationManager authenticationManager;
     @Mock private RestTemplate restTemplate;
+    @Spy private Clock clock = Clock.fixed(Instant.parse("2026-06-16T00:00:00Z"), ZoneId.of("Asia/Seoul"));
 
     @Test
     @DisplayName("Refresh Token 재발급 시 기존 토큰을 회전하고 새 Access Token과 Refresh Token을 발급한다")
@@ -57,7 +62,7 @@ class AuthServiceTest {
         // given
         String refreshTokenValue = "refresh-token";
         User user = buildUser();
-        RefreshToken refreshToken = buildRefreshToken(user, refreshTokenValue, LocalDateTime.now().plusDays(7));
+        RefreshToken refreshToken = buildRefreshToken(user, refreshTokenValue, now().plusDays(7));
 
         given(refreshTokenRepository.findByTokenForUpdate(refreshTokenValue)).willReturn(Optional.of(refreshToken));
         given(jwtTokenProvider.createAccessToken(1L, "test@example.com", "USER")).willReturn("new-access-token");
@@ -121,7 +126,7 @@ class AuthServiceTest {
     void reissue_expiredRefreshToken_throwsUnauthorized() {
         // given
         User user = buildUser();
-        RefreshToken expiredToken = buildRefreshToken(user, "expired-refresh-token", LocalDateTime.now().minusDays(1));
+        RefreshToken expiredToken = buildRefreshToken(user, "expired-refresh-token", now().minusDays(1));
         given(refreshTokenRepository.findByTokenForUpdate("expired-refresh-token")).willReturn(Optional.of(expiredToken));
 
         // when & then
@@ -140,13 +145,14 @@ class AuthServiceTest {
     @DisplayName("회전된 Refresh Token이 유예 시간 안에 다시 들어오면 같은 대체 토큰을 반환한다")
     void reissue_rotatedRefreshTokenWithinGrace_returnsReplacementToken() {
         // given
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         User user = buildUser();
         RefreshToken rotatedToken = buildRefreshToken(user, "old-refresh-token", now.plusDays(7));
         rotatedToken.rotateTo("new-refresh-token", now.minusSeconds(1), now.plusSeconds(20));
         RefreshToken replacementToken = buildRefreshToken(user, "new-refresh-token", now.plusDays(14));
 
         given(refreshTokenRepository.findByTokenForUpdate("old-refresh-token")).willReturn(Optional.of(rotatedToken));
+        given(refreshTokenRepository.findByToken("new-refresh-token")).willReturn(Optional.of(replacementToken));
         given(refreshTokenRepository.findByTokenForUpdate("new-refresh-token")).willReturn(Optional.of(replacementToken));
         given(jwtTokenProvider.createAccessToken(1L, "test@example.com", "USER")).willReturn("new-access-token");
         given(jwtTokenProvider.getAccessTokenExpirationInSeconds()).willReturn(1800L);
@@ -157,7 +163,7 @@ class AuthServiceTest {
         // then
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
         assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
-        assertThat(response.getRefreshTokenExpiresIn()).isBetween(14L * 24 * 60 * 60 - 5, 14L * 24 * 60 * 60);
+        assertThat(response.getRefreshTokenExpiresIn()).isEqualTo(14L * 24 * 60 * 60);
         assertThat(response.getIsNewUser()).isNull();
 
         verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
@@ -168,7 +174,7 @@ class AuthServiceTest {
     @DisplayName("회전된 대체 Refresh Token도 유예 시간 안에 다시 회전된 경우 최종 활성 토큰을 따라간다")
     void reissue_rotatedReplacementTokenWithinGrace_returnsFinalActiveToken() {
         // given
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         User user = buildUser();
         RefreshToken oldToken = buildRefreshToken(user, "old-refresh-token", now.plusDays(7));
         oldToken.rotateTo("new-refresh-token", now.minusSeconds(2), now.plusSeconds(20));
@@ -177,7 +183,8 @@ class AuthServiceTest {
         RefreshToken finalToken = buildRefreshToken(user, "final-refresh-token", now.plusDays(14));
 
         given(refreshTokenRepository.findByTokenForUpdate("old-refresh-token")).willReturn(Optional.of(oldToken));
-        given(refreshTokenRepository.findByTokenForUpdate("new-refresh-token")).willReturn(Optional.of(newToken));
+        given(refreshTokenRepository.findByToken("new-refresh-token")).willReturn(Optional.of(newToken));
+        given(refreshTokenRepository.findByToken("final-refresh-token")).willReturn(Optional.of(finalToken));
         given(refreshTokenRepository.findByTokenForUpdate("final-refresh-token")).willReturn(Optional.of(finalToken));
         given(jwtTokenProvider.createAccessToken(1L, "test@example.com", "USER")).willReturn("new-access-token");
         given(jwtTokenProvider.getAccessTokenExpirationInSeconds()).willReturn(1800L);
@@ -198,7 +205,7 @@ class AuthServiceTest {
     @DisplayName("회전된 Refresh Token의 유예 시간이 지나면 401 예외가 발생한다")
     void reissue_rotatedRefreshTokenAfterGrace_throwsUnauthorized() {
         // given
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         User user = buildUser();
         RefreshToken rotatedToken = buildRefreshToken(user, "old-refresh-token", now.plusDays(7));
         rotatedToken.rotateTo("new-refresh-token", now.minusMinutes(1), now.minusSeconds(1));
@@ -244,5 +251,9 @@ class AuthServiceTest {
                 .token(token)
                 .expiresAt(expiresAt)
                 .build();
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 }

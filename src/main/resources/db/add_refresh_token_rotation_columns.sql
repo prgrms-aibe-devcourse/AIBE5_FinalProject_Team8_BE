@@ -9,3 +9,6 @@ ALTER TABLE refresh_tokens
     ADD COLUMN rotated_at DATETIME NULL,
     ADD COLUMN grace_expires_at DATETIME NULL,
     ADD COLUMN replacement_token VARCHAR(512) NULL;
+
+CREATE INDEX idx_refresh_tokens_grace_expires_at
+    ON refresh_tokens (grace_expires_at);

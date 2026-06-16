@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -50,6 +51,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final RestTemplate restTemplate;
+    private final Clock clock;
 
     @Value("${auth.refresh-token.grace-seconds:30}")
     private long refreshTokenRotationGraceSeconds;
@@ -258,7 +260,7 @@ public class AuthService {
         RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(refreshTokenValue)
                 .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         // 2. 이미 회전된 토큰은 Grace Period 안에서만 같은 대체 토큰으로 재응답한다.
         if (refreshToken.isRotated()) {
@@ -329,7 +331,7 @@ public class AuthService {
                 user.getRole().name()
         );
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         // Refresh Token 생성 — email만 포함 (최소 정보)
         String refreshTokenValue = jwtTokenProvider.createRefreshToken(user.getEmail());
@@ -396,8 +398,34 @@ public class AuthService {
     private RefreshToken resolveActiveReplacementToken(String token, LocalDateTime now) {
         String currentToken = token;
 
+        for (int attempt = 0; attempt < MAX_REFRESH_TOKEN_ROTATION_TRACE_DEPTH; attempt++) {
+            String activeTokenValue = resolveActiveReplacementTokenValue(currentToken, now);
+            RefreshToken lockedToken = refreshTokenRepository.findByTokenForUpdate(activeTokenValue)
+                    .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
+
+            if (lockedToken.isExpired(now)) {
+                throw new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다.");
+            }
+
+            if (!lockedToken.isRotated()) {
+                return lockedToken;
+            }
+
+            if (!lockedToken.isWithinGracePeriod(now) || lockedToken.getReplacementToken() == null) {
+                throw new CustomException(HttpStatus.UNAUTHORIZED, "이미 사용된 Refresh Token입니다. 다시 로그인해 주세요.");
+            }
+
+            currentToken = lockedToken.getReplacementToken();
+        }
+
+        throw new CustomException(HttpStatus.UNAUTHORIZED, "Refresh Token 재발급 상태가 올바르지 않습니다.");
+    }
+
+    private String resolveActiveReplacementTokenValue(String token, LocalDateTime now) {
+        String currentToken = token;
+
         for (int depth = 0; depth < MAX_REFRESH_TOKEN_ROTATION_TRACE_DEPTH; depth++) {
-            RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(currentToken)
+            RefreshToken refreshToken = refreshTokenRepository.findByToken(currentToken)
                     .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
 
             if (refreshToken.isExpired(now)) {
@@ -405,7 +433,7 @@ public class AuthService {
             }
 
             if (!refreshToken.isRotated()) {
-                return refreshToken;
+                return refreshToken.getToken();
             }
 
             if (!refreshToken.isWithinGracePeriod(now) || refreshToken.getReplacementToken() == null) {
