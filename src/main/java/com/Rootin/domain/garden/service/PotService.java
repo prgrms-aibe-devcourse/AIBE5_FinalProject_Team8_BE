@@ -4,8 +4,10 @@ import com.Rootin.domain.garden.dto.PotCreateRequest;
 import com.Rootin.domain.garden.dto.PotResponse;
 import com.Rootin.domain.garden.dto.PotSummaryResponse;
 import com.Rootin.domain.garden.dto.PotUpdateRequest;
+import com.Rootin.domain.garden.entity.PlantCollection;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
+import com.Rootin.domain.garden.repository.PlantCollectionRepository;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
@@ -52,6 +54,8 @@ public class PotService {
     private final PotRepository potRepository;
     private final PlantItemRepository plantItemRepository;
     private final PlantRepository plantRepository;
+    private final PlantCollectionRepository plantCollectionRepository;
+    private final SeedAssignmentService seedAssignmentService;
     private final TilRepository tilRepository;
     private final AiResultRepository aiResultRepository;
     private final WateringLogRepository wateringLogRepository;
@@ -72,9 +76,8 @@ public class PotService {
      */
     @Transactional
     public PotResponse createPot(Long userId, PotCreateRequest request) {
-        Plant defaultPlant = getDefaultPlant();
+        Plant selectedPlant = resolveInitialSeed(userId);
 
-        // 1. 화분 데이터 생성 및 저장
         Pot pot = Pot.builder()
                 .userId(userId)
                 .title(request.getTitle())
@@ -82,22 +85,30 @@ public class PotService {
                 .build();
         Pot savedPot = potRepository.save(pot);
 
-        // 2. 화분에 심을 기본 씨앗 정보 매핑 저장
-        PlantItem plantItem = PlantItem.builder()
+        plantItemRepository.save(PlantItem.builder()
                 .userId(userId)
                 .potId(savedPot.getId())
-                .plantId(defaultPlant.getId())
-                .build();
-        plantItemRepository.save(plantItem);
+                .plantId(selectedPlant.getId())
+                .build());
 
         return PotResponse.from(savedPot);
     }
 
-    private Plant getDefaultPlant() {
-        // 화분 생성 시 반드시 필요한 마스터 데이터입니다.
-        // 이 데이터가 없으면 서비스가 정상 동작할 수 없으므로 notFound 예외로 빠르게 문제를 드러냅니다.
-        return plantRepository.findFirstByNameAndGradeAndGrowthStage(DEFAULT_PLANT_NAME, Grade.COMMON, GrowthStage.SEED)
-                .orElseThrow(() -> CustomException.notFound("기본 식물 마스터 데이터가 존재하지 않습니다."));
+    private Plant resolveInitialSeed(Long userId) {
+        boolean hasCollection = !plantCollectionRepository.findByUserId(userId).isEmpty();
+        if (!hasCollection) {
+            // 첫 화분: 기본 씨앗 고정 후 해금 풀에 등록
+            Plant defaultPlant = plantRepository.findFirstByNameAndGradeAndGrowthStage(
+                            DEFAULT_PLANT_NAME, Grade.COMMON, GrowthStage.SEED)
+                    .orElseThrow(() -> CustomException.notFound("기본 식물 마스터 데이터가 존재하지 않습니다."));
+            plantCollectionRepository.save(PlantCollection.builder()
+                    .userId(userId)
+                    .plantId(defaultPlant.getId())
+                    .build());
+            return defaultPlant;
+        }
+        // 이후 화분: 해금 풀 내 랜덤 배정
+        return seedAssignmentService.selectFromCollection(userId);
     }
 
     /**
