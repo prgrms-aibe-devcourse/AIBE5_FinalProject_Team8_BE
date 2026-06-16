@@ -44,7 +44,7 @@ public class AiService {
     /**
      * TIL 요약 요청
      * [tilIds 없음] 기존 로직: 화분 소유 검증 -> 화분 내 전체 PUBLISHED TIL 사용 (하위 호환)
-     * [tilIds 있음] 선택 로직: tilIds로 TIL 조회 -> 소유 검증(403) -> 빈 결과(404)
+     * [tilIds 있음] 선택 로직: tilIds로 TIL 조회 -> 소유 검증(400) -> 빈 결과(404)
      * 공통: 포인트 확인(402) -> 합산 -> OpenAI -> 포인트 차감 + PointLog
      */
     @Transactional
@@ -95,7 +95,7 @@ public class AiService {
     /**
      * 복습 문제 생성 요청
      * [tilIds 없음] 기존 로직: 화분 소유 검증 -> 화분 내 전체 PUBLISHED TIL 사용 (하위 호환)
-     * [tilIds 있음] 선택 로직: tilIds로 TIL 조회 -> 소유 검증(403) -> 빈 결과(404)
+     * [tilIds 있음] 선택 로직: tilIds로 TIL 조회 -> 소유 검증(400) -> 빈 결과(404)
      * 공통: 포인트 확인(402) -> 합산 -> OpenAI -> 포인트 차감 + PointLog
      */
     @Transactional

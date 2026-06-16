@@ -20,7 +20,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -67,6 +69,9 @@ class UserControllerTest {
                 .provider(Provider.LOCAL)
                 .build();
 
+        LocalDateTime fixedCreatedAt = LocalDateTime.of(2025, 1, 15, 10, 30, 0);
+        ReflectionTestUtils.setField(mockUser, "createdAt", fixedCreatedAt);
+
         JwtUserDetails jwtUserDetails = new JwtUserDetails(
                 1L, "test@rootin.com",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -84,7 +89,9 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.profileImageUrl").value("https://cdn.rootin.com/profile/1.jpg"))
                 .andExpect(jsonPath("$.data.point").value(100))
                 .andExpect(jsonPath("$.data.provider").value("LOCAL"))
-                .andExpect(jsonPath("$.data.tilCount").value(7));
+                .andExpect(jsonPath("$.data.tilCount").value(7))
+                .andExpect(jsonPath("$.data.createdAt").isString())
+                .andExpect(jsonPath("$.data.createdAt").value("2025-01-15T10:30:00"));
     }
 
     @Test
