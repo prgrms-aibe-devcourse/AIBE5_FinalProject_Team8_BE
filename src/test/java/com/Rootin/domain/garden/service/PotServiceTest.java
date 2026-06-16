@@ -562,6 +562,6 @@ class PotServiceTest {
         assertThat(assignedPlant.getName()).isEqualTo("기본 씨앗");
 
         // then — 해금 풀 크기는 여전히 1 (새 종 추가 없음)
-        assertThat(plantCollectionRepository.findByUserId(userId)).hasSize(1);
+        assertThat(plantCollectionRepository.findPlantIdsByUserId(userId)).hasSize(1);
     }
 }

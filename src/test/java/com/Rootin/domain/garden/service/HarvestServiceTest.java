@@ -185,9 +185,9 @@ class HarvestServiceTest {
                 .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
                 .growthExp(1000).isHarvested(false).build());
 
-        int beforeCount = plantCollectionRepository.findByUserId(testUser.getId()).size();
+        int beforeCount = plantCollectionRepository.findPlantIdsByUserId(testUser.getId()).size();
         harvestService.harvest(testUser.getId(), testPot.getId());
-        int afterCount = plantCollectionRepository.findByUserId(testUser.getId()).size();
+        int afterCount = plantCollectionRepository.findPlantIdsByUserId(testUser.getId()).size();
 
         assertThat(afterCount).isEqualTo(beforeCount + 1);
         assertThat(plantCollectionRepository.existsByUserIdAndPlantId(testUser.getId(), rareSeed.getId())).isTrue();
@@ -203,9 +203,9 @@ class HarvestServiceTest {
                 .userId(testUser.getId()).potId(testPot.getId()).plantId(testPlantSeed.getId())
                 .growthExp(300).isHarvested(false).build());
 
-        int beforeCount = plantCollectionRepository.findByUserId(testUser.getId()).size();
+        int beforeCount = plantCollectionRepository.findPlantIdsByUserId(testUser.getId()).size();
         harvestService.harvest(testUser.getId(), testPot.getId());
-        int afterCount = plantCollectionRepository.findByUserId(testUser.getId()).size();
+        int afterCount = plantCollectionRepository.findPlantIdsByUserId(testUser.getId()).size();
 
         assertThat(afterCount).isEqualTo(beforeCount);
     }

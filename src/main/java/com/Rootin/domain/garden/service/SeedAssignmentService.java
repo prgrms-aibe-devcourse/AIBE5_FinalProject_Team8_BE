@@ -39,15 +39,22 @@ public class SeedAssignmentService {
     private final PlantRepository plantRepository;
 
     public Plant selectFromCollection(Long userId) {
-        List<PlantCollection> collection = plantCollectionRepository.findByUserId(userId);
-        if (collection.isEmpty()) {
+        List<Long> plantIdsInCollection = plantCollectionRepository.findPlantIdsByUserId(userId);
+        if (plantIdsInCollection.isEmpty()) {
             throw CustomException.notFound("해금된 씨앗이 없습니다.");
         }
 
-        List<Long> plantIds = collection.stream().map(PlantCollection::getPlantId).toList();
-        List<Plant> plants = plantRepository.findAllById(plantIds);
+        Grade grade = decideGrade();
+        List<Plant> candidates = plantRepository.findByGradeAndGrowthStageAndIdIn(grade, GrowthStage.SEED, plantIdsInCollection);
 
-        return selectByGrade(plants);
+        if (candidates.isEmpty() && grade == Grade.RARE) {
+            candidates = plantRepository.findByGradeAndGrowthStageAndIdIn(Grade.COMMON, GrowthStage.SEED, plantIdsInCollection);
+        }
+        if (candidates.isEmpty()) {
+            throw CustomException.notFound("해금된 씨앗이 없습니다.");
+        }
+
+        return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
     }
 
     public Plant selectFromAllPlants() {
@@ -70,19 +77,6 @@ public class SeedAssignmentService {
                     .plantId(plant.getId())
                     .build());
         }
-    }
-
-    private Plant selectByGrade(List<Plant> plants) {
-        List<Plant> rarePlants = plants.stream().filter(p -> p.getGrade() == Grade.RARE).toList();
-        List<Plant> commonPlants = plants.stream().filter(p -> p.getGrade() == Grade.COMMON).toList();
-
-        if (!rarePlants.isEmpty() && ThreadLocalRandom.current().nextDouble() < 0.1) {
-            return rarePlants.get(ThreadLocalRandom.current().nextInt(rarePlants.size()));
-        }
-        if (commonPlants.isEmpty()) {
-            throw CustomException.notFound("해금된 common 씨앗이 없습니다.");
-        }
-        return commonPlants.get(ThreadLocalRandom.current().nextInt(commonPlants.size()));
     }
 
     protected Grade decideGrade() {

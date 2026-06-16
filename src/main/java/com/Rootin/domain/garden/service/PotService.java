@@ -95,7 +95,7 @@ public class PotService {
     }
 
     private Plant resolveInitialSeed(Long userId) {
-        boolean hasCollection = !plantCollectionRepository.findByUserId(userId).isEmpty();
+        boolean hasCollection = plantCollectionRepository.existsByUserId(userId);
         if (!hasCollection) {
             // 첫 화분: 기본 씨앗 고정 후 해금 풀에 등록
             Plant defaultPlant = plantRepository.findFirstByNameAndGradeAndGrowthStage(

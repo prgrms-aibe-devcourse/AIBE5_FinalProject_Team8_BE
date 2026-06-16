@@ -26,4 +26,6 @@ public interface PlantRepository extends JpaRepository<Plant, Long> {
      * @return 해당 이름들을 가진 모든 단계/등급의 식물 엔티티 목록
      */
     List<Plant> findByNameIn(List<String> names);
+
+    List<Plant> findByGradeAndGrowthStageAndIdIn(Grade grade, GrowthStage growthStage, List<Long> ids);
 }
