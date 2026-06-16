@@ -36,7 +36,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus # CI/CD health check와 메트릭 수집도구 프로메테우스
   endpoint:
     health:
       show-details: never
@@ -77,7 +77,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
