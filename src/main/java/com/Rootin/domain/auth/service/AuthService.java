@@ -240,7 +240,7 @@ public class AuthService {
      * @param refreshTokenValue 클라이언트가 보낸 Refresh Token 문자열
      * @return TokenResponse (새 Access Token + 기존 Refresh Token)
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public TokenResponse reissue(String refreshTokenValue) {
         if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
             throw CustomException.badRequest("Refresh Token은 필수입니다.");
