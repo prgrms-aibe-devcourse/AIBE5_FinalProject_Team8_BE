@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+permissions:
+  id-token: write     # OIDC 토큰 발급
+  contents: read      # checkout이 코드 읽을 권한
 
 jobs:
   build-and-push:
@@ -49,14 +52,50 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/rootin-be:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/rootin-be:${{ github.sha }}
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/rootin
-            docker compose -f docker-compose.yml pull be
-            docker compose -f docker-compose.yml up -d --no-deps be
-            docker image prune -f
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EC2 via SSM
+        env:
+          INSTANCE_ID: ${{ secrets.EC2_ID }}
+        run: |
+          set -euo pipefail
+          
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy from ${{ github.repository }}" \
+            --parameters 'commands=["cd /home/ubuntu/rootin && docker compose -f docker-compose.yml pull be && docker compose -f docker-compose.yml up -d --no-deps be && docker image prune -f"]' \
+            --query "Command.CommandId" --output text)
+          echo "Command ID: $CMD_ID"
+          
+          sleep 5
+          
+          # 종료 상태가 될 때까지 직접 폴링 (긴 배포도 끝까지 기다림)
+          while true; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            echo "Current status: $STATUS"
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 5
+          done
+
+          # 실행 로그 출력 (성공/실패 무관하게 항상)
+          echo "----- stdout -----"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query "StandardOutputContent" --output text
+          echo "----- stderr -----"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query "StandardErrorContent" --output text
+
+          # Success가 아니면 워크플로우 실패 처리
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::Deployment failed with status: $STATUS"
+            exit 1
+          fi
+          echo "Deployment succeeded ✅"
+
