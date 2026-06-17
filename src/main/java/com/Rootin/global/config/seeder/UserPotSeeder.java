@@ -82,6 +82,14 @@ public class UserPotSeeder {
                 .findFirstByNameAndGradeAndGrowthStage("흑장미씨앗", Grade.RARE, GrowthStage.SEED)
                 .orElseThrow(() -> new IllegalStateException("식물 마스터 데이터 누락: 흑장미씨앗 (RARE/SEED). PlantMasterSeeder가 먼저 실행되었는지 확인하세요."));
 
+        // ── plant_collection: 8종 씨앗 전부 해금 ────────────────────────────────
+        for (Plant seed : new Plant[]{seedPlant, moonPlant, shroomPlant, cactusPlant,
+                boltPlant, firePlant, icePlant, rosePlant}) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO plant_collection (user_id, plant_id, created_at) VALUES (?, ?, NOW())",
+                    user.getId(), seed.getId());
+        }
+
         // ── 화분 생성 ──────────────────────────────────────────────────────────
         Pot codingPot = potRepository.save(Pot.builder()
                 .userId(user.getId()).title("코딩").description("매일 한 가지씩 배우는 코딩 기록")
