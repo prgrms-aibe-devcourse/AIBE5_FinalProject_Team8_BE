@@ -14,9 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
-
 @Service
 @RequiredArgsConstructor
 public class HarvestService {
@@ -24,6 +21,7 @@ public class HarvestService {
     private final PotRepository potRepository;
     private final PlantItemRepository plantItemRepository;
     private final PlantRepository plantRepository;
+    private final SeedAssignmentService seedAssignmentService;
     private final LevelCalculator levelCalculator;
 
     @Transactional
@@ -45,12 +43,22 @@ public class HarvestService {
 
         // 4. 수확 처리 (경험치 중복 연산을 피하고 화분에 저장된 최신 레벨 정보를 직접 활용하여 상태를 연동합니다)
         current.harvest(pot.getLevel(), stageIndex);
+        // IDENTITY 전략의 즉시 INSERT로 인해 ux_plant_item_one_active_per_pot 제약 위반을 막기 위해 먼저 플러시합니다.
+        plantItemRepository.saveAndFlush(current);
 
         Plant harvestedPlant = plantRepository.findById(current.getPlantId())
                 .orElseThrow(() -> CustomException.notFound("식물 마스터 데이터를 찾을 수 없습니다."));
 
-        // 5. 다음 키울 새로운 랜덤 식물(씨앗 단계)을 선택하여 화분에 배정합니다.
-        Plant nextPlant = selectRandomPlant();
+        // 5. 수확 단계에 따라 다음 씨앗 배정
+        // FULL_BLOOM: 전체 풀 랜덤 + 새 종이면 해금 풀에 추가
+        // 미만: 기존 해금 풀 내 랜덤 (풀 변화 없음)
+        Plant nextPlant;
+        if (stageIndex == GrowthStage.FULL_BLOOM.ordinal()) {
+            nextPlant = seedAssignmentService.selectFromAllPlants();
+            seedAssignmentService.addToCollectionIfNew(userId, nextPlant);
+        } else {
+            nextPlant = seedAssignmentService.selectFromCollection(userId);
+        }
 
         plantItemRepository.save(PlantItem.builder()
                 .userId(userId)
@@ -66,33 +74,5 @@ public class HarvestService {
                 nextPlant.getName(),
                 nextPlant.getGrade() == Grade.RARE ? "희귀" : "일반"
         );
-    }
-
-    /**
-     * 다음 화분에 배정할 임의의 식물 마스터(SEED 단계) 데이터를 선택합니다.
-     */
-    private Plant selectRandomPlant() {
-        Grade grade = decideNextPlantGrade();
-
-        List<Plant> candidates = plantRepository.findByGradeAndGrowthStage(grade, GrowthStage.SEED);
-        if (candidates.isEmpty()) {
-            // RARE 등급 식물이 데이터베이스에 존재하지 않으면 COMMON 등급 식물로 대체(Fallback)합니다.
-            candidates = plantRepository.findByGradeAndGrowthStage(Grade.COMMON, GrowthStage.SEED);
-        }
-        if (candidates.isEmpty()) {
-            throw CustomException.notFound("배정 가능한 식물 마스터 데이터가 없습니다.");
-        }
-
-        return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
-    }
-
-    /**
-     * 다음 식물의 등급을 무작위로 선택합니다. (10% 확률로 RARE, 90% 확률로 COMMON)
-     * 단위 테스트 시 난수 확률과 무관하게 RARE Fallback 분기를 100% 확정 검증할 수 있도록
-     * Mockito Spy를 적용 가능하도록 protected 메소드로 추출했습니다.
-     */
-    protected Grade decideNextPlantGrade() {
-        boolean isRare = ThreadLocalRandom.current().nextDouble() < 0.1;
-        return isRare ? Grade.RARE : Grade.COMMON;
     }
 }

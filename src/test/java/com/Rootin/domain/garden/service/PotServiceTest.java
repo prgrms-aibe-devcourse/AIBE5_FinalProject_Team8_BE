@@ -7,6 +7,7 @@ import com.Rootin.domain.garden.dto.PotSummaryResponse;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
+import com.Rootin.domain.garden.repository.PlantCollectionRepository;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
@@ -68,6 +69,9 @@ class PotServiceTest {
 
     @Autowired
     private AiResultRepository aiResultRepository;
+
+    @Autowired
+    private PlantCollectionRepository plantCollectionRepository;
 
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
@@ -520,5 +524,44 @@ class PotServiceTest {
         Assertions.assertThrows(CustomException.class, () -> {
             potService.deletePot(9999L, 1L);
         });
+    }
+
+    @Test
+    @DisplayName("첫 화분 생성 시 기본 씨앗이 고정으로 배정되고 해금 풀에 등록된다")
+    void createFirstPotAssignsDefaultSeedAndRegistersCollection() {
+        // given
+        Long userId = 9001L;
+
+        // when
+        PotResponse pot = potService.createPot(userId, PotCreateRequest.builder().title("첫 화분").build());
+
+        // then — 기본 씨앗이 배정되었는지 확인
+        PlantItem plantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(pot.getId()).orElseThrow();
+        Plant assignedPlant = plantRepository.findById(plantItem.getPlantId()).orElseThrow();
+        assertThat(assignedPlant.getName()).isEqualTo("기본 씨앗");
+
+        // then — 해금 풀에 기본 씨앗이 등록되었는지 확인
+        boolean collectionRegistered = plantCollectionRepository
+                .existsByUserIdAndPlantId(userId, assignedPlant.getId());
+        assertThat(collectionRegistered).isTrue();
+    }
+
+    @Test
+    @DisplayName("두 번째 화분 생성 시 해금 풀에서 씨앗이 배정된다")
+    void createSecondPotSelectsFromCollection() {
+        // given
+        Long userId = 9002L;
+        potService.createPot(userId, PotCreateRequest.builder().title("첫 번째 화분").build());
+
+        // when — 두 번째 화분: 해금 풀(기본 씨앗)에서 배정
+        PotResponse secondPot = potService.createPot(userId, PotCreateRequest.builder().title("두 번째 화분").build());
+
+        // then — 해금 풀 내 기본 씨앗이 배정됨
+        PlantItem plantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(secondPot.getId()).orElseThrow();
+        Plant assignedPlant = plantRepository.findById(plantItem.getPlantId()).orElseThrow();
+        assertThat(assignedPlant.getName()).isEqualTo("기본 씨앗");
+
+        // then — 해금 풀 크기는 여전히 1 (새 종 추가 없음)
+        assertThat(plantCollectionRepository.findPlantIdsByUserId(userId)).hasSize(1);
     }
 }
