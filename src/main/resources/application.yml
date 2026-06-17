@@ -37,6 +37,9 @@ management:
     web:
       exposure:
         include: health, prometheus # CI/CD health check와 메트릭 수집도구 프로메테우스
+  metrics:
+    tags:
+      apllication: rootin-be # 매트릭에 태그 추가
   endpoint:
     health:
       show-details: never
