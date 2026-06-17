@@ -43,6 +43,8 @@ public class HarvestService {
 
         // 4. 수확 처리 (경험치 중복 연산을 피하고 화분에 저장된 최신 레벨 정보를 직접 활용하여 상태를 연동합니다)
         current.harvest(pot.getLevel(), stageIndex);
+        // IDENTITY 전략의 즉시 INSERT로 인해 ux_plant_item_one_active_per_pot 제약 위반을 막기 위해 먼저 플러시합니다.
+        plantItemRepository.saveAndFlush(current);
 
         Plant harvestedPlant = plantRepository.findById(current.getPlantId())
                 .orElseThrow(() -> CustomException.notFound("식물 마스터 데이터를 찾을 수 없습니다."));
