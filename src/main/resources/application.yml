@@ -18,6 +18,10 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_EXPIRATION:1800000}
   refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
 
+auth:
+  refresh-token:
+    grace-seconds: ${AUTH_REFRESH_TOKEN_GRACE_SECONDS:30}
+
 # AWS S3 설정
 cloud:
   aws:
@@ -89,4 +93,3 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
-

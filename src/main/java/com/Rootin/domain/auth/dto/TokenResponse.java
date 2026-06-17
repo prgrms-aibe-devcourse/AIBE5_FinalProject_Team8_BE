@@ -21,6 +21,9 @@ public class TokenResponse {
     // Access Token 만료 시간 (초 단위) — /자동 재발급에 활용
     private long accessTokenExpiresIn;
 
+    // Refresh Token 만료까지 남은 시간 (초 단위) — 세션 만료 안내 등에 활용 가능
+    private long refreshTokenExpiresIn;
+
     /**
      * 최초 가입 여부 (구글 로그인 전용)
      * true: 처음 가입한 사용자 → 프론트에서 온보딩(닉네임 설정 등) 화면으로 이동
