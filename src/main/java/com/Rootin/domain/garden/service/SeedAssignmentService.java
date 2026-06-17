@@ -51,7 +51,7 @@ public class SeedAssignmentService {
             candidates = plantRepository.findByGradeAndGrowthStageAndIdIn(Grade.COMMON, GrowthStage.SEED, plantIdsInCollection);
         }
         if (candidates.isEmpty()) {
-            throw CustomException.notFound("해금된 씨앗이 없습니다.");
+            throw CustomException.notFound("배정 가능한 씨앗 마스터 데이터가 없습니다.");
         }
 
         return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
