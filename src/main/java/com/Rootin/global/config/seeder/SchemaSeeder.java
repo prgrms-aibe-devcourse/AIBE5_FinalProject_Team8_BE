@@ -58,31 +58,16 @@ public class SchemaSeeder {
      * 참조 스크립트: backfill_plant_collection.sql
      */
     public void backfillPlantCollection() {
-        Integer affected = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM (" +
-                "  SELECT DISTINCT pi.user_id, pi.plant_id" +
-                "  FROM plant_item pi" +
-                "  INNER JOIN plant p ON p.id = pi.plant_id AND p.growth_stage = 'Seed'" +
-                "  WHERE NOT EXISTS (" +
-                "    SELECT 1 FROM plant_collection pc" +
-                "    WHERE pc.user_id = pi.user_id AND pc.plant_id = pi.plant_id" +
-                "  )" +
-                ") t",
-                Integer.class
-        );
-
-        if (affected == null || affected == 0) {
-            log.debug("plant_collection 백필 불필요 — 모든 유저 레코드 정상.");
-            return;
-        }
-
-        log.info("plant_collection 백필 시작 — 누락 (user, plant) 쌍 {}건", affected);
-        jdbcTemplate.update(
+        int insertedRows = jdbcTemplate.update(
                 "INSERT IGNORE INTO plant_collection (user_id, plant_id, created_at)" +
                 " SELECT DISTINCT pi.user_id, pi.plant_id, NOW()" +
                 " FROM plant_item pi" +
                 " INNER JOIN plant p ON p.id = pi.plant_id AND p.growth_stage = 'Seed'"
         );
-        log.info("plant_collection 백필 완료 — {}건 삽입 (중복 스킵 포함). 참조: {}", affected, BACKFILL_SCRIPT);
+        if (insertedRows > 0) {
+            log.info("plant_collection 백필 완료 — {}건 삽입. 참조: {}", insertedRows, BACKFILL_SCRIPT);
+        } else {
+            log.debug("plant_collection 백필 불필요 — 모든 유저 레코드 정상.");
+        }
     }
 }
