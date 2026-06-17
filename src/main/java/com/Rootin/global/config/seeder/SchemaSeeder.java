@@ -12,6 +12,7 @@ public class SchemaSeeder {
 
     private static final String INDEX_NAME = "ux_plant_item_one_active_per_pot";
     private static final String MIGRATION_FILE = "src/main/resources/db/cleanup_duplicate_active_plant_items.sql";
+    private static final String BACKFILL_SCRIPT = "src/main/resources/db/backfill_plant_collection.sql";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -48,5 +49,40 @@ public class SchemaSeeder {
                       "아래 마이그레이션 파일을 수동으로 실행한 뒤 앱을 재시작하세요. " +
                       "파일: {}", MIGRATION_FILE, e);
         }
+    }
+
+    /**
+     * PR #169 이전에 pot을 생성한 기존 계정의 plant_collection 백필.
+     * plant_item 이력 기반으로 유저별 해금 씨앗을 INSERT IGNORE.
+     * 이미 존재하는 레코드는 unique constraint(user_id, plant_id)로 자동 스킵.
+     * 참조 스크립트: backfill_plant_collection.sql
+     */
+    public void backfillPlantCollection() {
+        Integer affected = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM (" +
+                "  SELECT DISTINCT pi.user_id, pi.plant_id" +
+                "  FROM plant_item pi" +
+                "  INNER JOIN plant p ON p.id = pi.plant_id AND p.growth_stage = 'Seed'" +
+                "  WHERE NOT EXISTS (" +
+                "    SELECT 1 FROM plant_collection pc" +
+                "    WHERE pc.user_id = pi.user_id AND pc.plant_id = pi.plant_id" +
+                "  )" +
+                ") t",
+                Integer.class
+        );
+
+        if (affected == null || affected == 0) {
+            log.debug("plant_collection 백필 불필요 — 모든 유저 레코드 정상.");
+            return;
+        }
+
+        log.info("plant_collection 백필 시작 — 누락 (user, plant) 쌍 {}건", affected);
+        jdbcTemplate.update(
+                "INSERT IGNORE INTO plant_collection (user_id, plant_id, created_at)" +
+                " SELECT DISTINCT pi.user_id, pi.plant_id, NOW()" +
+                " FROM plant_item pi" +
+                " INNER JOIN plant p ON p.id = pi.plant_id AND p.growth_stage = 'Seed'"
+        );
+        log.info("plant_collection 백필 완료 — {}건 삽입 (중복 스킵 포함). 참조: {}", affected, BACKFILL_SCRIPT);
     }
 }

@@ -25,6 +25,7 @@ public class DatabaseSeeder {
         log.info("=== DB 시드 데이터 검사 시작 ===");
         schemaSeeder.ensureUniqueActivePlantPerPot();
         plantMasterSeeder.seed();
+        schemaSeeder.backfillPlantCollection();
         userPotSeeder.seed().ifPresent(tilSeeder::seed);
         log.info("=== DB 시드 데이터 완료 ===");
     }
