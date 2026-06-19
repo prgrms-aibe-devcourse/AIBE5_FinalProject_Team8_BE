@@ -5,9 +5,12 @@ import com.Rootin.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import lombok.extern.slf4j.Slf4j;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -15,6 +18,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.io.IOException;
 import java.time.Duration;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class S3Service {
@@ -60,7 +64,14 @@ public class S3Service {
 
             return getFileUrl(objectKey);
         } catch (IOException e) {
+            log.error("S3 업로드 중 파일 스트림 처리 오류. objectKey={}", objectKey, e);
+            throw CustomException.internalServerError("파일 스트림 처리 중 오류가 발생했습니다.");
+        } catch (S3Exception e) {
+            log.error("S3 업로드 실패. objectKey={}, statusCode={}, message={}", objectKey, e.statusCode(), e.getMessage());
             throw CustomException.internalServerError("S3 업로드 중 오류가 발생했습니다.");
+        } catch (SdkClientException e) {
+            log.error("S3 연결 실패 (네트워크/인증 오류). objectKey={}, message={}", objectKey, e.getMessage());
+            throw CustomException.internalServerError("S3 서버와의 연결 중 오류가 발생했습니다.");
         }
     }
 
