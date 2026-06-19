@@ -265,7 +265,7 @@ class ExperienceServiceTest {
         TilCreateRequest request = new TilCreateRequest("서식 TIL", html, testPot.getId(), List.of("Java"));
 
         // when
-        TilResponse response = tilService.create(testUser.getId(), request);
+        TilResponse response = tilService.create(testUser.getId(), request, null);
 
         em.flush();
         em.clear();
@@ -288,7 +288,7 @@ class ExperienceServiceTest {
         TilCreateRequest request = new TilCreateRequest("빈 본문 TIL", "<p></p>", testPot.getId(), List.of());
 
         // when
-        TilResponse response = tilService.create(testUser.getId(), request);
+        TilResponse response = tilService.create(testUser.getId(), request, null);
 
         em.flush();
         em.clear();
