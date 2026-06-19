@@ -70,6 +70,9 @@ dependencies {
 
 	// Metrics Collection (Prometheus)
 	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+	// HTML 파싱 (TIL 본문 경험치 산정 시 태그 제외 후 순수 텍스트 길이 계산)
+	implementation 'org.jsoup:jsoup:1.18.1'
 }
 
 // ─── 테스트용 MySQL 컨테이너 생명주기 태스크 ─────────────────────────────────

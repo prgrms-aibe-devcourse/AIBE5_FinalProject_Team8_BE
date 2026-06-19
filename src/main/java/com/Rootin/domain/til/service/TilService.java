@@ -58,7 +58,9 @@ public class TilService {
 
         // TIL 저장 성공 직후, 글자 수 및 이력을 바탕으로 물주기 경험치/포인트/레벨업 비즈니스 로직을 구동합니다.
         // 이 호출이 Phase 2 경험치 시스템과 TIL 도메인을 연결하는 핵심 지점입니다.
-        int contentLength = request.content() != null ? request.content().length() : 0;
+        // 경험치 산정 글자 수는 HTML 원문 길이가 아니라 태그·공백을 제외한 순수 텍스트 기준으로 계산합니다.
+        // (서식만 추가해도 경험치가 늘어나는 문제 방지 + 에디터 예상 경험치와 기준 일치)
+        int contentLength = TilContentLength.countVisibleCharacters(request.content());
         experienceService.applyWatering(userId, pot, contentLength, til.getId());
 
         return TilResponse.from(til);
