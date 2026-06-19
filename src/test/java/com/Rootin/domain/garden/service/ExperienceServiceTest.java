@@ -241,7 +241,7 @@ class ExperienceServiceTest {
         );
 
         // when
-        TilResponse response = tilService.create(testUser.getId(), request);
+        TilResponse response = tilService.create(testUser.getId(), request, null);
 
         // then
         // 1. TIL이 정상 생성 확인 (레코드는 getId()가 아니라 tilId() 메소드를 제공함)
@@ -304,7 +304,7 @@ class ExperienceServiceTest {
         );
 
         CustomException exception = assertThrows(CustomException.class, () ->
-                tilService.create(otherUser.getId(), request)
+                tilService.create(otherUser.getId(), request, null)
         );
 
         assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
@@ -322,7 +322,7 @@ class ExperienceServiceTest {
         );
 
         CustomException exception = assertThrows(CustomException.class, () ->
-                tilService.saveDraft(otherUser.getId(), request)
+                tilService.saveDraft(otherUser.getId(), request, null)
         );
 
         assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
