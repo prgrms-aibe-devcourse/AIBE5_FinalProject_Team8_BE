@@ -1,3 +1,4 @@
+// TIL 응답 DTO: TIL 조회·작성 시 클라이언트로 반환하는 데이터 구조 (thumbnailUrl 필드 추가)
 package com.Rootin.domain.til.dto.response;
 
 import com.Rootin.domain.til.entity.Til;
@@ -9,6 +10,7 @@ public record TilResponse(
         Long tilId,
         String title,
         String content,
+        String thumbnailUrl,
         List<String> tags,
         AuthorInfo author,
         Long potId,
@@ -33,6 +35,7 @@ public record TilResponse(
                 til.getId(),
                 til.getTitle(),
                 til.getContent(),
+                til.getThumbnailUrl(),
                 tags,
                 author,
                 til.getPot().getId(),

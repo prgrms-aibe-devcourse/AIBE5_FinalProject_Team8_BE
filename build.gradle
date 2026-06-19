@@ -69,7 +69,8 @@ dependencies {
 	testImplementation 'org.testcontainers:mysql'
 
 	// Metrics Collection (Prometheus)
-	implementation 'io.micrometer:micrometer-registry-prometheus'
+	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+	implementation 'io.github.mweirauch:micrometer-jvm-extras:0.2.2'
 }
 
 // ─── 테스트용 MySQL 컨테이너 생명주기 태스크 ─────────────────────────────────

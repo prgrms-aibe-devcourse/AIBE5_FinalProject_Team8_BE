@@ -1,3 +1,4 @@
+// TIL 비즈니스 로직: TIL 작성 시 썸네일 이미지를 S3에 업로드하고 URL을 저장하는 흐름을 담당한다
 package com.Rootin.domain.til.service;
 
 import com.Rootin.domain.ai.repository.AiResultTilRepository;
@@ -15,6 +16,7 @@ import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,8 +24,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -36,9 +40,10 @@ public class TilService {
     private final ExperienceService experienceService;
     private final AiResultTilRepository aiResultTilRepository;
     private final WateringLogRepository wateringLogRepository;
+    private final S3Service s3Service;
 
     @Transactional
-    public TilResponse create(Long userId, TilCreateRequest request) {
+    public TilResponse create(Long userId, TilCreateRequest request, MultipartFile thumbnailImage) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
 
@@ -49,9 +54,12 @@ public class TilService {
                 .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
         validatePotOwner(pot, userId);
 
+        // 썸네일 이미지가 첨부된 경우 S3에 업로드하고 URL을 저장합니다.
+        String thumbnailUrl = uploadThumbnailIfPresent(thumbnailImage, userId, request.potId());
+
         // Til.create()는 PUBLISHED 상태의 TIL을 만드는 도메인 생성 메서드입니다.
         // 저장 후 til.getId()가 필요하므로 먼저 save()를 호출한 뒤 물주기 로직을 실행합니다.
-        Til til = Til.create(user, request.title(), request.content(), pot);
+        Til til = Til.create(user, request.title(), request.content(), pot, thumbnailUrl);
         tilRepository.save(til);
 
         syncTags(til, request.tags());
@@ -114,21 +122,27 @@ public class TilService {
     }
 
     @Transactional
-    public TilResponse saveDraft(Long userId, DraftSaveRequest request) {
+    public TilResponse saveDraft(Long userId, DraftSaveRequest request, MultipartFile thumbnailImage) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
         Pot pot = potRepository.findById(request.potId())
                 .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
         validatePotOwner(pot, userId);
 
+        // 썸네일 이미지가 첨부된 경우 S3에 업로드하고 URL을 저장합니다.
+        String thumbnailUrl = uploadThumbnailIfPresent(thumbnailImage, userId, request.potId());
+
         // 임시저장은 DRAFT 상태이므로 경험치/물주기를 발생시키지 않습니다.
         // 이미 같은 화분에 임시저장 글이 있으면 새로 만들지 않고 기존 글을 갱신합니다.
         Til til = tilRepository.findFirstByUserIdAndPotIdAndStatus(userId, request.potId(), PostStatus.DRAFT)
                 .map(existing -> {
                     existing.update(request.title(), request.content());
+                    if (thumbnailUrl != null) {
+                        existing.updateThumbnailUrl(thumbnailUrl);
+                    }
                     return existing;
                 })
-                .orElseGet(() -> tilRepository.save(Til.createDraft(user, request.title(), request.content(), pot)));
+                .orElseGet(() -> tilRepository.save(Til.createDraft(user, request.title(), request.content(), pot, thumbnailUrl)));
 
         syncTags(til, request.tags());
 
@@ -150,6 +164,25 @@ public class TilService {
         // DRAFT 상태 TIL은 watering_log·ai_result_til 레코드가 생성되지 않으므로 별도 FK 정리 불필요.
         // 향후 AI 분석 또는 물주기가 DRAFT 단계까지 확장될 경우 delete()와 동일한 패턴 적용 필요.
         tilRepository.delete(til);
+    }
+
+    /**
+     * 썸네일 이미지가 존재하면 S3에 업로드하고 URL을 반환합니다.
+     * 이미지가 없거나 비어있으면 null을 반환합니다.
+     */
+    private String uploadThumbnailIfPresent(MultipartFile image, Long userId, Long potId) {
+        if (image == null || image.isEmpty()) {
+            return null;
+        }
+        String contentType = image.getContentType();
+        String ext = switch (contentType != null ? contentType : "") {
+            case "image/png"  -> "png";
+            case "image/jpeg" -> "jpg";
+            case "image/webp" -> "webp";
+            default -> throw CustomException.badRequest("지원하지 않는 이미지 형식입니다: " + contentType);
+        };
+        String objectKey = String.format("til-images/%d/%d/%s.%s", userId, potId, UUID.randomUUID(), ext);
+        return s3Service.uploadFile(image, objectKey);
     }
 
     private Til getTilOrThrow(Long tilId) {

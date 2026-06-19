@@ -1,3 +1,4 @@
+// 공통 예외 클래스: HTTP 상태코드와 메시지를 함께 담아 던지는 RuntimeException (internalServerError 팩토리 추가)
 package com.Rootin.global.exception;
 
 import lombok.Getter;
@@ -50,5 +51,9 @@ public class CustomException extends RuntimeException {
 
     public static CustomException paymentRequired(String message) {
         return new CustomException(HttpStatus.PAYMENT_REQUIRED, message);
+    }
+
+    public static CustomException internalServerError(String message) {
+        return new CustomException(HttpStatus.INTERNAL_SERVER_ERROR, message);
     }
 }
