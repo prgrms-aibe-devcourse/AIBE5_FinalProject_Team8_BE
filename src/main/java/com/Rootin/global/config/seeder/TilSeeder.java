@@ -152,74 +152,49 @@ public class TilSeeder {
     private static final Map<String, List<String>> CONTENTS = Map.of(
             "Java", List.of(
                     """
-                    ## 오늘 배운 것
-                    제네릭의 upper bounded wildcard(`? extends T`)와 lower bounded wildcard(`? super T`)를 드디어 제대로 이해했다.
-
-                    핵심은 **PECS 원칙** — Producer Extends, Consumer Super.
-                    - 값을 꺼낼(produce) 때는 `? extends T`
-                    - 값을 넣을(consume) 때는 `? super T`
-
-                    ```java
-                    // 읽기 전용 → extends
-                    public double sum(List<? extends Number> list) { ... }
+                    <h2>오늘 배운 것</h2>
+                    <p>제네릭의 upper bounded wildcard(<code>? extends T</code>)와 lower bounded wildcard(<code>? super T</code>)를 드디어 제대로 이해했다.</p>
+                    <p>핵심은 <strong>PECS 원칙</strong> — Producer Extends, Consumer Super.</p>
+                    <ul><li>값을 꺼낼(produce) 때는 <code>? extends T</code></li><li>값을 넣을(consume) 때는 <code>? super T</code></li></ul>
+                    <pre><code class="language-java">// 읽기 전용 → extends
+                    public double sum(List&lt;? extends Number&gt; list) { ... }
 
                     // 쓰기 전용 → super
-                    public void addNumbers(List<? super Integer> list) { ... }
-                    ```
-
-                    ## 느낀 점
-                    제네릭을 그냥 `<T>`로만 쓰다가 wildcard를 처음 보면 왜 두 가지인지 직관적으로 안 잡히는데, PECS로 외우니 금방 정리됐다.
+                    public void addNumbers(List&lt;? super Integer&gt; list) { ... }</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>제네릭을 그냥 <code>&lt;T&gt;</code>로만 쓰다가 wildcard를 처음 보면 왜 두 가지인지 직관적으로 안 잡히는데, PECS로 외우니 금방 정리됐다.</p>
                     """,
                     """
-                    ## 오늘 배운 것
-                    `equals()`를 재정의할 때 `hashCode()`도 반드시 같이 재정의해야 하는 이유를 제대로 짚었다.
-
-                    HashMap은 버킷을 찾을 때 `hashCode()`를 먼저 쓰고, 같은 버킷 안에서 `equals()`로 비교한다.
-                    `hashCode()`만 다르면 같은 객체인데 다른 버킷에 들어가서 get이 null을 반환하는 버그가 생긴다.
-
-                    ```java
-                    @Override
+                    <h2>오늘 배운 것</h2>
+                    <p><code>equals()</code>를 재정의할 때 <code>hashCode()</code>도 반드시 같이 재정의해야 하는 이유를 제대로 짚었다.</p>
+                    <p>HashMap은 버킷을 찾을 때 <code>hashCode()</code>를 먼저 쓰고, 같은 버킷 안에서 <code>equals()</code>로 비교한다. <code>hashCode()</code>만 다르면 같은 객체인데 다른 버킷에 들어가서 get이 null을 반환하는 버그가 생긴다.</p>
+                    <pre><code class="language-java">@Override
                     public int hashCode() {
                         return Objects.hash(id, email);
-                    }
-                    ```
-
-                    ## 느낀 점
-                    Lombok `@EqualsAndHashCode`를 쓰면 편하긴 한데, JPA Entity에 쓸 때는 연관 엔티티를 포함시키면
-                    LazyInitializationException 날 수 있어서 주의해야 한다.
+                    }</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>Lombok <code>@EqualsAndHashCode</code>를 쓰면 편하긴 한데, JPA Entity에 쓸 때는 연관 엔티티를 포함시키면 LazyInitializationException 날 수 있어서 주의해야 한다.</p>
                     """
             ),
             "Spring", List.of(
                     """
-                    ## 오늘 배운 것
-                    `@Transactional(propagation = Propagation.REQUIRES_NEW)`를 잘못 쓰면 트랜잭션이 예상과 다르게 동작한다는 걸 직접 겪었다.
-
-                    - `REQUIRED` : 기존 트랜잭션에 합류. 없으면 새로 생성
-                    - `REQUIRES_NEW` : 기존 트랜잭션을 **일시 중단**하고 새 트랜잭션으로 실행
-
-                    문제 상황: 부모 트랜잭션이 롤백돼도 `REQUIRES_NEW` 자식은 이미 커밋된 상태라 데이터 불일치가 생겼다.
-
-                    ```java
-                    @Transactional(propagation = Propagation.REQUIRES_NEW)
+                    <h2>오늘 배운 것</h2>
+                    <p><code>@Transactional(propagation = Propagation.REQUIRES_NEW)</code>를 잘못 쓰면 트랜잭션이 예상과 다르게 동작한다는 걸 직접 겪었다.</p>
+                    <ul><li><code>REQUIRED</code> : 기존 트랜잭션에 합류. 없으면 새로 생성</li><li><code>REQUIRES_NEW</code> : 기존 트랜잭션을 <strong>일시 중단</strong>하고 새 트랜잭션으로 실행</li></ul>
+                    <p>문제 상황: 부모 트랜잭션이 롤백돼도 <code>REQUIRES_NEW</code> 자식은 이미 커밋된 상태라 데이터 불일치가 생겼다.</p>
+                    <pre><code class="language-java">@Transactional(propagation = Propagation.REQUIRES_NEW)
                     public void saveAuditLog(AuditLog log) {
                         // 부모 롤백과 무관하게 독립 커밋됨
                         auditLogRepository.save(log);
-                    }
-                    ```
-
-                    ## 느낀 점
-                    감사 로그처럼 "부모가 실패해도 반드시 기록해야 하는 것"에는 `REQUIRES_NEW`가 맞지만,
-                    일반 비즈니스 로직에서 습관적으로 쓰는 건 위험하다.
+                    }</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>감사 로그처럼 "부모가 실패해도 반드시 기록해야 하는 것"에는 <code>REQUIRES_NEW</code>가 맞지만, 일반 비즈니스 로직에서 습관적으로 쓰는 건 위험하다.</p>
                     """,
                     """
-                    ## 오늘 배운 것
-                    JPA N+1 문제를 fetch join으로 해결하다가 `MultipleBagFetchException`을 만났다.
-
-                    컬렉션을 두 개 이상 fetch join하면 카테시안 곱이 발생해서 Hibernate가 거부한다.
-                    해결 방법은 하나만 fetch join하고 나머지는 `@BatchSize`로 처리하는 것.
-
-                    ```java
-                    // ❌ 두 컬렉션 동시 fetch join → 예외
+                    <h2>오늘 배운 것</h2>
+                    <p>JPA N+1 문제를 fetch join으로 해결하다가 <code>MultipleBagFetchException</code>을 만났다.</p>
+                    <p>컬렉션을 두 개 이상 fetch join하면 카테시안 곱이 발생해서 Hibernate가 거부한다. 해결 방법은 하나만 fetch join하고 나머지는 <code>@BatchSize</code>로 처리하는 것.</p>
+                    <pre><code class="language-java">// ❌ 두 컬렉션 동시 fetch join → 예외
                     SELECT p FROM Post p
                     JOIN FETCH p.tags
                     JOIN FETCH p.comments
@@ -227,234 +202,166 @@ public class TilSeeder {
                     // ✅ 하나만 fetch join + BatchSize
                     @BatchSize(size = 100)
                     @OneToMany(mappedBy = "post")
-                    private List<Comment> comments;
-                    ```
-
-                    ## 느낀 점
-                    `@BatchSize`는 IN 쿼리로 N+1을 줄여주는데, fetch join만큼 완전히 없애지는 못하지만 실용적인 타협안이다.
+                    private List&lt;Comment&gt; comments;</code></pre>
+                    <h2>느낀 점</h2>
+                    <p><code>@BatchSize</code>는 IN 쿼리로 N+1을 줄여주는데, fetch join만큼 완전히 없애지는 못하지만 실용적인 타협안이다.</p>
                     """
             ),
             "React", List.of(
                     """
-                    ## 오늘 배운 것
-                    `useEffect` 의존성 배열에서 함수를 넣을 때 무한 루프가 생기는 이유를 파악했다.
-
-                    컴포넌트가 렌더링될 때마다 함수 참조가 새로 만들어지기 때문에 의존성 배열이 항상 변경된 것으로 감지된다.
-
-                    ```jsx
-                    // ❌ fetchData가 매 렌더에 새로 생성 → 무한 루프
-                    const fetchData = () => { ... };
-                    useEffect(() => { fetchData(); }, [fetchData]);
+                    <h2>오늘 배운 것</h2>
+                    <p><code>useEffect</code> 의존성 배열에서 함수를 넣을 때 무한 루프가 생기는 이유를 파악했다.</p>
+                    <p>컴포넌트가 렌더링될 때마다 함수 참조가 새로 만들어지기 때문에 의존성 배열이 항상 변경된 것으로 감지된다.</p>
+                    <pre><code class="language-jsx">// ❌ fetchData가 매 렌더에 새로 생성 → 무한 루프
+                    const fetchData = () =&gt; { ... };
+                    useEffect(() =&gt; { fetchData(); }, [fetchData]);
 
                     // ✅ useCallback으로 참조 고정
-                    const fetchData = useCallback(() => { ... }, [userId]);
-                    useEffect(() => { fetchData(); }, [fetchData]);
-                    ```
-
-                    ## 느낀 점
-                    ESLint의 `exhaustive-deps` 규칙을 켜두면 의존성 누락을 잡아줘서 도움이 된다.
-                    무조건 경고를 끄는 게 아니라 `useCallback`으로 해결하는 게 맞다.
+                    const fetchData = useCallback(() =&gt; { ... }, [userId]);
+                    useEffect(() =&gt; { fetchData(); }, [fetchData]);</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>ESLint의 <code>exhaustive-deps</code> 규칙을 켜두면 의존성 누락을 잡아줘서 도움이 된다. 무조건 경고를 끄는 게 아니라 <code>useCallback</code>으로 해결하는 게 맞다.</p>
                     """,
                     """
-                    ## 오늘 배운 것
-                    React Query의 `staleTime`과 `cacheTime`(gcTime)이 다른 개념이라는 걸 명확히 정리했다.
-
-                    - `staleTime` : 데이터를 **신선한 것으로 간주**하는 시간. 이 시간 내에는 refetch 안 함
-                    - `gcTime` (구 cacheTime) : 캐시를 **메모리에 유지**하는 시간. 컴포넌트 언마운트 후 기준
-
-                    ```js
-                    useQuery({
+                    <h2>오늘 배운 것</h2>
+                    <p>React Query의 <code>staleTime</code>과 <code>cacheTime</code>(gcTime)이 다른 개념이라는 걸 명확히 정리했다.</p>
+                    <ul><li><code>staleTime</code> : 데이터를 <strong>신선한 것으로 간주</strong>하는 시간. 이 시간 내에는 refetch 안 함</li><li><code>gcTime</code> (구 cacheTime) : 캐시를 <strong>메모리에 유지</strong>하는 시간. 컴포넌트 언마운트 후 기준</li></ul>
+                    <pre><code class="language-js">useQuery({
                       queryKey: ['user'],
                       queryFn: fetchUser,
                       staleTime: 1000 * 60 * 5,   // 5분간 fresh
                       gcTime: 1000 * 60 * 10,      // 10분간 캐시 유지
-                    });
-                    ```
-
-                    ## 느낀 점
-                    목록 페이지에서 상세 페이지 갔다가 돌아올 때 깜빡임이 생기면 `staleTime`을 늘리면 해결된다.
-                    API 호출 빈도와 데이터 신선도 사이의 트레이드오프를 팀과 논의해야 할 것 같다.
+                    });</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>목록 페이지에서 상세 페이지 갔다가 돌아올 때 깜빡임이 생기면 <code>staleTime</code>을 늘리면 해결된다. API 호출 빈도와 데이터 신선도 사이의 트레이드오프를 팀과 논의해야 할 것 같다.</p>
                     """
             ),
             "영어", List.of(
                     """
-                    ## 오늘 배운 것
-                    현재완료와 과거시제를 언제 써야 하는지 원어민 감각으로 정리해봤다.
-
-                    핵심 차이:
-                    - 과거시제: 과거의 특정 시점 강조 (`I lost my key yesterday.`)
-                    - 현재완료: 과거 행위의 **현재 영향** 강조 (`I've lost my key.` → 지금도 없음)
-
-                    자주 헷갈리는 케이스:
-                    ```
-                    Did you eat lunch? → 점심 먹었어? (일반 질문)
-                    Have you eaten lunch? → 점심 먹었어? (지금 배고프냐는 뉘앙스)
-                    ```
-
-                    ## 느낀 점
-                    영어권 뉴스 기사 읽을 때 의식적으로 시제를 분석하면서 읽으니 감이 잡히기 시작했다.
+                    <h2>오늘 배운 것</h2>
+                    <p>현재완료와 과거시제를 언제 써야 하는지 원어민 감각으로 정리해봤다.</p>
+                    <p>핵심 차이:</p>
+                    <ul><li>과거시제: 과거의 특정 시점 강조 (<code>I lost my key yesterday.</code>)</li><li>현재완료: 과거 행위의 <strong>현재 영향</strong> 강조 (<code>I've lost my key.</code> → 지금도 없음)</li></ul>
+                    <p>자주 헷갈리는 케이스:</p>
+                    <pre><code>Did you eat lunch? → 점심 먹었어? (일반 질문)
+                    Have you eaten lunch? → 점심 먹었어? (지금 배고프냐는 뉘앙스)</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>영어권 뉴스 기사 읽을 때 의식적으로 시제를 분석하면서 읽으니 감이 잡히기 시작했다.</p>
                     """,
                     """
-                    ## 오늘 배운 것
-                    비즈니스 이메일에서 자주 쓰는 정중한 요청 표현들을 정리했다.
-
-                    ```
-                    I was wondering if you could ~  → ~해 주실 수 있을까요?
+                    <h2>오늘 배운 것</h2>
+                    <p>비즈니스 이메일에서 자주 쓰는 정중한 요청 표현들을 정리했다.</p>
+                    <pre><code>I was wondering if you could ~  → ~해 주실 수 있을까요?
                     Would it be possible to ~?       → ~이 가능할까요?
                     I'd appreciate it if ~           → ~해 주시면 감사하겠습니다
-                    Please feel free to ~            → 편하게 ~하세요
-                    ```
-
-                    마감 언급 방법:
-                    ```
-                    At your earliest convenience  → 되는 대로 빨리
-                    By end of day Friday          → 금요일 업무 종료 전까지
-                    ```
-
-                    ## 느낀 점
-                    한국어를 직역하면 딱딱하게 들린다. "Please do this"보다 "I was wondering if you could" 같은
-                    우회 표현이 훨씬 자연스럽다는 걸 이번에 확실히 익혔다.
+                    Please feel free to ~            → 편하게 ~하세요</code></pre>
+                    <p>마감 언급 방법:</p>
+                    <pre><code>At your earliest convenience  → 되는 대로 빨리
+                    By end of day Friday          → 금요일 업무 종료 전까지</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>한국어를 직역하면 딱딱하게 들린다. "Please do this"보다 "I was wondering if you could" 같은 우회 표현이 훨씬 자연스럽다는 걸 이번에 확실히 익혔다.</p>
                     """
             ),
             "문법", List.of(
                     """
-                    ## 오늘 배운 것
-                    가정법 과거(`If + 과거형, would + 동사원형`)와 가정법 과거완료(`If + had p.p., would have p.p.`)의 차이를 정리했다.
-
-                    ```
-                    가정법 과거 (현재 사실과 반대):
+                    <h2>오늘 배운 것</h2>
+                    <p>가정법 과거(<code>If + 과거형, would + 동사원형</code>)와 가정법 과거완료(<code>If + had p.p., would have p.p.</code>)의 차이를 정리했다.</p>
+                    <pre><code>가정법 과거 (현재 사실과 반대):
                     If I had more time, I would study harder.
                     (시간이 있다면 더 열심히 공부할 텐데 → 실제로 시간이 없음)
 
                     가정법 과거완료 (과거 사실과 반대):
                     If I had had more time, I would have studied harder.
-                    (시간이 있었더라면 더 열심히 공부했을 텐데 → 실제로 시간이 없었음)
-                    ```
-
-                    ## 느낀 점
-                    혼합 가정법(`If I had p.p., I would 동사원형`)도 있는데, 이건 과거 원인 + 현재 결과 조합이다.
-                    실전에서 이 세 가지를 구분하는 게 꽤 까다롭지만 반복 노출이 답인 것 같다.
+                    (시간이 있었더라면 더 열심히 공부했을 텐데 → 실제로 시간이 없었음)</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>혼합 가정법(<code>If I had p.p., I would 동사원형</code>)도 있는데, 이건 과거 원인 + 현재 결과 조합이다. 실전에서 이 세 가지를 구분하는 게 꽤 까다롭지만 반복 노출이 답인 것 같다.</p>
                     """,
                     """
-                    ## 오늘 배운 것
-                    분사구문의 주어 일치 규칙을 확실히 정리했다.
-
-                    분사구문은 주절의 주어와 분사의 의미상 주어가 같을 때 쓴다.
-
-                    ```
-                    ✅ Walking down the street, I found a wallet.
+                    <h2>오늘 배운 것</h2>
+                    <p>분사구문의 주어 일치 규칙을 확실히 정리했다.</p>
+                    <p>분사구문은 주절의 주어와 분사의 의미상 주어가 같을 때 쓴다.</p>
+                    <pre><code>✅ Walking down the street, I found a wallet.
                        → I was walking, I found (주어 일치)
 
                     ❌ Walking down the street, a wallet was found.
-                       → wallet이 걷지 않음 → 댕글링 수식어(dangling modifier)
-                    ```
-
-                    ## 느낀 점
-                    영어 글쓰기에서 이 실수를 많이 한다. 분사구문 쓸 때는 주절 주어를 먼저 확인하는 습관을 들여야겠다.
+                       → wallet이 걷지 않음 → 댕글링 수식어(dangling modifier)</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>영어 글쓰기에서 이 실수를 많이 한다. 분사구문 쓸 때는 주절 주어를 먼저 확인하는 습관을 들여야겠다.</p>
                     """
             ),
             "독서", List.of(
                     """
-                    ## 오늘 읽은 것
-                    『클린 코드』 3장 - 함수
-
-                    ## 핵심 내용
-                    함수는 **한 가지 일만** 해야 한다. 함수 이름으로 설명할 수 없는 일을 하고 있다면 분리해야 한다.
-
-                    > "함수에서 이상적인 인수 개수는 0개다."
-
-                    인수가 많아질수록 함수 이해가 어렵고 테스트 케이스도 기하급수적으로 늘어난다.
-                    플래그 인수는 특히 나쁘다 — 함수가 두 가지 일을 한다는 신호다.
-
-                    ```java
-                    // ❌ 플래그 인수
+                    <h2>오늘 읽은 것</h2>
+                    <p>『클린 코드』 3장 - 함수</p>
+                    <h2>핵심 내용</h2>
+                    <p>함수는 <strong>한 가지 일만</strong> 해야 한다. 함수 이름으로 설명할 수 없는 일을 하고 있다면 분리해야 한다.</p>
+                    <blockquote><p>"함수에서 이상적인 인수 개수는 0개다."</p></blockquote>
+                    <p>인수가 많아질수록 함수 이해가 어렵고 테스트 케이스도 기하급수적으로 늘어난다. 플래그 인수는 특히 나쁘다 — 함수가 두 가지 일을 한다는 신호다.</p>
+                    <pre><code class="language-java">// ❌ 플래그 인수
                     render(true);
 
                     // ✅ 이름으로 의도를 드러내기
                     renderForSuite();
-                    renderForSingleTest();
-                    ```
-
-                    ## 느낀 점
-                    내 코드를 돌아보면 플래그 인수가 꽤 있다. 리팩토링할 때 우선순위로 잡아야겠다.
+                    renderForSingleTest();</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>내 코드를 돌아보면 플래그 인수가 꽤 있다. 리팩토링할 때 우선순위로 잡아야겠다.</p>
                     """,
                     """
-                    ## 오늘 읽은 것
-                    『함께 자라기』 - 애자일 회고 챕터
-
-                    ## 핵심 내용
-                    회고의 핵심은 **심리적 안전감**이다. 잘못을 지적하는 자리가 아니라 함께 배우는 자리여야 한다.
-
-                    저자가 강조한 실천 방법:
-                    1. 사람이 아닌 **시스템과 프로세스**를 개선 대상으로
-                    2. "왜 그랬어?"가 아닌 "어떤 맥락이었어?"로 질문
-                    3. 비난 없는 사후 분석(blameless postmortem)
-
-                    ## 느낀 점
-                    팀에서 회고를 할 때 침묵이 많았던 이유를 이제 알 것 같다.
-                    형식이 있어도 심리적 안전감이 없으면 회고는 진행되지 않는다.
+                    <h2>오늘 읽은 것</h2>
+                    <p>『함께 자라기』 - 애자일 회고 챕터</p>
+                    <h2>핵심 내용</h2>
+                    <p>회고의 핵심은 <strong>심리적 안전감</strong>이다. 잘못을 지적하는 자리가 아니라 함께 배우는 자리여야 한다.</p>
+                    <p>저자가 강조한 실천 방법:</p>
+                    <ol><li>사람이 아닌 <strong>시스템과 프로세스</strong>를 개선 대상으로</li><li>"왜 그랬어?"가 아닌 "어떤 맥락이었어?"로 질문</li><li>비난 없는 사후 분석(blameless postmortem)</li></ol>
+                    <h2>느낀 점</h2>
+                    <p>팀에서 회고를 할 때 침묵이 많았던 이유를 이제 알 것 같다. 형식이 있어도 심리적 안전감이 없으면 회고는 진행되지 않는다.</p>
                     """
             ),
             "알고리즘", List.of(
                     """
-                    ## 오늘 풀어본 문제
-                    이진 탐색 경계 조건 - lo/hi를 어떻게 잡느냐에 따라 결과가 달라지는 케이스 정리.
-
-                    ## 핵심 정리
-                    ```java
-                    // 찾는 값의 첫 번째 위치 (lower_bound)
+                    <h2>오늘 풀어본 문제</h2>
+                    <p>이진 탐색 경계 조건 - lo/hi를 어떻게 잡느냐에 따라 결과가 달라지는 케이스 정리.</p>
+                    <h2>핵심 정리</h2>
+                    <pre><code class="language-java">// 찾는 값의 첫 번째 위치 (lower_bound)
                     int lo = 0, hi = n;
-                    while (lo < hi) {
+                    while (lo &lt; hi) {
                         int mid = lo + (hi - lo) / 2;
-                        if (arr[mid] < target) lo = mid + 1;
+                        if (arr[mid] &lt; target) lo = mid + 1;
                         else hi = mid;
                     }
                     // lo == hi == 정답 인덱스
 
                     // 찾는 값의 마지막 위치 + 1 (upper_bound)
-                    if (arr[mid] <= target) lo = mid + 1;
-                    else hi = mid;
-                    ```
-
-                    ## 느낀 점
-                    `lo < hi`로 종료 조건을 잡고 `hi = mid`로 범위를 좁히는 패턴이 가장 실수가 적다.
-                    `lo <= hi`, `hi = mid - 1` 패턴과 섞어 쓰다 틀렸는데, 한 가지 패턴으로 통일해야겠다.
+                    if (arr[mid] &lt;= target) lo = mid + 1;
+                    else hi = mid;</code></pre>
+                    <h2>느낀 점</h2>
+                    <p><code>lo &lt; hi</code>로 종료 조건을 잡고 <code>hi = mid</code>로 범위를 좁히는 패턴이 가장 실수가 적다. <code>lo &lt;= hi</code>, <code>hi = mid - 1</code> 패턴과 섞어 쓰다 틀렸는데, 한 가지 패턴으로 통일해야겠다.</p>
                     """,
                     """
-                    ## 오늘 공부한 내용
-                    다이나믹 프로그래밍 점화식 세우는 법을 체계적으로 정리했다.
-
-                    ## 핵심 정리
-                    1. **상태 정의**: `dp[i]`가 무엇을 의미하는지 먼저 말로 쓰기
-                    2. **초기값**: 가장 작은 케이스의 답
-                    3. **점화식**: 이전 상태로 현재 상태 표현
-
-                    예시 - 최대 부분합(Kadane's Algorithm):
-                    ```java
-                    // dp[i] = i번째 원소를 반드시 포함하는 부분 배열의 최대 합
+                    <h2>오늘 공부한 내용</h2>
+                    <p>다이나믹 프로그래밍 점화식 세우는 법을 체계적으로 정리했다.</p>
+                    <h2>핵심 정리</h2>
+                    <ol><li><strong>상태 정의</strong>: <code>dp[i]</code>가 무엇을 의미하는지 먼저 말로 쓰기</li><li><strong>초기값</strong>: 가장 작은 케이스의 답</li><li><strong>점화식</strong>: 이전 상태로 현재 상태 표현</li></ol>
+                    <p>예시 - 최대 부분합(Kadane's Algorithm):</p>
+                    <pre><code class="language-java">// dp[i] = i번째 원소를 반드시 포함하는 부분 배열의 최대 합
                     dp[i] = Math.max(arr[i], dp[i-1] + arr[i]);
-                    answer = Arrays.stream(dp).max().getAsInt();
-                    ```
-
-                    ## 느낀 점
-                    "상태 정의를 말로 먼저 쓴다"는 습관이 생기니까 점화식이 훨씬 빨리 잡힌다.
-                    Top-down(메모이제이션)으로 먼저 구현하고 Bottom-up으로 바꾸는 연습을 해야겠다.
+                    answer = Arrays.stream(dp).max().getAsInt();</code></pre>
+                    <h2>느낀 점</h2>
+                    <p>"상태 정의를 말로 먼저 쓴다"는 습관이 생기니까 점화식이 훨씬 빨리 잡힌다. Top-down(메모이제이션)으로 먼저 구현하고 Bottom-up으로 바꾸는 연습을 해야겠다.</p>
                     """
             ),
             "운동", List.of(
                     """
-                    ## 오늘 운동
-                    스쿼트 3세트 × 12회 진행. 무릎이 안으로 꺾이는 문제가 있어서 발 너비를 어깨 1.2배로 벌리고 발끝을 30도 바깥으로 했더니 자세가 안정됐다.
-
-                    ## 느낀 점
-                    폼부터 잡고 중량을 올리는 게 맞다. 욕심 부리다가 허리 다쳤던 기억이 있어서 이번엔 천천히 가기로 했다.
+                    <h2>오늘 운동</h2>
+                    <p>스쿼트 3세트 × 12회 진행. 무릎이 안으로 꺾이는 문제가 있어서 발 너비를 어깨 1.2배로 벌리고 발끝을 30도 바깥으로 했더니 자세가 안정됐다.</p>
+                    <h2>느낀 점</h2>
+                    <p>폼부터 잡고 중량을 올리는 게 맞다. 욕심 부리다가 허리 다쳤던 기억이 있어서 이번엔 천천히 가기로 했다.</p>
                     """,
                     """
-                    ## 오늘 운동
-                    인터벌 트레이닝 — 30초 전력 질주 + 90초 걷기 × 8세트. 심박수 145~165bpm 유지.
-
-                    ## 느낀 점
-                    꾸준히 하니 예전보다 심박수가 빨리 안정권으로 돌아온다. 유산소 능력이 분명히 올라가고 있다.
+                    <h2>오늘 운동</h2>
+                    <p>인터벌 트레이닝 — 30초 전력 질주 + 90초 걷기 × 8세트. 심박수 145~165bpm 유지.</p>
+                    <h2>느낀 점</h2>
+                    <p>꾸준히 하니 예전보다 심박수가 빨리 안정권으로 돌아온다. 유산소 능력이 분명히 올라가고 있다.</p>
                     """
             )
     );
@@ -671,7 +578,7 @@ public class TilSeeder {
         // ── 임시저장 초안 ─────────────────────────────────────────────────
         tilRepository.save(Til.createDraft(user,
                 "React Query 캐싱 전략 정리 중",
-                "staleTime을 팀 상황에 맞게 조정하는 방법을 정리하다가 멈춤... gcTime이랑 헷갈려서 다시 찾아보는 중",
+                "<p>staleTime을 팀 상황에 맞게 조정하는 방법을 정리하다가 멈춤... gcTime이랑 헷갈려서 다시 찾아보는 중</p>",
                 codingPot));
 
         // ── AI 포인트 소비 이력 ───────────────────────────────────────────
