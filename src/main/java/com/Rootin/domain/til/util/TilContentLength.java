@@ -1,4 +1,4 @@
-package com.Rootin.domain.til.service;
+package com.Rootin.domain.til.util;
 
 import org.jsoup.Jsoup;
 

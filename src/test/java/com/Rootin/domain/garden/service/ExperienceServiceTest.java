@@ -258,6 +258,49 @@ class ExperienceServiceTest {
     }
 
     @Test
+    @DisplayName("TIL 본문에 서식(HTML 태그)이 있어도 경험치는 태그·공백을 제외한 순수 텍스트 글자 수로 산정된다")
+    void tilCreateUsesVisibleTextLengthForExp() {
+        // given: 가시 텍스트는 "오늘배운것"(5자)이지만 HTML 원문은 태그 때문에 훨씬 길다
+        String html = "<p><strong>오늘</strong> <code>배운</code> 것</p>";
+        TilCreateRequest request = new TilCreateRequest("서식 TIL", html, testPot.getId(), List.of("Java"));
+
+        // when
+        TilResponse response = tilService.create(testUser.getId(), request);
+
+        em.flush();
+        em.clear();
+
+        // then: WateringLog에는 HTML 원문 길이가 아니라 가시 글자 수(5)가 기록된다
+        List<WateringLog> logs = wateringLogRepository.findByPotId(testPot.getId());
+        assertThat(logs).hasSize(1);
+        WateringLog log = logs.get(0);
+        assertThat(log.getPostId()).isEqualTo(response.tilId());
+        assertThat(log.getContentLength()).isEqualTo(5);
+        assertThat(log.getContentLength()).isLessThan(html.length());
+        // 경험치 = floor(min(5 * 0.2, 300) * 1.0) = 1 (첫 작성이라 스트릭 0일)
+        assertThat(log.getExpGained()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("가시 텍스트가 없는 본문(서식 태그만 존재)은 경험치/물주기 이력을 만들지 않는다")
+    void tilCreateWithNoVisibleTextSkipsWatering() {
+        // given: @NotBlank는 통과하지만 가시 글자 수가 0인 본문
+        TilCreateRequest request = new TilCreateRequest("빈 본문 TIL", "<p></p>", testPot.getId(), List.of());
+
+        // when
+        TilResponse response = tilService.create(testUser.getId(), request);
+
+        em.flush();
+        em.clear();
+
+        // then: TIL은 생성되지만 물주기 이력이 남지 않고(0-exp 로그가 post_id를 선점하지 않음) 화분 경험치도 그대로다
+        assertThat(response.tilId()).isNotNull();
+        assertThat(wateringLogRepository.findByPotId(testPot.getId())).isEmpty();
+        Pot pot = potRepository.findById(testPot.getId()).orElseThrow();
+        assertThat(pot.getTotalExp()).isZero();
+    }
+
+    @Test
     @DisplayName("본인의 화분이 아닌 다른 사용자의 화분에 물주기를 수행하면 FORBIDDEN 에러가 발생한다")
     void applyWateringForbidden() {
         // given

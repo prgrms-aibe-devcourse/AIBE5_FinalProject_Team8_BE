@@ -1,4 +1,4 @@
-package com.Rootin.domain.til.service;
+package com.Rootin.domain.til.util;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
