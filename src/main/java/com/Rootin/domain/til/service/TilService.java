@@ -109,12 +109,17 @@ public class TilService {
     }
 
     @Transactional
-    public TilResponse update(Long tilId, Long userId, TilUpdateRequest request) {
+    public TilResponse update(Long tilId, Long userId, TilUpdateRequest request, MultipartFile thumbnailImage) {
         Til til = getTilOrThrow(tilId);
         validateOwner(til, userId);
 
         til.update(request.title(), request.content());
         syncTags(til, request.tags());
+
+        if (thumbnailImage != null && !thumbnailImage.isEmpty()) {
+            String newThumbnailUrl = uploadThumbnailIfPresent(thumbnailImage, userId, til.getPot().getId());
+            til.updateThumbnailUrl(newThumbnailUrl);
+        }
 
         return TilResponse.from(til);
     }

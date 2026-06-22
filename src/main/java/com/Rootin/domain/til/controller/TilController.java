@@ -66,13 +66,14 @@ public class TilController {
                 tilService.findMyTils(userDetails.getUserId(), potId, page, size, sort, keyword, tag)));
     }
 
-    @PutMapping("/{tilId}")
+    @PutMapping(value = "/{tilId}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<ApiResponse<TilResponse>> update(
             @PathVariable Long tilId,
             @AuthenticationPrincipal JwtUserDetails userDetails,
-            @Valid @RequestBody TilUpdateRequest request
+            @RequestPart("data") @Valid TilUpdateRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile thumbnailImage
     ) {
-        return ResponseEntity.ok(ApiResponse.success(tilService.update(tilId, userDetails.getUserId(), request)));
+        return ResponseEntity.ok(ApiResponse.success(tilService.update(tilId, userDetails.getUserId(), request, thumbnailImage)));
     }
 
     @DeleteMapping("/{tilId}")
