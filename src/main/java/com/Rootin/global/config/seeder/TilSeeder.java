@@ -5,6 +5,7 @@ import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.garden.service.LevelCalculator;
 import com.Rootin.domain.til.entity.Tag;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.entity.TilTag;
@@ -37,6 +38,7 @@ public class TilSeeder {
     private final PotRepository potRepository;
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final LevelCalculator levelCalculator;
 
     // ── 태그별 TIL 제목 풀 ────────────────────────────────────────────────────
 
@@ -489,8 +491,9 @@ public class TilSeeder {
         int[] potExp = {0, 0, 0, 0, 0};
 
         // 날짜별 퀘스트 달성 여부 추적 (Q1/Q2/Q3 중복 지급 방지)
-        // 모든 시드 TIL은 태그 포함(Q2) + 200자 이상(Q3)이므로 TIL 작성일 = 퀘스트 전부 달성일
+        // Q3(200자 이상)는 날짜별 실제 charCount 합계가 200 이상인 날에만 지급
         Set<LocalDate> questDates = new java.util.LinkedHashSet<>();
+        Map<LocalDate, Integer> questCharCounts = new java.util.HashMap<>();
 
         // ── 태그 초기화 ───────────────────────────────────────────────────
         Map<String, Tag> tags = Map.of(
@@ -513,7 +516,7 @@ public class TilSeeder {
             for (int i = 0; i < row.tilCount(); i++) {
                 LocalDate date = base.plusDays(Math.min(i * 2, 26));
                 int before = potExp[row.potIdx()];
-                int exp = saveTil(user, pot, tag, 0, 1.0, before, date.atTime(21, 0), questDates);
+                int exp = saveTil(user, pot, tag, 0, before, date.atTime(21, 0), questDates, questCharCounts);
                 potExp[row.potIdx()] += exp;
             }
         }
@@ -521,10 +524,9 @@ public class TilSeeder {
         // ── 이번 달 코딩 ──────────────────────────────────────────────────
         int curCodingExp = 0;
         for (DailyEntry d : CODING_DAYS) {
-            double mult = 1.0 + Math.min(d.streakDays() * 0.05, 0.5);
             int before = potExp[0] + curCodingExp;
-            int exp = saveTil(user, codingPot, tags.get(d.tagKey()), d.streakDays(), mult, before,
-                    today.minusDays(d.daysAgo()).atTime(21, 0), questDates);
+            int exp = saveTil(user, codingPot, tags.get(d.tagKey()), d.streakDays(), before,
+                    today.minusDays(d.daysAgo()).atTime(21, 0), questDates, questCharCounts);
             curCodingExp += exp;
         }
 
@@ -532,8 +534,8 @@ public class TilSeeder {
         int curEnglishExp = 0;
         for (DailyEntry d : ENGLISH_DAYS) {
             int before = potExp[1] + curEnglishExp;
-            int exp = saveTil(user, englishPot, tags.get(d.tagKey()), 0, 1.0, before,
-                    today.minusDays(d.daysAgo()).atTime(20, 0), questDates);
+            int exp = saveTil(user, englishPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(20, 0), questDates, questCharCounts);
             curEnglishExp += exp;
         }
 
@@ -541,8 +543,8 @@ public class TilSeeder {
         int curReadingExp = 0;
         for (DailyEntry d : READING_DAYS) {
             int before = potExp[2] + curReadingExp;
-            int exp = saveTil(user, readingPot, tags.get(d.tagKey()), 0, 1.0, before,
-                    today.minusDays(d.daysAgo()).atTime(19, 0), questDates);
+            int exp = saveTil(user, readingPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(19, 0), questDates, questCharCounts);
             curReadingExp += exp;
         }
 
@@ -550,8 +552,8 @@ public class TilSeeder {
         int curMathExp = 0;
         for (DailyEntry d : MATH_DAYS) {
             int before = potExp[3] + curMathExp;
-            int exp = saveTil(user, mathPot, tags.get(d.tagKey()), 0, 1.0, before,
-                    today.minusDays(d.daysAgo()).atTime(18, 0), questDates);
+            int exp = saveTil(user, mathPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(18, 0), questDates, questCharCounts);
             curMathExp += exp;
         }
 
@@ -559,8 +561,8 @@ public class TilSeeder {
         int curFitnessExp = 0;
         for (DailyEntry d : FITNESS_DAYS) {
             int before = potExp[4] + curFitnessExp;
-            int exp = saveTil(user, fitnessPot, tags.get(d.tagKey()), 0, 1.0, before,
-                    today.minusDays(d.daysAgo()).atTime(17, 0), questDates);
+            int exp = saveTil(user, fitnessPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(17, 0), questDates, questCharCounts);
             curFitnessExp += exp;
         }
 
@@ -576,15 +578,18 @@ public class TilSeeder {
         savePointLogWithSign(user, -50, PointLogReason.AI_SUMMARY, today.minusDays(1).atTime(11, 0));
 
         // ── 날짜별 퀘스트 포인트 지급 ────────────────────────────────────
-        // 모든 시드 TIL은 태그 포함(Q2) + 200자 이상(Q3)이므로 TIL 작성일 = 3개 퀘스트 전부 달성
         // (user_id, reason, awarded_date) 유니크 제약 준수: Set으로 날짜 중복 제거됨
+        // Q3(200자 이상)는 해당 날짜의 실제 charCount 합계가 200 이상일 때만 지급
         int questEarned = 0;
         for (LocalDate questDate : questDates) {
             LocalDateTime logTime = questDate.atTime(23, 0);
             saveQuestPointLog(user, PointLogReason.QUEST_Q1, 50, questDate, logTime);
             saveQuestPointLog(user, PointLogReason.QUEST_Q2, 30, questDate, logTime);
-            saveQuestPointLog(user, PointLogReason.QUEST_Q3, 20, questDate, logTime);
-            questEarned += 100;
+            questEarned += 80;
+            if (questCharCounts.getOrDefault(questDate, 0) >= 200) {
+                saveQuestPointLog(user, PointLogReason.QUEST_Q3, 20, questDate, logTime);
+                questEarned += 20;
+            }
         }
 
         // ── 화분 exp/level 최종 업데이트 ─────────────────────────────────
@@ -594,15 +599,15 @@ public class TilSeeder {
         int mathTotal    = potExp[3] + curMathExp;
         int fitnessTotal = potExp[4] + curFitnessExp;
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                codingTotal,  calcLevel(codingTotal),  codingPot.getId());
+                codingTotal,  levelCalculator.calculateLevel(codingTotal),  codingPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                englishTotal, calcLevel(englishTotal), englishPot.getId());
+                englishTotal, levelCalculator.calculateLevel(englishTotal), englishPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                readingTotal, calcLevel(readingTotal), readingPot.getId());
+                readingTotal, levelCalculator.calculateLevel(readingTotal), readingPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                mathTotal,    calcLevel(mathTotal),    mathPot.getId());
+                mathTotal,    levelCalculator.calculateLevel(mathTotal),    mathPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                fitnessTotal, calcLevel(fitnessTotal), fitnessPot.getId());
+                fitnessTotal, levelCalculator.calculateLevel(fitnessTotal), fitnessPot.getId());
 
         // ── 유저 최종 포인트 (퀘스트 적립 - AI 소비) ─────────────────────
         int used = 50 + 30 + 50;
@@ -615,22 +620,24 @@ public class TilSeeder {
     // ── 내부 유틸 ─────────────────────────────────────────────────────────────
 
     private int saveTil(User user, Pot pot, Tag tag,
-                        int streakDays, double multiplier,
+                        int streakDays,
                         int beforeExp,
                         LocalDateTime publishedAt,
-                        Set<LocalDate> questDates) {
-        String title    = nextTitle(tag.getName());
-        String content  = nextContent(tag.getName());
-        int charCount   = TilContentLength.countVisibleCharacters(content);
-        int exp         = (int) Math.floor(calcExp(charCount) * multiplier);
-        int afterExp    = beforeExp + exp;
+                        Set<LocalDate> questDates,
+                        Map<LocalDate, Integer> questCharCounts) {
+        String title      = nextTitle(tag.getName());
+        String content    = nextContent(tag.getName());
+        int charCount     = TilContentLength.countVisibleCharacters(content);
+        double multiplier = levelCalculator.calculateStreakMultiplier(streakDays);
+        int exp           = levelCalculator.calculateExperience(charCount, streakDays);
+        int afterExp      = beforeExp + exp;
 
         Til til = tilRepository.save(Til.create(user, title, content, pot));
         jdbcTemplate.update("UPDATE til SET published_at=? WHERE post_id=?", publishedAt, til.getId());
         tilTagRepository.save(TilTag.of(til, tag));
 
-        int beforeLevel = calcLevel(beforeExp);
-        int afterLevel  = calcLevel(afterExp);
+        int beforeLevel = levelCalculator.calculateLevel(beforeExp);
+        int afterLevel  = levelCalculator.calculateLevel(afterExp);
         // 포인트는 TIL 작성 시 지급하지 않음 — 퀘스트 달성 시 DashboardService에서 지급
         jdbcTemplate.update("""
                 INSERT INTO watering_log
@@ -644,8 +651,9 @@ public class TilSeeder {
                 streakDays, multiplier, beforeLevel, afterLevel,
                 beforeExp, afterExp, publishedAt);
 
-        // 이 날짜에 TIL이 작성됐으므로 퀘스트 달성 후보 날짜로 등록
-        questDates.add(publishedAt.toLocalDate());
+        LocalDate tilDate = publishedAt.toLocalDate();
+        questDates.add(tilDate);
+        questCharCounts.merge(tilDate, charCount, Integer::sum);
         return exp;
     }
 
@@ -692,13 +700,4 @@ public class TilSeeder {
         jdbcTemplate.update("UPDATE point_log SET created_at=? WHERE id=?", createdAt, saved.getId());
     }
 
-    private static int calcExp(int charCount) {
-        return (int) Math.floor(Math.min(charCount * 0.2, 300.0));
-    }
-
-    private static int calcLevel(int totalExp) {
-        int level = 1, remaining = totalExp;
-        while (remaining >= level * 100) { remaining -= level * 100; level++; }
-        return level;
-    }
 }
