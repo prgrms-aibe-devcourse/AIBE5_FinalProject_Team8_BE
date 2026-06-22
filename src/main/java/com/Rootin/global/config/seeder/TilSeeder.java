@@ -5,12 +5,14 @@ import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PotRepository;
+import com.Rootin.domain.garden.service.LevelCalculator;
 import com.Rootin.domain.til.entity.Tag;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.entity.TilTag;
 import com.Rootin.domain.til.repository.TagRepository;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.til.repository.TilTagRepository;
+import com.Rootin.domain.til.util.TilContentLength;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class TilSeeder {
     private final PotRepository potRepository;
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final LevelCalculator levelCalculator;
 
     // ── 태그별 TIL 제목 풀 ────────────────────────────────────────────────────
 
@@ -367,108 +370,108 @@ public class TilSeeder {
     );
 
     // ── 시드 계획 레코드 ──────────────────────────────────────────────────────
-    record MonthlyEntry(int monthsAgo, int potIdx, int charCount, String tagKey, int tilCount) {}
-    record DailyEntry(int daysAgo, int charCount, String tagKey, int streakDays) {
-        DailyEntry(int daysAgo, int charCount, String tagKey) { this(daysAgo, charCount, tagKey, 0); }
+    record MonthlyEntry(int monthsAgo, int potIdx, String tagKey, int tilCount) {}
+    record DailyEntry(int daysAgo, String tagKey, int streakDays) {
+        DailyEntry(int daysAgo, String tagKey) { this(daysAgo, tagKey, 0); }
     }
 
     // ── 월별 시드 계획 ────────────────────────────────────────────────────────
     private static final List<MonthlyEntry> MONTHLY_PLAN = List.of(
         // Month -12
-        new MonthlyEntry(12, 0, 500, "Java",   6), new MonthlyEntry(12, 0, 600, "Spring", 3),
-        new MonthlyEntry(12, 1, 400, "영어",   5), new MonthlyEntry(12, 1, 400, "문법",   3),
+        new MonthlyEntry(12, 0, "Java",   6), new MonthlyEntry(12, 0, "Spring", 3),
+        new MonthlyEntry(12, 1, "영어",   5), new MonthlyEntry(12, 1, "문법",   3),
         // Month -11
-        new MonthlyEntry(11, 0, 520, "Java",   6), new MonthlyEntry(11, 0, 620, "Spring", 4),
-        new MonthlyEntry(11, 1, 400, "영어",   5), new MonthlyEntry(11, 1, 400, "문법",   4),
+        new MonthlyEntry(11, 0, "Java",   6), new MonthlyEntry(11, 0, "Spring", 4),
+        new MonthlyEntry(11, 1, "영어",   5), new MonthlyEntry(11, 1, "문법",   4),
         // Month -10
-        new MonthlyEntry(10, 0, 600, "Java",   5), new MonthlyEntry(10, 0, 650, "Spring", 5),
-        new MonthlyEntry(10, 1, 420, "영어",   6), new MonthlyEntry(10, 1, 400, "문법",   4),
+        new MonthlyEntry(10, 0, "Java",   5), new MonthlyEntry(10, 0, "Spring", 5),
+        new MonthlyEntry(10, 1, "영어",   6), new MonthlyEntry(10, 1, "문법",   4),
         // Month -9
-        new MonthlyEntry(9, 0, 600, "Java",   5), new MonthlyEntry(9, 0, 600, "Spring", 4),
-        new MonthlyEntry(9, 0, 700, "React",  3), new MonthlyEntry(9, 1, 420, "영어",   6),
-        new MonthlyEntry(9, 1, 400, "문법",   4),
+        new MonthlyEntry(9, 0, "Java",   5), new MonthlyEntry(9, 0, "Spring", 4),
+        new MonthlyEntry(9, 0, "React",  3), new MonthlyEntry(9, 1, "영어",   6),
+        new MonthlyEntry(9, 1, "문법",   4),
         // Month -8
-        new MonthlyEntry(8, 0, 500, "Java",   3), new MonthlyEntry(8, 0, 600, "Spring", 4),
-        new MonthlyEntry(8, 0, 720, "React",  6), new MonthlyEntry(8, 1, 420, "영어",   5),
-        new MonthlyEntry(8, 1, 400, "문법",   4),
+        new MonthlyEntry(8, 0, "Java",   3), new MonthlyEntry(8, 0, "Spring", 4),
+        new MonthlyEntry(8, 0, "React",  6), new MonthlyEntry(8, 1, "영어",   5),
+        new MonthlyEntry(8, 1, "문법",   4),
         // Month -7
-        new MonthlyEntry(7, 0, 500, "Java",   2), new MonthlyEntry(7, 0, 550, "Spring", 3),
-        new MonthlyEntry(7, 0, 750, "React",  8), new MonthlyEntry(7, 1, 420, "영어",   5),
-        new MonthlyEntry(7, 1, 400, "문법",   3),
+        new MonthlyEntry(7, 0, "Java",   2), new MonthlyEntry(7, 0, "Spring", 3),
+        new MonthlyEntry(7, 0, "React",  8), new MonthlyEntry(7, 1, "영어",   5),
+        new MonthlyEntry(7, 1, "문법",   3),
         // Month -6
-        new MonthlyEntry(6, 0, 500, "Java",   2), new MonthlyEntry(6, 0, 720, "React",  8),
-        new MonthlyEntry(6, 1, 400, "영어",   5), new MonthlyEntry(6, 1, 380, "문법",   3),
+        new MonthlyEntry(6, 0, "Java",   2), new MonthlyEntry(6, 0, "React",  8),
+        new MonthlyEntry(6, 1, "영어",   5), new MonthlyEntry(6, 1, "문법",   3),
         // Month -5
-        new MonthlyEntry(5, 0, 500, "Java",     2), new MonthlyEntry(5, 0, 750, "React",    9),
-        new MonthlyEntry(5, 0, 820, "알고리즘", 2), new MonthlyEntry(5, 1, 400, "영어",     4),
-        new MonthlyEntry(5, 1, 370, "문법",     3),
+        new MonthlyEntry(5, 0, "Java",     2), new MonthlyEntry(5, 0, "React",    9),
+        new MonthlyEntry(5, 0, "알고리즘", 2), new MonthlyEntry(5, 1, "영어",     4),
+        new MonthlyEntry(5, 1, "문법",     3),
         // Month -4
-        new MonthlyEntry(4, 0, 500, "Java",     2), new MonthlyEntry(4, 0, 760, "React",    7),
-        new MonthlyEntry(4, 0, 870, "알고리즘", 5), new MonthlyEntry(4, 1, 400, "영어",     4),
-        new MonthlyEntry(4, 1, 360, "문법",     3),
+        new MonthlyEntry(4, 0, "Java",     2), new MonthlyEntry(4, 0, "React",    7),
+        new MonthlyEntry(4, 0, "알고리즘", 5), new MonthlyEntry(4, 1, "영어",     4),
+        new MonthlyEntry(4, 1, "문법",     3),
         // Month -3
-        new MonthlyEntry(3, 0, 500, "Java",     2), new MonthlyEntry(3, 0, 720, "React",    5),
-        new MonthlyEntry(3, 0, 900, "알고리즘", 7), new MonthlyEntry(3, 1, 400, "영어",     3),
-        new MonthlyEntry(3, 1, 360, "문법",     3), new MonthlyEntry(3, 2, 500, "독서",     3),
+        new MonthlyEntry(3, 0, "Java",     2), new MonthlyEntry(3, 0, "React",    5),
+        new MonthlyEntry(3, 0, "알고리즘", 7), new MonthlyEntry(3, 1, "영어",     3),
+        new MonthlyEntry(3, 1, "문법",     3), new MonthlyEntry(3, 2, "독서",     3),
         // Month -2
-        new MonthlyEntry(2, 0, 500, "Java",     2), new MonthlyEntry(2, 0, 720, "React",    5),
-        new MonthlyEntry(2, 0, 920, "알고리즘", 8), new MonthlyEntry(2, 1, 400, "영어",     3),
-        new MonthlyEntry(2, 1, 350, "문법",     3), new MonthlyEntry(2, 2, 560, "독서",     5),
+        new MonthlyEntry(2, 0, "Java",     2), new MonthlyEntry(2, 0, "React",    5),
+        new MonthlyEntry(2, 0, "알고리즘", 8), new MonthlyEntry(2, 1, "영어",     3),
+        new MonthlyEntry(2, 1, "문법",     3), new MonthlyEntry(2, 2, "독서",     5),
         // Month -1
-        new MonthlyEntry(1, 0, 500, "Java",      2), new MonthlyEntry(1, 0, 720, "React",     5),
-        new MonthlyEntry(1, 0, 940, "알고리즘", 10), new MonthlyEntry(1, 1, 400, "영어",      3),
-        new MonthlyEntry(1, 1, 350, "문법",      2), new MonthlyEntry(1, 2, 600, "독서",      6),
+        new MonthlyEntry(1, 0, "Java",      2), new MonthlyEntry(1, 0, "React",     5),
+        new MonthlyEntry(1, 0, "알고리즘", 10), new MonthlyEntry(1, 1, "영어",      3),
+        new MonthlyEntry(1, 1, "문법",      2), new MonthlyEntry(1, 2, "독서",      6),
         // Math pot (potIdx=3)
-        new MonthlyEntry(8, 3, 600, "알고리즘", 3), new MonthlyEntry(7, 3, 650, "알고리즘", 3),
-        new MonthlyEntry(6, 3, 600, "알고리즘", 2), new MonthlyEntry(5, 3, 700, "알고리즘", 4),
-        new MonthlyEntry(4, 3, 650, "알고리즘", 3), new MonthlyEntry(3, 3, 700, "알고리즘", 4),
-        new MonthlyEntry(2, 3, 700, "알고리즘", 4), new MonthlyEntry(1, 3, 750, "알고리즘", 5),
+        new MonthlyEntry(8, 3, "알고리즘", 3), new MonthlyEntry(7, 3, "알고리즘", 3),
+        new MonthlyEntry(6, 3, "알고리즘", 2), new MonthlyEntry(5, 3, "알고리즘", 4),
+        new MonthlyEntry(4, 3, "알고리즘", 3), new MonthlyEntry(3, 3, "알고리즘", 4),
+        new MonthlyEntry(2, 3, "알고리즘", 4), new MonthlyEntry(1, 3, "알고리즘", 5),
         // Fitness pot (potIdx=4)
-        new MonthlyEntry(6, 4, 400, "운동", 3), new MonthlyEntry(5, 4, 420, "운동", 3),
-        new MonthlyEntry(4, 4, 450, "운동", 2), new MonthlyEntry(3, 4, 500, "운동", 3),
-        new MonthlyEntry(2, 4, 450, "운동", 3), new MonthlyEntry(1, 4, 500, "운동", 3)
+        new MonthlyEntry(6, 4, "운동", 3), new MonthlyEntry(5, 4, "운동", 3),
+        new MonthlyEntry(4, 4, "운동", 2), new MonthlyEntry(3, 4, "운동", 3),
+        new MonthlyEntry(2, 4, "운동", 3), new MonthlyEntry(1, 4, "운동", 3)
     );
 
     // ── 이번 달 일별 시드 계획 ────────────────────────────────────────────────
     private static final List<DailyEntry> CODING_DAYS = List.of(
-        new DailyEntry(29, 600, "React"),    new DailyEntry(27, 800, "알고리즘"),
-        new DailyEntry(25, 500, "Java"),     new DailyEntry(23, 700, "React"),
-        new DailyEntry(21, 400, "Spring"),   new DailyEntry(19, 900, "알고리즘"),
-        new DailyEntry(17, 600, "React"),    new DailyEntry(15, 800, "Spring"),
-        new DailyEntry(13, 500, "Java"),
+        new DailyEntry(29, "React"),    new DailyEntry(27, "알고리즘"),
+        new DailyEntry(25, "Java"),     new DailyEntry(23, "React"),
+        new DailyEntry(21, "Spring"),   new DailyEntry(19, "알고리즘"),
+        new DailyEntry(17, "React"),    new DailyEntry(15, "Spring"),
+        new DailyEntry(13, "Java"),
         // 연속 14일 스트릭
-        new DailyEntry(13, 600, "React",    1),  new DailyEntry(12, 700, "알고리즘", 2),
-        new DailyEntry(11, 600, "Java",     3),  new DailyEntry(10, 700, "React",    4),
-        new DailyEntry(9,  800, "Spring",   5),  new DailyEntry(8,  500, "알고리즘", 6),
-        new DailyEntry(7,  900, "React",    7),  new DailyEntry(6,  600, "Java",     8),
-        new DailyEntry(5,  700, "Spring",   9),  new DailyEntry(4,  800, "알고리즘", 10),
-        new DailyEntry(3,  650, "React",   11),  new DailyEntry(2,  750, "Java",    12),
-        new DailyEntry(1,  600, "Spring",  13),  new DailyEntry(0,  900, "알고리즘", 14)
+        new DailyEntry(13, "React",    1),  new DailyEntry(12, "알고리즘", 2),
+        new DailyEntry(11, "Java",     3),  new DailyEntry(10, "React",    4),
+        new DailyEntry(9,  "Spring",   5),  new DailyEntry(8,  "알고리즘", 6),
+        new DailyEntry(7,  "React",    7),  new DailyEntry(6,  "Java",     8),
+        new DailyEntry(5,  "Spring",   9),  new DailyEntry(4,  "알고리즘", 10),
+        new DailyEntry(3,  "React",   11),  new DailyEntry(2,  "Java",    12),
+        new DailyEntry(1,  "Spring",  13),  new DailyEntry(0,  "알고리즘", 14)
     );
 
     private static final List<DailyEntry> ENGLISH_DAYS = List.of(
-        new DailyEntry(28, 400, "영어"), new DailyEntry(24, 500, "문법"),
-        new DailyEntry(20, 350, "영어"), new DailyEntry(16, 450, "문법"),
-        new DailyEntry(12, 500, "영어"), new DailyEntry(8,  400, "문법"),
-        new DailyEntry(5,  450, "영어"), new DailyEntry(3,  500, "문법"),
-        new DailyEntry(1,  380, "영어"), new DailyEntry(0,  520, "문법")
+        new DailyEntry(28, "영어"), new DailyEntry(24, "문법"),
+        new DailyEntry(20, "영어"), new DailyEntry(16, "문법"),
+        new DailyEntry(12, "영어"), new DailyEntry(8,  "문법"),
+        new DailyEntry(5,  "영어"), new DailyEntry(3,  "문법"),
+        new DailyEntry(1,  "영어"), new DailyEntry(0,  "문법")
     );
 
     private static final List<DailyEntry> READING_DAYS = List.of(
-        new DailyEntry(6, 300, "독서"),
-        new DailyEntry(3, 350, "독서"),
-        new DailyEntry(0, 400, "독서")
+        new DailyEntry(6, "독서"),
+        new DailyEntry(3, "독서"),
+        new DailyEntry(0, "독서")
     );
 
     private static final List<DailyEntry> MATH_DAYS = List.of(
-        new DailyEntry(22, 600, "알고리즘"), new DailyEntry(15, 700, "알고리즘"),
-        new DailyEntry(8,  650, "알고리즘"), new DailyEntry(2,  700, "알고리즘")
+        new DailyEntry(22, "알고리즘"), new DailyEntry(15, "알고리즘"),
+        new DailyEntry(8,  "알고리즘"), new DailyEntry(2,  "알고리즘")
     );
 
     private static final List<DailyEntry> FITNESS_DAYS = List.of(
-        new DailyEntry(20, 400, "운동"),
-        new DailyEntry(12, 450, "운동"),
-        new DailyEntry(5,  400, "운동")
+        new DailyEntry(20, "운동"),
+        new DailyEntry(12, "운동"),
+        new DailyEntry(5,  "운동")
     );
 
     // ── 제목/본문 인덱스 순환 카운터 ─────────────────────────────────────────
@@ -488,8 +491,9 @@ public class TilSeeder {
         int[] potExp = {0, 0, 0, 0, 0};
 
         // 날짜별 퀘스트 달성 여부 추적 (Q1/Q2/Q3 중복 지급 방지)
-        // 모든 시드 TIL은 태그 포함(Q2) + 200자 이상(Q3)이므로 TIL 작성일 = 퀘스트 전부 달성일
+        // Q3(200자 이상)는 날짜별 실제 charCount 합계가 200 이상인 날에만 지급
         Set<LocalDate> questDates = new java.util.LinkedHashSet<>();
+        Map<LocalDate, Integer> questCharCounts = new java.util.HashMap<>();
 
         // ── 태그 초기화 ───────────────────────────────────────────────────
         Map<String, Tag> tags = Map.of(
@@ -507,72 +511,59 @@ public class TilSeeder {
         for (MonthlyEntry row : MONTHLY_PLAN) {
             Tag tag = tags.get(row.tagKey());
             Pot pot = pots[row.potIdx()];
-            int exp  = calcExp(row.charCount());
             LocalDate base = today.minusMonths(row.monthsAgo()).withDayOfMonth(1);
 
             for (int i = 0; i < row.tilCount(); i++) {
                 LocalDate date = base.plusDays(Math.min(i * 2, 26));
                 int before = potExp[row.potIdx()];
+                int exp = saveTil(user, pot, tag, 0, before, date.atTime(21, 0), questDates, questCharCounts);
                 potExp[row.potIdx()] += exp;
-                saveTil(user, pot, tag, row.charCount(), exp, 0, 1.0,
-                        before, potExp[row.potIdx()], date.atTime(21, 0), questDates);
             }
         }
 
         // ── 이번 달 코딩 ──────────────────────────────────────────────────
         int curCodingExp = 0;
         for (DailyEntry d : CODING_DAYS) {
-            double mult = 1.0 + Math.min(d.streakDays() * 0.05, 0.5);
-            int exp   = (int) Math.floor(calcExp(d.charCount()) * mult);
             int before = potExp[0] + curCodingExp;
+            int exp = saveTil(user, codingPot, tags.get(d.tagKey()), d.streakDays(), before,
+                    today.minusDays(d.daysAgo()).atTime(21, 0), questDates, questCharCounts);
             curCodingExp += exp;
-            saveTil(user, codingPot, tags.get(d.tagKey()), d.charCount(), exp,
-                    d.streakDays(), mult, before, before + exp,
-                    today.minusDays(d.daysAgo()).atTime(21, 0), questDates);
         }
 
         // ── 이번 달 영어 ──────────────────────────────────────────────────
         int curEnglishExp = 0;
         for (DailyEntry d : ENGLISH_DAYS) {
-            int exp   = calcExp(d.charCount());
             int before = potExp[1] + curEnglishExp;
+            int exp = saveTil(user, englishPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(20, 0), questDates, questCharCounts);
             curEnglishExp += exp;
-            saveTil(user, englishPot, tags.get(d.tagKey()), d.charCount(), exp,
-                    0, 1.0, before, before + exp,
-                    today.minusDays(d.daysAgo()).atTime(20, 0), questDates);
         }
 
         // ── 이번 달 독서 ──────────────────────────────────────────────────
         int curReadingExp = 0;
         for (DailyEntry d : READING_DAYS) {
-            int exp   = calcExp(d.charCount());
             int before = potExp[2] + curReadingExp;
+            int exp = saveTil(user, readingPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(19, 0), questDates, questCharCounts);
             curReadingExp += exp;
-            saveTil(user, readingPot, tags.get(d.tagKey()), d.charCount(), exp,
-                    0, 1.0, before, before + exp,
-                    today.minusDays(d.daysAgo()).atTime(19, 0), questDates);
         }
 
         // ── 이번 달 수학 ──────────────────────────────────────────────────
         int curMathExp = 0;
         for (DailyEntry d : MATH_DAYS) {
-            int exp   = calcExp(d.charCount());
             int before = potExp[3] + curMathExp;
+            int exp = saveTil(user, mathPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(18, 0), questDates, questCharCounts);
             curMathExp += exp;
-            saveTil(user, mathPot, tags.get(d.tagKey()), d.charCount(), exp,
-                    0, 1.0, before, before + exp,
-                    today.minusDays(d.daysAgo()).atTime(18, 0), questDates);
         }
 
         // ── 이번 달 운동 ──────────────────────────────────────────────────
         int curFitnessExp = 0;
         for (DailyEntry d : FITNESS_DAYS) {
-            int exp   = calcExp(d.charCount());
             int before = potExp[4] + curFitnessExp;
+            int exp = saveTil(user, fitnessPot, tags.get(d.tagKey()), 0, before,
+                    today.minusDays(d.daysAgo()).atTime(17, 0), questDates, questCharCounts);
             curFitnessExp += exp;
-            saveTil(user, fitnessPot, tags.get(d.tagKey()), d.charCount(), exp,
-                    0, 1.0, before, before + exp,
-                    today.minusDays(d.daysAgo()).atTime(17, 0), questDates);
         }
 
         // ── 임시저장 초안 ─────────────────────────────────────────────────
@@ -587,15 +578,18 @@ public class TilSeeder {
         savePointLogWithSign(user, -50, PointLogReason.AI_SUMMARY, today.minusDays(1).atTime(11, 0));
 
         // ── 날짜별 퀘스트 포인트 지급 ────────────────────────────────────
-        // 모든 시드 TIL은 태그 포함(Q2) + 200자 이상(Q3)이므로 TIL 작성일 = 3개 퀘스트 전부 달성
         // (user_id, reason, awarded_date) 유니크 제약 준수: Set으로 날짜 중복 제거됨
+        // Q3(200자 이상)는 해당 날짜의 실제 charCount 합계가 200 이상일 때만 지급
         int questEarned = 0;
         for (LocalDate questDate : questDates) {
             LocalDateTime logTime = questDate.atTime(23, 0);
             saveQuestPointLog(user, PointLogReason.QUEST_Q1, 50, questDate, logTime);
             saveQuestPointLog(user, PointLogReason.QUEST_Q2, 30, questDate, logTime);
-            saveQuestPointLog(user, PointLogReason.QUEST_Q3, 20, questDate, logTime);
-            questEarned += 100;
+            questEarned += 80;
+            if (questCharCounts.getOrDefault(questDate, 0) >= 200) {
+                saveQuestPointLog(user, PointLogReason.QUEST_Q3, 20, questDate, logTime);
+                questEarned += 20;
+            }
         }
 
         // ── 화분 exp/level 최종 업데이트 ─────────────────────────────────
@@ -605,15 +599,15 @@ public class TilSeeder {
         int mathTotal    = potExp[3] + curMathExp;
         int fitnessTotal = potExp[4] + curFitnessExp;
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                codingTotal,  calcLevel(codingTotal),  codingPot.getId());
+                codingTotal,  levelCalculator.calculateLevel(codingTotal),  codingPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                englishTotal, calcLevel(englishTotal), englishPot.getId());
+                englishTotal, levelCalculator.calculateLevel(englishTotal), englishPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                readingTotal, calcLevel(readingTotal), readingPot.getId());
+                readingTotal, levelCalculator.calculateLevel(readingTotal), readingPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                mathTotal,    calcLevel(mathTotal),    mathPot.getId());
+                mathTotal,    levelCalculator.calculateLevel(mathTotal),    mathPot.getId());
         jdbcTemplate.update("UPDATE pot SET total_exp=?, level=? WHERE id=?",
-                fitnessTotal, calcLevel(fitnessTotal), fitnessPot.getId());
+                fitnessTotal, levelCalculator.calculateLevel(fitnessTotal), fitnessPot.getId());
 
         // ── 유저 최종 포인트 (퀘스트 적립 - AI 소비) ─────────────────────
         int used = 50 + 30 + 50;
@@ -625,21 +619,25 @@ public class TilSeeder {
 
     // ── 내부 유틸 ─────────────────────────────────────────────────────────────
 
-    private void saveTil(User user, Pot pot, Tag tag,
-                         int charCount, int exp,
-                         int streakDays, double multiplier,
-                         int beforeExp, int afterExp,
-                         LocalDateTime publishedAt,
-                         Set<LocalDate> questDates) {
-        String title   = nextTitle(tag.getName());
-        String content = nextContent(tag.getName());
+    private int saveTil(User user, Pot pot, Tag tag,
+                        int streakDays,
+                        int beforeExp,
+                        LocalDateTime publishedAt,
+                        Set<LocalDate> questDates,
+                        Map<LocalDate, Integer> questCharCounts) {
+        String title      = nextTitle(tag.getName());
+        String content    = nextContent(tag.getName());
+        int charCount     = TilContentLength.countVisibleCharacters(content);
+        double multiplier = levelCalculator.calculateStreakMultiplier(streakDays);
+        int exp           = levelCalculator.calculateExperience(charCount, streakDays);
+        int afterExp      = beforeExp + exp;
 
         Til til = tilRepository.save(Til.create(user, title, content, pot));
         jdbcTemplate.update("UPDATE til SET published_at=? WHERE post_id=?", publishedAt, til.getId());
         tilTagRepository.save(TilTag.of(til, tag));
 
-        int beforeLevel = calcLevel(beforeExp);
-        int afterLevel  = calcLevel(afterExp);
+        int beforeLevel = levelCalculator.calculateLevel(beforeExp);
+        int afterLevel  = levelCalculator.calculateLevel(afterExp);
         // 포인트는 TIL 작성 시 지급하지 않음 — 퀘스트 달성 시 DashboardService에서 지급
         jdbcTemplate.update("""
                 INSERT INTO watering_log
@@ -653,8 +651,10 @@ public class TilSeeder {
                 streakDays, multiplier, beforeLevel, afterLevel,
                 beforeExp, afterExp, publishedAt);
 
-        // 이 날짜에 TIL이 작성됐으므로 퀘스트 달성 후보 날짜로 등록
-        questDates.add(publishedAt.toLocalDate());
+        LocalDate tilDate = publishedAt.toLocalDate();
+        questDates.add(tilDate);
+        questCharCounts.merge(tilDate, charCount, Integer::sum);
+        return exp;
     }
 
     private void saveQuestPointLog(User user, PointLogReason reason, int amount,
@@ -700,13 +700,4 @@ public class TilSeeder {
         jdbcTemplate.update("UPDATE point_log SET created_at=? WHERE id=?", createdAt, saved.getId());
     }
 
-    private static int calcExp(int charCount) {
-        return (int) Math.floor(Math.min(charCount * 0.2, 300.0));
-    }
-
-    private static int calcLevel(int totalExp) {
-        int level = 1, remaining = totalExp;
-        while (remaining >= level * 100) { remaining -= level * 100; level++; }
-        return level;
-    }
 }
