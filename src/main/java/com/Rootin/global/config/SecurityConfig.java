@@ -27,11 +27,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-/**
- * TODO [로그인 담당자]: JWT 필터 추가 예정
- * - JwtAuthenticationFilter를 addFilterBefore()로 등록
- * - 공개 경로(회원가입, 로그인 등) permitAll() 추가
- */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -52,7 +47,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/test", "/h2-console/**").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(
                                 "/actuator/health",
