@@ -13,6 +13,7 @@ import com.Rootin.domain.user.entity.ENUM.GardenTheme;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -201,7 +202,7 @@ public class GardenService {
             List<Pot> pots = potRepository.findAllById(distinctPotIds);
 
             if (pots.size() != distinctPotIds.size()) {
-                throw CustomException.notFound("일부 화분을 찾을 수 없거나 존재하지 않는 ID가 포함되어 있습니다.");
+                throw new CustomException(ErrorCode.POT_NOT_FOUND);
             }
 
             // Collectors.toMap() 연산 수행 시 중복 키로 인한 IllegalStateException(500 에러) 발생을 방지하기 위해

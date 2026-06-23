@@ -8,6 +8,7 @@ import com.Rootin.domain.user.entity.ENUM.Role;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import com.Rootin.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -82,13 +83,13 @@ public class AuthService {
             if (!existing.isEnabled()) {
                 deleteUserAndTokens(existing);
             } else {
-                throw CustomException.badRequest("이미 사용 중인 이메일입니다.");
+                throw CustomException.of(ErrorCode.DUPLICATE_EMAIL);
             }
         });
 
         // 2. 닉네임 중복 검사
         if (userRepository.existsByNickname(request.getNickname())) {
-            throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
+            throw CustomException.of(ErrorCode.DUPLICATE_NICKNAME);
         }
 
         // 3~4. 비밀번호 암호화 후 User 생성 및 저장
@@ -204,7 +205,7 @@ public class AuthService {
         // 3. 신규 사용자 → 자동 회원가입
         if (user == null) {
             if (userRepository.existsByEmail(email)) {
-                throw CustomException.badRequest("이미 다른 방식으로 가입된 이메일입니다.");
+                throw CustomException.of(ErrorCode.DUPLICATE_EMAIL);
             }
 
             String nickname = generateUniqueNickname(googleName, sub);

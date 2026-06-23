@@ -14,6 +14,7 @@ import com.Rootin.domain.plant.repository.PlantRepository;
 import com.Rootin.domain.til.entity.PostStatus;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,22 +68,22 @@ public class GardenDashboardService {
     public GardenInfoResponse getGardenDashboard(Long potId, Long userId) {
         // 1. 화분 정보를 조회합니다. (락 미사용)
         Pot pot = potRepository.findById(potId)
-                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         // 2. 요청자가 이 화분의 실제 소유주가 맞는지 검증합니다.
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분의 대시보드에 접근할 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         // 3. 현재 화분에 심겨 있고 수확되지 않은 식물(PlantItem)을 조회합니다.
         // PlantItem은 "사용자의 화분에 어떤 식물이 심겨 있는지"를 나타내는 연결 테이블 역할을 합니다.
         PlantItem plantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(potId)
-                .orElseThrow(() -> CustomException.notFound("화분에 심어진 식물이 존재하지 않습니다. ID: " + potId));
+                .orElseThrow(() -> CustomException.of(ErrorCode.NO_ACTIVE_PLANT));
 
         // 4. 식물의 기본 정보(Fallback 대비 마스터 데이터)를 획득합니다.
         // Plant는 이미지 URL, 등급, 성장 단계 같은 "식물 마스터 데이터"를 담습니다.
         Plant basePlant = plantRepository.findById(plantItem.getPlantId())
-                .orElseThrow(() -> CustomException.notFound("식물 마스터 정보가 존재하지 않습니다. ID: " + plantItem.getPlantId()));
+                .orElseThrow(() -> CustomException.of(ErrorCode.PLANT_NOT_FOUND));
 
         // 5. 현재 식물의 누적 경험치를 토대로 이 식물의 런타임 성장 단계를 판별합니다.
         GrowthStage calculatedStage = levelCalculator.determinePlantGrowthStage(plantItem.getGrowthExp());

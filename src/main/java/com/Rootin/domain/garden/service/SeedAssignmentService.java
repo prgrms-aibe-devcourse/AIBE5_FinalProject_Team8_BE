@@ -7,6 +7,7 @@ import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,7 +52,7 @@ public class SeedAssignmentService {
             candidates = plantRepository.findByGradeAndGrowthStageAndIdIn(Grade.COMMON, GrowthStage.SEED, plantIdsInCollection);
         }
         if (candidates.isEmpty()) {
-            throw CustomException.notFound("배정 가능한 씨앗 마스터 데이터가 없습니다.");
+            throw CustomException.of(ErrorCode.PLANT_NOT_FOUND);
         }
 
         return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
@@ -64,7 +65,7 @@ public class SeedAssignmentService {
             candidates = plantRepository.findByGradeAndGrowthStage(Grade.COMMON, GrowthStage.SEED);
         }
         if (candidates.isEmpty()) {
-            throw CustomException.notFound("배정 가능한 식물 마스터 데이터가 없습니다.");
+            throw CustomException.of(ErrorCode.PLANT_NOT_FOUND);
         }
         return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
     }

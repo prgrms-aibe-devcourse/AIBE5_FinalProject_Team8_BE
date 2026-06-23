@@ -10,6 +10,7 @@ import com.Rootin.domain.plant.entity.enums.Grade;
 import com.Rootin.domain.plant.entity.enums.GrowthStage;
 import com.Rootin.domain.plant.repository.PlantRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,15 +29,15 @@ public class HarvestService {
     public HarvestResponse harvest(Long userId, Long potId) {
         // 1. 동시 수확 요청 시 중복 씨앗 생성을 방지하기 위해 비관적 쓰기 락(Pessimistic Write Lock)을 사용해 화분을 조회합니다.
         Pot pot = potRepository.findByIdWithLock(potId)
-                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분에 접근할 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         // 2. 현재 화분에 자라고 있는 활성 식물(isHarvested = false)을 조회합니다.
         PlantItem current = plantItemRepository.findByPotIdAndIsHarvestedFalse(potId)
-                .orElseThrow(() -> CustomException.notFound("수확할 식물이 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.NO_ACTIVE_PLANT));
 
         // 3. 수확 시점의 성장 단계(0=씨앗 ~ 4=만개)를 계산합니다.
         int stageIndex = levelCalculator.determinePlantGrowthStage(current.getGrowthExp()).ordinal();
@@ -47,7 +48,7 @@ public class HarvestService {
         plantItemRepository.saveAndFlush(current);
 
         Plant harvestedPlant = plantRepository.findById(current.getPlantId())
-                .orElseThrow(() -> CustomException.notFound("식물 마스터 데이터를 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.PLANT_NOT_FOUND));
 
         // 5. 수확 단계에 따라 다음 씨앗 배정
         // FULL_BLOOM: 전체 풀 랜덤 + 새 종이면 해금 풀에 추가
