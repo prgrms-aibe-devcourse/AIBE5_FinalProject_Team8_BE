@@ -12,6 +12,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
@@ -45,12 +46,20 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ErrorCode.INVALID_INPUT.getMessage()));
     }
 
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
+        log.warn("HttpRequestMethodNotSupportedException: {}", e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(ApiResponse.error(ErrorCode.METHOD_NOT_ALLOWED.getMessage()));
+    }
+
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingRequestHeader(MissingRequestHeaderException e) {
         log.warn("MissingRequestHeaderException: {}", e.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("필수 헤더가 누락되었습니다: " + e.getHeaderName()));
+                .body(ApiResponse.error(ErrorCode.MISSING_REQUEST_HEADER.getMessage() + ": " + e.getHeaderName()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -66,7 +75,7 @@ public class GlobalExceptionHandler {
         log.warn("DataIntegrityViolationException: {}", e.getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("이미 처리된 요청이거나 데이터 제약 조건에 위배됩니다."));
+                .body(ApiResponse.error(ErrorCode.CONFLICT.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
