@@ -18,6 +18,7 @@ import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -62,14 +63,14 @@ public class AiService {
             tils = resolveTilsByIds(request.tilIds(), userId, "요약");
         } else {
             Pot pot = potRepository.findById(request.potId())
-                    .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+                    .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
             if (!pot.getUserId().equals(user.getId())) {
-                throw CustomException.forbidden("본인의 화분만 요약할 수 있습니다.");
+                throw CustomException.of(ErrorCode.POT_FORBIDDEN);
             }
             tils = tilRepository.findByUserIdAndPotIdAndStatus(
                     user.getId(), request.potId(), PostStatus.PUBLISHED);
             if (tils.isEmpty()) {
-                throw CustomException.notFound("요약할 TIL이 없습니다.");
+                throw CustomException.of(ErrorCode.TIL_NOT_FOUND);
             }
         }
 
@@ -115,14 +116,14 @@ public class AiService {
             tils = resolveTilsByIds(request.tilIds(), userId, "퀴즈 생성");
         } else {
             Pot pot = potRepository.findById(request.potId())
-                    .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+                    .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
             if (!pot.getUserId().equals(user.getId())) {
-                throw CustomException.forbidden("본인의 화분으로만 복습 문제를 생성할 수 있습니다.");
+                throw CustomException.of(ErrorCode.POT_FORBIDDEN);
             }
             tils = tilRepository.findByUserIdAndPotIdAndStatus(
                     user.getId(), request.potId(), PostStatus.PUBLISHED);
             if (tils.isEmpty()) {
-                throw CustomException.notFound("문제를 생성할 TIL이 없습니다.");
+                throw CustomException.of(ErrorCode.TIL_NOT_FOUND);
             }
         }
 

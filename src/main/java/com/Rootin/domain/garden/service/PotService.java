@@ -22,6 +22,7 @@ import com.Rootin.domain.ai.entity.AiResult;
 import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -100,7 +101,7 @@ public class PotService {
             // 첫 화분: 기본 씨앗 고정 후 해금 풀에 등록
             Plant defaultPlant = plantRepository.findFirstByNameAndGradeAndGrowthStage(
                             DEFAULT_PLANT_NAME, Grade.COMMON, GrowthStage.SEED)
-                    .orElseThrow(() -> CustomException.notFound("기본 식물 마스터 데이터가 존재하지 않습니다."));
+                    .orElseThrow(() -> CustomException.of(ErrorCode.PLANT_NOT_FOUND));
             plantCollectionRepository.save(PlantCollection.builder()
                     .userId(userId)
                     .plantId(defaultPlant.getId())
@@ -209,10 +210,10 @@ public class PotService {
      */
     public PotResponse getPot(Long potId, Long userId) {
         Pot pot = potRepository.findById(potId)
-                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분에 접근할 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         return PotResponse.from(pot);
@@ -221,10 +222,10 @@ public class PotService {
     @Transactional
     public PotResponse updatePot(Long potId, Long userId, PotUpdateRequest request) {
         Pot pot = potRepository.findById(potId)
-                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분을 수정할 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         pot.updateInfo(request.getTitle().trim(),
@@ -245,10 +246,10 @@ public class PotService {
     @Transactional
     public void deletePot(Long potId, Long userId) {
         Pot pot = potRepository.findById(potId)
-                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분을 삭제할 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         // 1. 해당 화분과 연결된 AI 분석 결과(AiResult) 조회 및 일괄 삭제 처리
@@ -277,10 +278,10 @@ public class PotService {
     // S3에서 사용하기 위한 Validation
     public void validateOwnership(Long userId, Long potId) {
         Pot pot = potRepository.findById(potId)
-                .orElseThrow(() -> CustomException.notFound("존재하지 않는 화분입니다. ID: " + potId));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분에 접근할 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
     }
 }

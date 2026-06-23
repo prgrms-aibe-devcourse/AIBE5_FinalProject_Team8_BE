@@ -16,6 +16,7 @@ import com.Rootin.domain.til.util.TilContentLength;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,13 +42,13 @@ public class TilService {
     @Transactional
     public TilResponse create(Long userId, TilCreateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.USER_NOT_FOUND));
 
         // TIL 발행은 곧 화분 경험치 변경으로 이어집니다.
         // 같은 화분에 여러 요청이 동시에 들어오면 totalExp 계산이 꼬일 수 있으므로,
         // 쓰기 흐름에서는 비관적 락으로 Pot을 조회해 한 번에 하나의 트랜잭션만 경험치를 수정하게 합니다.
         Pot pot = potRepository.findByIdWithLock(request.potId())
-                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
         validatePotOwner(pot, userId);
 
         // Til.create()는 PUBLISHED 상태의 TIL을 만드는 도메인 생성 메서드입니다.
@@ -126,9 +127,9 @@ public class TilService {
     @Transactional
     public TilResponse saveDraft(Long userId, DraftSaveRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.USER_NOT_FOUND));
         Pot pot = potRepository.findById(request.potId())
-                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
         validatePotOwner(pot, userId);
 
         // 임시저장은 DRAFT 상태이므로 경험치/물주기를 발생시키지 않습니다.
@@ -177,7 +178,7 @@ public class TilService {
         // TIL 요청의 potId가 "내 화분"인지 확인합니다.
         // 이 검증이 없으면 사용자가 다른 사람의 potId를 넣어 타인의 화분에 글을 쓰거나 경험치를 줄 수 있습니다.
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("해당 화분에 대한 권한이 없습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
     }
 
