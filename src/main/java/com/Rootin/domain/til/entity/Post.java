@@ -10,6 +10,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+// id/user 필드는 AiResult ManyToMany 조인(ai_result_til.post_id = posts.id)에 필요하므로 제거 금지
 @Getter
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
