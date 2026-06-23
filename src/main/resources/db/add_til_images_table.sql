@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS til_images (
     post_id     BIGINT       NOT NULL                COMMENT 'TIL post ID (posts.id FK)',
     url         VARCHAR(500) NOT NULL                COMMENT 'S3 이미지 공개 URL',
     image_order INT          NOT NULL DEFAULT 0      COMMENT '본문 삽입 순서 (0부터 시작)',
-    created_at  DATETIME     NOT NULL                COMMENT '레코드 생성 시각',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '레코드 생성 시각',
     PRIMARY KEY (id),
     CONSTRAINT fk_til_images_post
         FOREIGN KEY (post_id) REFERENCES posts (id)
