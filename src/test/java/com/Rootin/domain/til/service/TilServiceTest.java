@@ -273,9 +273,10 @@ class TilServiceTest {
                     buildPostImage(2L, 100L, "https://s3.amazonaws.com/til-images/b/img2.jpg", 1)
             );
             given(postImageRepository.findAllById(deletedIds)).willReturn(toDelete);
-            // existingCount 조회 (삭제 후) + 최종 조회
+            // [버그 수정 반영] remainingImages 조회(nextOrder 계산용) + 최종 조회 → 각 1회씩 2회 호출
             given(postImageRepository.findByPostIdOrderByImageOrder(100L))
-                    .willReturn(Collections.emptyList());
+                    .willReturn(Collections.emptyList())  // 1st: nextOrder 계산 (max=-1 → nextOrder=0)
+                    .willReturn(Collections.emptyList()); // 2nd: 최종 이미지 목록
 
             tilService.update(100L, 1L, request, null);
 
@@ -297,7 +298,7 @@ class TilServiceTest {
             List<PostImage> existing = List.of(
                     buildPostImage(3L, 100L, "https://s3.amazonaws.com/til-images/old/img0.jpg", 0)
             );
-            // 1st call: existingCount=1, 2nd call: 최종 목록
+            // 1st call: remainingImages(nextOrder 계산 → max(0)+1=1), 2nd call: 최종 목록
             given(postImageRepository.findByPostIdOrderByImageOrder(100L))
                     .willReturn(existing)
                     .willReturn(List.of(

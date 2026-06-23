@@ -64,9 +64,10 @@ public class TilService {
         String thumbnailUrl = uploadThumbnailIfPresent(thumbnailImage, userId, request.potId());
 
         // Til.create()는 PUBLISHED 상태의 TIL을 만드는 도메인 생성 메서드입니다.
-        // 저장 후 til.getId()가 필요하므로 먼저 save()를 호출한 뒤 물주기 로직을 실행합니다.
-        Til til = Til.create(user, request.title(), request.content(), pot, thumbnailUrl);
-        tilRepository.save(til);
+        // [버그 수정] save() 반환값을 변수에 재할당해야 JPA가 할당한 id를 얻을 수 있다.
+        // 기존: tilRepository.save(til) 후 til.getId() == null (Mockito 환경에서 원본 객체 id 미설정)
+        // 수정: til = tilRepository.save(til)로 JPA/Mock이 반환하는 영속 객체를 사용한다.
+        Til til = tilRepository.save(Til.create(user, request.title(), request.content(), pot, thumbnailUrl));
 
         syncTags(til, request.tags());
 
@@ -140,9 +141,15 @@ public class TilService {
         deleteRequestedImages(request.deletedImageIds());
 
         // [S3 이미지 업로드 기능 추가] 새로 추가된 이미지 URL 목록을 til_images에 저장한다.
-        // 기존 이미지를 삭제한 뒤 추가하므로 imageOrder는 삭제 후 남은 이미지 개수 기준으로 이어진다.
-        int existingCount = postImageRepository.findByPostIdOrderByImageOrder(tilId).size();
-        saveImages(tilId, request.imageUrls(), existingCount);
+        // [버그 수정] existingCount(남은 개수) 대신 max(imageOrder)+1을 startOrder로 사용한다.
+        // 이유: 삭제 후 남은 이미지의 imageOrder가 0,2처럼 불연속일 수 있어
+        //       existingCount(=1)로 시작하면 기존 order=2와 충돌하는 중복이 발생한다.
+        List<PostImage> remainingImages = postImageRepository.findByPostIdOrderByImageOrder(tilId);
+        int nextOrder = remainingImages.stream()
+                .mapToInt(PostImage::getImageOrder)
+                .max()
+                .orElse(-1) + 1;
+        saveImages(tilId, request.imageUrls(), nextOrder);
 
         // [S3 이미지 업로드 기능 추가] 최종 이미지 목록을 조회하여 응답에 포함
         List<PostImage> updatedImages = postImageRepository.findByPostIdOrderByImageOrder(tilId);
@@ -215,8 +222,10 @@ public class TilService {
                 .orElseThrow(() -> CustomException.notFound("임시저장된 TIL이 없습니다."));
         validateOwner(til, userId);
         // DRAFT 상태 TIL은 watering_log·ai_result_til 레코드가 생성되지 않으므로 별도 FK 정리 불필요.
-        // [S3 이미지 업로드 기능 추가] DRAFT 이미지 DB 레코드 삭제 (S3 파일은 유지 — 발행 후 재사용 가능성)
-        postImageRepository.deleteByPostId(til.getId());
+        // [버그 수정] DRAFT 삭제 시 S3 파일도 함께 삭제한다.
+        // 기존: DB 레코드만 삭제 → S3 파일 누수 발생
+        // 수정: deleteAllImagesForTil()로 S3 파일 + DB 레코드 일괄 삭제
+        deleteAllImagesForTil(til.getId());
         tilRepository.delete(til);
     }
 
