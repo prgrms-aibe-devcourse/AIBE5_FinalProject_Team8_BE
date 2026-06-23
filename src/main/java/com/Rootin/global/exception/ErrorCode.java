@@ -24,6 +24,7 @@ public enum ErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
+    EMAIL_PROVIDER_MISMATCH(HttpStatus.CONFLICT, "이미 다른 방식으로 가입된 이메일입니다."),
 
     // TIL
     TIL_NOT_FOUND(HttpStatus.NOT_FOUND, "TIL을 찾을 수 없습니다."),
@@ -38,6 +39,7 @@ public enum ErrorCode {
 
     // AI
     AI_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 결과를 찾을 수 없습니다."),
+    AI_RESULT_FORBIDDEN(HttpStatus.FORBIDDEN, "본인의 AI 결과만 삭제할 수 있습니다."),
     AI_REQUEST_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "AI 요청 처리 중 오류가 발생했습니다."),
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
 

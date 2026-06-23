@@ -42,7 +42,7 @@ public class TilService {
     @Transactional
     public TilResponse create(Long userId, TilCreateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.USER_NOT_FOUND));
 
         // TIL 발행은 곧 화분 경험치 변경으로 이어집니다.
         // 같은 화분에 여러 요청이 동시에 들어오면 totalExp 계산이 꼬일 수 있으므로,
@@ -127,7 +127,7 @@ public class TilService {
     @Transactional
     public TilResponse saveDraft(Long userId, DraftSaveRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.USER_NOT_FOUND));
         Pot pot = potRepository.findById(request.potId())
                 .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
         validatePotOwner(pot, userId);

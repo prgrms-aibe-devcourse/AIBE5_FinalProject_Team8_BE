@@ -99,7 +99,7 @@ public class AiResultService {
                 .orElseThrow(() -> CustomException.of(ErrorCode.AI_RESULT_NOT_FOUND));
 
         if (!aiResult.getUser().getId().equals(userId)) {
-            throw CustomException.forbidden("본인의 AI 결과만 삭제할 수 있습니다.");
+            throw CustomException.of(ErrorCode.AI_RESULT_FORBIDDEN);
         }
 
         aiResultRepository.delete(aiResult);

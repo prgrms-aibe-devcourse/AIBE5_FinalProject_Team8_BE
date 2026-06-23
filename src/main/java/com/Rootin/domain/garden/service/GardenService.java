@@ -202,7 +202,7 @@ public class GardenService {
             List<Pot> pots = potRepository.findAllById(distinctPotIds);
 
             if (pots.size() != distinctPotIds.size()) {
-                throw new CustomException(ErrorCode.POT_NOT_FOUND);
+                throw CustomException.of(ErrorCode.POT_NOT_FOUND);
             }
 
             // Collectors.toMap() 연산 수행 시 중복 키로 인한 IllegalStateException(500 에러) 발생을 방지하기 위해

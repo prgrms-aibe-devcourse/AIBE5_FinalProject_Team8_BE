@@ -205,7 +205,7 @@ public class AuthService {
         // 3. 신규 사용자 → 자동 회원가입
         if (user == null) {
             if (userRepository.existsByEmail(email)) {
-                throw CustomException.of(ErrorCode.DUPLICATE_EMAIL);
+                throw CustomException.of(ErrorCode.EMAIL_PROVIDER_MISMATCH);
             }
 
             String nickname = generateUniqueNickname(googleName, sub);
