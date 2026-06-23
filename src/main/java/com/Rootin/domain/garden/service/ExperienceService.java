@@ -11,6 +11,7 @@ import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,7 +65,7 @@ public class ExperienceService {
         // 1. 동일 TIL 포스트에 대한 물주기 중복 적립 방지 검사.
         // 애플리케이션 레벨에서 먼저 막고, WateringLog.post_id unique 제약으로 DB 레벨에서도 한 번 더 막습니다.
         if (wateringLogRepository.existsByPostId(tilId)) {
-            throw CustomException.badRequest("이미 물주기가 완료된 TIL입니다.");
+            throw CustomException.of(ErrorCode.ALREADY_WATERED_TODAY);
         }
 
         // 2. 대상 TIL 포스트 존재 여부 및 유저 소유권, 화분 매핑 일치 검증.
@@ -118,7 +119,7 @@ public class ExperienceService {
 
         // [새 정책] 식물 개별 경험치 가산.
         PlantItem plantItem = plantItemRepository.findByPotIdAndIsHarvestedFalse(pot.getId())
-                .orElseThrow(() -> CustomException.notFound("화분에 심어진 식물이 존재하지 않습니다. ID: " + pot.getId()));
+                .orElseThrow(() -> CustomException.of(ErrorCode.NO_ACTIVE_PLANT));
         int beforePlantExp = plantItem.getGrowthExp();
         plantItem.increaseGrowthExp(gainedExp);
         log.info("식물 경험치 변동: {} Exp -> {} Exp (획득 경험치: {})", beforePlantExp, plantItem.getGrowthExp(), gainedExp);

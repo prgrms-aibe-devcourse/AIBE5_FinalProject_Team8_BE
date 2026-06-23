@@ -37,6 +37,10 @@ public class CustomException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    public static CustomException of(ErrorCode errorCode) {
+        return new CustomException(errorCode);
+    }
+
     public static CustomException forbidden(String message) {
         return new CustomException(HttpStatus.FORBIDDEN, message);
     }

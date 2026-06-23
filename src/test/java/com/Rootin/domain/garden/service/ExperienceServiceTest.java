@@ -333,7 +333,7 @@ class ExperienceServiceTest {
             experienceService.applyWatering(testUser.getId(), testPot, 500, testTil.getId());
         });
         
-        assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
+        assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
         assertThat(exception.getMessage()).contains("이미 물주기가 완료된 TIL입니다.");
     }
 

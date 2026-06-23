@@ -12,6 +12,7 @@ import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,17 +38,17 @@ public class AiResultService {
     @Transactional
     public AiResultResponse save(AiResultSaveRequest request, Long userId) {
         Pot pot = potRepository.findById(request.potId())
-                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("본인의 화분에만 AI 결과를 저장할 수 있습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         List<Til> tils = tilRepository.findByUserIdAndPotIdAndStatus(
                 userId, request.potId(), PostStatus.PUBLISHED);
 
         if (tils.isEmpty()) {
-            throw CustomException.notFound("화분에 저장된 TIL이 없습니다.");
+            throw CustomException.of(ErrorCode.TIL_NOT_FOUND);
         }
 
         // JPA FK 설정을 위해 프록시 참조 사용 (실제 SELECT 없이 ID만 사용)
@@ -81,10 +82,10 @@ public class AiResultService {
         }
 
         Pot pot = potRepository.findById(potId)
-                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
 
         if (!pot.getUserId().equals(userId)) {
-            throw CustomException.forbidden("본인의 화분 결과만 조회할 수 있습니다.");
+            throw CustomException.of(ErrorCode.POT_FORBIDDEN);
         }
 
         return aiResultRepository.findAllByUserAndPotId(userRef, potId).stream()
@@ -95,10 +96,10 @@ public class AiResultService {
     @Transactional
     public void delete(Long resultId, Long userId) {
         AiResult aiResult = aiResultRepository.findById(resultId)
-                .orElseThrow(() -> CustomException.notFound("AI 결과를 찾을 수 없습니다."));
+                .orElseThrow(() -> CustomException.of(ErrorCode.AI_RESULT_NOT_FOUND));
 
         if (!aiResult.getUser().getId().equals(userId)) {
-            throw CustomException.forbidden("본인의 AI 결과만 삭제할 수 있습니다.");
+            throw CustomException.of(ErrorCode.AI_RESULT_FORBIDDEN);
         }
 
         aiResultRepository.delete(aiResult);

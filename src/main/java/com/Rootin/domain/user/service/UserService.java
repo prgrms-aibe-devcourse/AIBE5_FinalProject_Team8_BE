@@ -10,6 +10,7 @@ import com.Rootin.domain.user.entity.ENUM.Provider;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
+import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -85,7 +86,7 @@ public class UserService {
         }
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            throw CustomException.badRequest("현재 비밀번호가 일치하지 않습니다.");
+            throw CustomException.of(ErrorCode.INVALID_PASSWORD);
         }
 
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
@@ -98,7 +99,7 @@ public class UserService {
 
         String newNickname = request.getNickname();
         if (!user.getNickname().equals(newNickname) && userRepository.existsByNickname(newNickname)) {
-            throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
+            throw CustomException.of(ErrorCode.DUPLICATE_NICKNAME);
         }
 
         user.updateProfile(newNickname, request.getBio(), request.getProfileImageUrl());
@@ -106,7 +107,7 @@ public class UserService {
         try {
             userRepository.flush();
         } catch (DataIntegrityViolationException e) {
-            throw CustomException.badRequest("이미 사용 중인 닉네임입니다.");
+            throw CustomException.of(ErrorCode.DUPLICATE_NICKNAME);
         }
 
         long tilCount = tilRepository.countByUserIdAndStatus(userId, PostStatus.PUBLISHED);

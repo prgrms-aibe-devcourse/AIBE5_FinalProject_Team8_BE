@@ -1,5 +1,6 @@
 package com.Rootin.global.config;
 
+import com.Rootin.global.filter.RateLimitFilter;
 import com.Rootin.global.jwt.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,16 +27,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-/**
- * TODO [로그인 담당자]: JWT 필터 추가 예정
- * - JwtAuthenticationFilter를 addFilterBefore()로 등록
- * - 공개 경로(회원가입, 로그인 등) permitAll() 추가
- */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final ObjectProvider<JwtAuthenticationFilter> jwtAuthenticationFilterProvider;
+    private final ObjectProvider<RateLimitFilter> rateLimitFilterProvider;
 
     @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private String[] allowedOrigins;
@@ -50,7 +47,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/test", "/h2-console/**").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(
                                 "/actuator/health",
@@ -120,6 +117,11 @@ public class SecurityConfig {
 
         jwtAuthenticationFilterProvider.ifAvailable(jwtAuthenticationFilter ->
                 http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        );
+
+        // JWT 인증 이후 실행 — SecurityContext에서 userId를 읽어 AI 엔드포인트 요청 제한
+        rateLimitFilterProvider.ifAvailable(rateLimitFilter ->
+                http.addFilterAfter(rateLimitFilter, JwtAuthenticationFilter.class)
         );
 
         return http.build();
