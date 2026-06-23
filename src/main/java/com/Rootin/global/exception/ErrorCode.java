@@ -22,6 +22,9 @@ public enum ErrorCode {
     TIL_NOT_FOUND(HttpStatus.NOT_FOUND, "TIL을 찾을 수 없습니다."),
     TIL_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 TIL에 대한 권한이 없습니다."),
 
+    // AI
+    RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
+
     // Point
     /** TODO: 포인트 차감 비용 정책 변경 시 AiService.SUMMARY_POINT_COST 값도 함께 수정이 필요합니다 */
     INSUFFICIENT_POINT(HttpStatus.PAYMENT_REQUIRED, "포인트가 부족합니다."),
