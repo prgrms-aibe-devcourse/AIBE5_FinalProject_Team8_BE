@@ -1,4 +1,5 @@
 // TIL 비즈니스 로직: TIL 작성 시 썸네일 이미지를 S3에 업로드하고 URL을 저장하는 흐름을 담당한다
+// [S3 이미지 업로드 기능 추가] 본문 이미지(PostImage) 저장·수정·삭제 로직 추가
 package com.Rootin.domain.til.service;
 
 import com.Rootin.domain.ai.repository.AiResultTilRepository;
@@ -11,6 +12,7 @@ import com.Rootin.domain.til.dto.request.TilCreateRequest;
 import com.Rootin.domain.til.dto.request.TilUpdateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
 import com.Rootin.domain.til.entity.*;
+import com.Rootin.domain.til.repository.PostImageRepository;
 import com.Rootin.domain.til.repository.TagRepository;
 import com.Rootin.domain.til.repository.TilRepository;
 import com.Rootin.domain.til.util.TilContentLength;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,6 +45,8 @@ public class TilService {
     private final AiResultTilRepository aiResultTilRepository;
     private final WateringLogRepository wateringLogRepository;
     private final S3Service s3Service;
+    // [S3 이미지 업로드 기능 추가] 본문 이미지 레코드 관리를 위한 리포지토리
+    private final PostImageRepository postImageRepository;
 
     @Transactional
     public TilResponse create(Long userId, TilCreateRequest request, MultipartFile thumbnailImage) {
@@ -65,6 +70,10 @@ public class TilService {
 
         syncTags(til, request.tags());
 
+        // [S3 이미지 업로드 기능 추가] TIL 저장 후 본문 이미지 URL 목록을 til_images 테이블에 저장한다.
+        // tilId가 확정된 이후에 호출해야 PostImage.postId가 올바르게 세팅된다.
+        saveImages(til.getId(), request.imageUrls());
+
         // TIL 저장 성공 직후, 글자 수 및 이력을 바탕으로 물주기 경험치/포인트/레벨업 비즈니스 로직을 구동합니다.
         // 이 호출이 Phase 2 경험치 시스템과 TIL 도메인을 연결하는 핵심 지점입니다.
         // 경험치 산정 글자 수는 HTML 원문 길이가 아니라 태그·공백을 제외한 순수 텍스트 기준으로 계산합니다.
@@ -79,14 +88,19 @@ public class TilService {
             experienceService.applyWatering(userId, pot, contentLength, til.getId());
         }
 
-        return TilResponse.from(til);
+        // [S3 이미지 업로드 기능 추가] 저장된 이미지 목록을 응답에 포함하여 반환
+        List<PostImage> savedImages = postImageRepository.findByPostIdOrderByImageOrder(til.getId());
+        return TilResponse.from(til, savedImages);
     }
 
     @Transactional(readOnly = true)
     public TilResponse findById(Long tilId, Long userId) {
         Til til = getTilOrThrow(tilId);
         validateOwner(til, userId);
-        return TilResponse.from(til);
+        // [S3 이미지 업로드 기능 추가] TIL 조회 시 연관 이미지 목록도 함께 반환한다.
+        // 클라이언트가 수정 화면 진입 시 기존 이미지를 복원하는 데 사용한다.
+        List<PostImage> images = postImageRepository.findByPostIdOrderByImageOrder(tilId);
+        return TilResponse.from(til, images);
     }
 
     @Transactional(readOnly = true)
@@ -105,6 +119,7 @@ public class TilService {
             tils = tilRepository.findByUserIdAndStatus(userId, PostStatus.PUBLISHED, pageable);
         }
 
+        // 목록 조회에서는 이미지가 필요 없으므로 빈 이미지 목록으로 반환 (N+1 방지)
         return tils.map(TilResponse::from);
     }
 
@@ -121,7 +136,17 @@ public class TilService {
             til.updateThumbnailUrl(newThumbnailUrl);
         }
 
-        return TilResponse.from(til);
+        // [S3 이미지 업로드 기능 추가] 삭제 요청된 이미지 처리: DB 레코드 삭제 + S3 파일 삭제
+        deleteRequestedImages(request.deletedImageIds());
+
+        // [S3 이미지 업로드 기능 추가] 새로 추가된 이미지 URL 목록을 til_images에 저장한다.
+        // 기존 이미지를 삭제한 뒤 추가하므로 imageOrder는 삭제 후 남은 이미지 개수 기준으로 이어진다.
+        int existingCount = postImageRepository.findByPostIdOrderByImageOrder(tilId).size();
+        saveImages(tilId, request.imageUrls(), existingCount);
+
+        // [S3 이미지 업로드 기능 추가] 최종 이미지 목록을 조회하여 응답에 포함
+        List<PostImage> updatedImages = postImageRepository.findByPostIdOrderByImageOrder(tilId);
+        return TilResponse.from(til, updatedImages);
     }
 
     @Transactional
@@ -131,6 +156,8 @@ public class TilService {
         // FK 참조 테이블을 먼저 정리한 뒤 TIL 삭제
         // - ai_result_til: 중간 테이블만 제거, ai_results 레코드는 유지
         // - watering_log: TIL에 귀속된 물주기 이력 제거 (경험치 중복 방지 unique 제약 해소)
+        // [S3 이미지 업로드 기능 추가] til_images: DB 레코드 삭제 + S3 파일 일괄 삭제
+        deleteAllImagesForTil(tilId);
         aiResultTilRepository.deleteByTilId(tilId);
         wateringLogRepository.deleteByPostId(tilId);
         tilRepository.delete(til);
@@ -161,14 +188,25 @@ public class TilService {
 
         syncTags(til, request.tags());
 
-        return TilResponse.from(til);
+        // [S3 이미지 업로드 기능 추가] 임시저장 시에도 이미지 URL이 전달되면 저장한다.
+        // 기존 임시저장을 갱신하는 경우: 기존 이미지 전체 교체 (삭제 후 재저장)
+        // 주의: DRAFT 이미지를 교체할 때는 기존 S3 파일은 유지하고 DB 레코드만 교체한다.
+        //       (아직 발행 전이므로 S3 정리는 발행 취소 또는 TIL 삭제 시 처리)
+        postImageRepository.deleteByPostId(til.getId());
+        saveImages(til.getId(), request.imageUrls());
+
+        // [S3 이미지 업로드 기능 추가] 저장된 이미지 목록 포함 반환
+        List<PostImage> savedImages = postImageRepository.findByPostIdOrderByImageOrder(til.getId());
+        return TilResponse.from(til, savedImages);
     }
 
     @Transactional(readOnly = true)
     public TilResponse getDraft(Long userId, Long potId) {
         Til til = tilRepository.findFirstByUserIdAndPotIdAndStatus(userId, potId, PostStatus.DRAFT)
                 .orElseThrow(() -> CustomException.notFound("임시저장된 TIL이 없습니다."));
-        return TilResponse.from(til);
+        // [S3 이미지 업로드 기능 추가] 임시저장 조회 시에도 이미지 목록 반환
+        List<PostImage> images = postImageRepository.findByPostIdOrderByImageOrder(til.getId());
+        return TilResponse.from(til, images);
     }
 
     @Transactional
@@ -177,7 +215,8 @@ public class TilService {
                 .orElseThrow(() -> CustomException.notFound("임시저장된 TIL이 없습니다."));
         validateOwner(til, userId);
         // DRAFT 상태 TIL은 watering_log·ai_result_til 레코드가 생성되지 않으므로 별도 FK 정리 불필요.
-        // 향후 AI 분석 또는 물주기가 DRAFT 단계까지 확장될 경우 delete()와 동일한 패턴 적용 필요.
+        // [S3 이미지 업로드 기능 추가] DRAFT 이미지 DB 레코드 삭제 (S3 파일은 유지 — 발행 후 재사용 가능성)
+        postImageRepository.deleteByPostId(til.getId());
         tilRepository.delete(til);
     }
 
@@ -198,6 +237,77 @@ public class TilService {
         };
         String objectKey = String.format("til-images/%d/%d/%s.%s", userId, potId, UUID.randomUUID(), ext);
         return s3Service.uploadFile(image, objectKey);
+    }
+
+    // ─── [S3 이미지 업로드 기능 추가] 이미지 헬퍼 메서드 ────────────────────────────────
+
+    /**
+     * imageUrls 목록을 순서대로 til_images 테이블에 저장합니다.
+     * imageOrder는 0부터 시작합니다.
+     * imageUrls가 null이거나 비어 있으면 아무 작업도 하지 않습니다.
+     *
+     * @param postId    TIL의 post_id (til_images.post_id FK)
+     * @param imageUrls 저장할 이미지 URL 목록 (순서 = imageOrder)
+     */
+    private void saveImages(Long postId, List<String> imageUrls) {
+        saveImages(postId, imageUrls, 0);
+    }
+
+    /**
+     * imageUrls 목록을 startOrder부터 시작하는 imageOrder로 til_images 테이블에 저장합니다.
+     * TIL 수정 시 기존 이미지 개수 이후로 순서를 이어붙일 때 사용합니다.
+     *
+     * @param postId     TIL의 post_id
+     * @param imageUrls  저장할 이미지 URL 목록
+     * @param startOrder imageOrder 시작값 (기존 이미지 개수)
+     */
+    private void saveImages(Long postId, List<String> imageUrls, int startOrder) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return;
+        }
+        List<PostImage> images = new java.util.ArrayList<>();
+        for (int i = 0; i < imageUrls.size(); i++) {
+            String url = imageUrls.get(i);
+            if (url != null && !url.isBlank()) {
+                images.add(PostImage.of(postId, url, startOrder + i));
+            }
+        }
+        if (!images.isEmpty()) {
+            postImageRepository.saveAll(images);
+        }
+    }
+
+    /**
+     * 삭제 요청된 이미지 ID 목록을 처리합니다.
+     * - til_images 테이블에서 해당 레코드를 삭제합니다.
+     * - S3에 저장된 실제 파일을 삭제합니다.
+     * deletedImageIds가 null이거나 비어 있으면 아무 작업도 하지 않습니다.
+     *
+     * @param deletedImageIds 삭제할 PostImage.id 목록
+     */
+    private void deleteRequestedImages(List<Long> deletedImageIds) {
+        if (deletedImageIds == null || deletedImageIds.isEmpty()) {
+            return;
+        }
+        // 삭제 전 S3 URL을 먼저 조회하여 S3 파일을 정리한다.
+        List<PostImage> toDelete = postImageRepository.findAllById(deletedImageIds);
+        for (PostImage image : toDelete) {
+            s3Service.deleteFileByUrl(image.getUrl());
+        }
+        postImageRepository.deleteAllByIdIn(deletedImageIds);
+    }
+
+    /**
+     * TIL 삭제 시 해당 TIL의 모든 이미지를 S3와 DB에서 일괄 삭제합니다.
+     *
+     * @param postId 삭제할 TIL의 post_id
+     */
+    private void deleteAllImagesForTil(Long postId) {
+        List<PostImage> images = postImageRepository.findByPostIdOrderByImageOrder(postId);
+        for (PostImage image : images) {
+            s3Service.deleteFileByUrl(image.getUrl());
+        }
+        postImageRepository.deleteByPostId(postId);
     }
 
     private Til getTilOrThrow(Long tilId) {
