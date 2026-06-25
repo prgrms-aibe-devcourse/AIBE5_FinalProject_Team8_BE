@@ -288,5 +288,17 @@ class LevelCalculatorTest {
             assertThat(calculator.calculateStreak(timesWithNull)).isEqualTo(2);
             assertThat(calculator.calculatePreviousStreak(timesWithNull)).isEqualTo(1);
         }
+
+        @Test
+        @DisplayName("날짜 단위로 축약된 발행일 목록으로 전시용 스트릭을 계산한다")
+        void calculateStreakFromDatesTests() {
+            java.time.LocalDate today = java.time.LocalDate.now();
+
+            assertThat(calculator.calculateStreakFromDates(List.of())).isEqualTo(0);
+            assertThat(calculator.calculateStreakFromDates(List.of(today))).isEqualTo(1);
+            assertThat(calculator.calculateStreakFromDates(List.of(today, today.minusDays(1)))).isEqualTo(2);
+            assertThat(calculator.calculateStreakFromDates(java.util.Arrays.asList(null, today, today.minusDays(1))))
+                    .isEqualTo(2);
+        }
     }
 }

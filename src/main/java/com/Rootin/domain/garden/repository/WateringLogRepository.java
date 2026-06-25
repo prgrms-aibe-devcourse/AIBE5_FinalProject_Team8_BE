@@ -10,12 +10,30 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * WateringLog 엔티티를 관리하기 위한 Spring Data JPA Repository 인터페이스입니다.
  */
 @Repository
 public interface WateringLogRepository extends JpaRepository<WateringLog, Long> {
+
+    interface WateringLogDailyAggregateProjection {
+        java.sql.Date getWateredDate();
+        long getTilCount();
+        long getContentLength();
+    }
+
+    interface WateringLogAggregateProjection {
+        long getTilCount();
+        long getContentLength();
+    }
+
+    interface DashboardPersonalOverviewProjection {
+        long getTotalTilCount();
+        long getTotalContentLength();
+        Integer getCurrentPoints();
+    }
 
     /**
      * 특정 화분에 기록된 모든 물주기 이력 목록을 조회합니다.
@@ -50,24 +68,79 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
      */
     java.util.Optional<WateringLog> findFirstByUserIdAndPotIdOrderByWateredAtDesc(Long userId, Long potId);
 
-    // 개인 통계용 - 사용자 전체 물주기 이력
-    List<WateringLog> findAllByUserId(Long userId);
+    @Query(value = """
+        SELECT watered_at
+        FROM watering_log
+        WHERE user_id = :userId
+          AND pot_id = :potId
+        ORDER BY watered_at DESC
+        LIMIT 1
+    """, nativeQuery = true)
+    Optional<LocalDateTime> findLatestWateredAtByUserIdAndPotId(
+            @Param("userId") Long userId,
+            @Param("potId") Long potId
+    );
+
+    @Query(value = """
+        SELECT
+            (SELECT COUNT(*)
+             FROM posts p
+             JOIN til t ON t.post_id = p.id
+             WHERE p.user_id = u.id
+               AND p.status = :publishedStatus) AS totalTilCount,
+            (SELECT COALESCE(SUM(w.content_length), 0)
+             FROM watering_log w
+             WHERE w.user_id = u.id) AS totalContentLength,
+            u.point AS currentPoints
+        FROM users u
+        WHERE u.id = :userId
+    """, nativeQuery = true)
+    Optional<DashboardPersonalOverviewProjection> findPersonalOverviewByUserId(
+            @Param("userId") Long userId,
+            @Param("publishedStatus") String publishedStatus
+    );
+
+    @Query(value = """
+        SELECT DISTINCT DATE(watered_at)
+        FROM watering_log
+        WHERE user_id = :userId
+    """, nativeQuery = true)
+    List<java.sql.Date> findDistinctWateredDatesByUserId(@Param("userId") Long userId);
 
     // 성장 이력 차트용 - 최근 30건
     List<WateringLog> findTop30ByUserIdOrderByWateredAtDesc(Long userId);
 
-    // 활동 캘린더용 - 기간별 물주기 이력 (inclusive BETWEEN)
-    List<WateringLog> findByUserIdAndWateredAtBetween(
-            Long userId,
-            LocalDateTime from,
-            LocalDateTime to
+    @Query(value = """
+        SELECT DATE(watered_at) AS wateredDate,
+               COUNT(*) AS tilCount,
+               COALESCE(SUM(content_length), 0) AS contentLength
+        FROM watering_log
+        WHERE user_id = :userId
+          AND watered_at >= :from
+          AND watered_at < :to
+        GROUP BY DATE(watered_at)
+        ORDER BY wateredDate
+    """, nativeQuery = true)
+    List<WateringLogDailyAggregateProjection> aggregateDailyByUserIdAndWateredAtRange(
+            @Param("userId") Long userId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
     );
 
-    // 퀘스트용 - 반열린 구간 [from, to) 조회. datetime(6) microsecond 누락 방지
-    List<WateringLog> findByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(
-            Long userId,
-            LocalDateTime from,
-            LocalDateTime to
+    long countByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(Long userId, LocalDateTime from, LocalDateTime to);
+
+    @Query("""
+        SELECT COUNT(w) AS tilCount,
+               COALESCE(SUM(w.contentLength), 0) AS contentLength
+        FROM WateringLog w
+        WHERE w.userId = :userId
+          AND w.wateredAt >= :from
+          AND w.wateredAt < :to
+    """)
+    WateringLogAggregateProjection aggregateByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(
+            @Param("userId") Long userId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
     );
 
     // 식물 성장 단계 날짜 계산용 — 특정 시점 이후 해당 화분의 물주기 이력 (시간순)

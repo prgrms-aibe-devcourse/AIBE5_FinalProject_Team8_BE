@@ -15,6 +15,7 @@ import com.Rootin.domain.til.entity.*;
 import com.Rootin.domain.til.repository.PostImageRepository;
 import com.Rootin.domain.til.repository.TagRepository;
 import com.Rootin.domain.til.repository.TilRepository;
+import com.Rootin.domain.til.repository.TilTagRepository;
 import com.Rootin.domain.til.util.TilContentLength;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
@@ -30,7 +31,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,11 +48,21 @@ public class TilService {
     private final S3Service s3Service;
     // [S3 이미지 업로드 기능 추가] 본문 이미지 레코드 관리를 위한 리포지토리
     private final PostImageRepository postImageRepository;
+    private final TilTagRepository tilTagRepository;
 
     @Transactional
     public TilResponse create(Long userId, TilCreateRequest request, MultipartFile thumbnailImage) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.of(ErrorCode.USER_NOT_FOUND));
+        // 경험치 산정 글자 수는 HTML 원문 길이가 아니라 태그·공백을 제외한 순수 텍스트 기준으로 계산합니다.
+        // 서식 태그만 있는 본문은 @NotBlank를 통과할 수 있지만, 사용자가 실제로 작성한 내용으로 보지 않습니다.
+        int contentLength = TilContentLength.countVisibleCharacters(request.content());
+        if (contentLength <= 0) {
+            throw CustomException.badRequest("본문은 한 글자 이상 입력해주세요.");
+        }
+
+        if (!userRepository.existsById(userId)) {
+            throw CustomException.of(ErrorCode.USER_NOT_FOUND);
+        }
+        User user = userRepository.getReferenceById(userId);
 
         // TIL 발행은 곧 화분 경험치 변경으로 이어집니다.
         // 같은 화분에 여러 요청이 동시에 들어오면 totalExp 계산이 꼬일 수 있으므로,
@@ -78,17 +88,7 @@ public class TilService {
 
         // TIL 저장 성공 직후, 글자 수 및 이력을 바탕으로 물주기 경험치/포인트/레벨업 비즈니스 로직을 구동합니다.
         // 이 호출이 Phase 2 경험치 시스템과 TIL 도메인을 연결하는 핵심 지점입니다.
-        // 경험치 산정 글자 수는 HTML 원문 길이가 아니라 태그·공백을 제외한 순수 텍스트 기준으로 계산합니다.
-        // (서식만 추가해도 경험치가 늘어나는 문제 방지 + 에디터 예상 경험치와 기준 일치)
-        int contentLength = TilContentLength.countVisibleCharacters(request.content());
-
-        // 가시 텍스트가 0자면 경험치도 0이므로 물주기를 수행하지 않습니다.
-        // 0자에 대해 applyWatering을 호출하면 expGained=0인 WateringLog가 기록되고,
-        // post_id unique 제약 + existsByPostId 중복 검사 탓에 해당 TIL은 이후로도 물주기 대상에서 영구 제외됩니다.
-        // (서식 태그만 있는 본문은 @NotBlank를 통과하지만 가시 글자 수는 0이 될 수 있습니다.)
-        if (contentLength > 0) {
-            experienceService.applyWatering(userId, pot, contentLength, til.getId());
-        }
+        experienceService.applyWatering(userId, pot, contentLength, til.getId());
 
         // [S3 이미지 업로드 기능 추가] 저장된 이미지 목록을 응답에 포함하여 반환
         List<PostImage> savedImages = postImageRepository.findByPostIdOrderByImageOrder(til.getId());
@@ -173,34 +173,31 @@ public class TilService {
 
     @Transactional
     public TilResponse saveDraft(Long userId, DraftSaveRequest request, MultipartFile thumbnailImage) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> CustomException.of(ErrorCode.USER_NOT_FOUND));
-        Pot pot = potRepository.findById(request.potId())
+        if (!userRepository.existsById(userId)) {
+            throw CustomException.of(ErrorCode.USER_NOT_FOUND);
+        }
+        // 같은 화분의 임시저장 저장/삭제가 동시에 들어오면 DRAFT 레코드가 중복 생성되거나
+        // 같은 TilTag를 여러 트랜잭션이 동시에 삭제할 수 있습니다.
+        // 발행 전 초안도 "화분당 하나" 정책이므로 pot row lock으로 같은 화분의 draft 쓰기를 직렬화합니다.
+        Pot pot = potRepository.findByIdWithLock(request.potId())
                 .orElseThrow(() -> CustomException.of(ErrorCode.POT_NOT_FOUND));
         validatePotOwner(pot, userId);
 
         // 썸네일 이미지가 첨부된 경우 S3에 업로드하고 URL을 저장합니다.
         String thumbnailUrl = uploadThumbnailIfPresent(thumbnailImage, userId, request.potId());
 
-        // 임시저장은 DRAFT 상태이므로 경험치/물주기를 발생시키지 않습니다.
-        // 이미 같은 화분에 임시저장 글이 있으면 새로 만들지 않고 기존 글을 갱신합니다.
-        Til til = tilRepository.findFirstByUserIdAndPotIdAndStatus(userId, request.potId(), PostStatus.DRAFT)
-                .map(existing -> {
-                    existing.update(request.title(), request.content());
-                    if (thumbnailUrl != null) {
-                        existing.updateThumbnailUrl(thumbnailUrl);
-                    }
-                    return existing;
-                })
-                .orElseGet(() -> tilRepository.save(Til.createDraft(user, request.title(), request.content(), pot, thumbnailUrl)));
+        // 임시저장은 화분당 최신 스냅샷 하나만 유지합니다.
+        // 기존 draft 엔티티를 갱신하며 tilTags 컬렉션을 clear()하면 동시 저장/삭제 부하에서
+        // Hibernate orphanRemoval 경로가 이미 삭제된 TilTag를 다시 지우려다 낙관락 예외를 만들 수 있습니다.
+        // DRAFT는 발행 전 데이터라 외부 이력과 연결되지 않으므로 기존 초안을 벌크 삭제한 뒤 새 초안을 저장합니다.
+        deleteDraftRows(userId, request.potId(), false);
+
+        // 벌크 삭제는 영속성 컨텍스트를 비우므로 새 초안 저장에는 관리되는 참조를 다시 사용합니다.
+        User user = userRepository.getReferenceById(userId);
+        Pot potRef = potRepository.getReferenceById(request.potId());
+        Til til = tilRepository.save(Til.createDraft(user, request.title(), request.content(), potRef, thumbnailUrl));
 
         syncTags(til, request.tags());
-
-        // [S3 이미지 업로드 기능 추가] 임시저장 시에도 이미지 URL이 전달되면 저장한다.
-        // 기존 임시저장을 갱신하는 경우: 기존 이미지 전체 교체 (삭제 후 재저장)
-        // 주의: DRAFT 이미지를 교체할 때는 기존 S3 파일은 유지하고 DB 레코드만 교체한다.
-        //       (아직 발행 전이므로 S3 정리는 발행 취소 또는 TIL 삭제 시 처리)
-        postImageRepository.deleteByPostId(til.getId());
         saveImages(til.getId(), request.imageUrls());
 
         // [S3 이미지 업로드 기능 추가] 저장된 이미지 목록 포함 반환
@@ -219,15 +216,11 @@ public class TilService {
 
     @Transactional
     public void deleteDraft(Long userId, Long potId) {
-        Til til = tilRepository.findFirstByUserIdAndPotIdAndStatus(userId, potId, PostStatus.DRAFT)
-                .orElseThrow(() -> CustomException.notFound("임시저장된 TIL이 없습니다."));
-        validateOwner(til, userId);
-        // DRAFT 상태 TIL은 watering_log·ai_result_til 레코드가 생성되지 않으므로 별도 FK 정리 불필요.
-        // [버그 수정] DRAFT 삭제 시 S3 파일도 함께 삭제한다.
-        // 기존: DB 레코드만 삭제 → S3 파일 누수 발생
-        // 수정: deleteAllImagesForTil()로 S3 파일 + DB 레코드 일괄 삭제
-        deleteAllImagesForTil(til.getId());
-        tilRepository.delete(til);
+        Pot pot = potRepository.findByIdWithLock(potId)
+                .orElseThrow(() -> CustomException.notFound("화분을 찾을 수 없습니다."));
+        validatePotOwner(pot, userId);
+
+        deleteDraftRows(userId, potId, true);
     }
 
     /**
@@ -318,6 +311,38 @@ public class TilService {
             s3Service.deleteFileByUrl(image.getUrl());
         }
         postImageRepository.deleteByPostId(postId);
+    }
+
+    private void deleteDraftRows(Long userId, Long potId, boolean deleteS3Images) {
+        List<Long> draftIds = tilRepository.findIdsByUserIdAndPotIdAndStatus(userId, potId, PostStatus.DRAFT);
+        if (draftIds.isEmpty()) {
+            return;
+        }
+
+        // 임시저장 삭제는 반복 호출되어도 성공하는 멱등 동작으로 처리합니다.
+        // 엔티티 그래프를 로딩해 orphanRemoval로 지우면 동시 DELETE에서 이미 지워진 TilTag를 다시 삭제하며
+        // ObjectOptimisticLockingFailureException과 대량 stack trace가 발생할 수 있어 벌크 삭제를 사용합니다.
+        // DRAFT 상태 TIL은 watering_log·ai_result_til 레코드가 생성되지 않으므로 별도 FK 정리 불필요.
+        if (deleteS3Images) {
+            deleteAllImagesForTils(draftIds);
+        } else {
+            deleteImageRowsForTils(draftIds);
+        }
+        tilTagRepository.deleteByTilIdIn(draftIds);
+        tilRepository.deleteTilRowsByIds(draftIds);
+        tilRepository.deletePostRowsByIds(draftIds);
+    }
+
+    private void deleteAllImagesForTils(List<Long> postIds) {
+        for (Long postId : postIds) {
+            deleteAllImagesForTil(postId);
+        }
+    }
+
+    private void deleteImageRowsForTils(List<Long> postIds) {
+        for (Long postId : postIds) {
+            postImageRepository.deleteByPostId(postId);
+        }
     }
 
     private Til getTilOrThrow(Long tilId) {

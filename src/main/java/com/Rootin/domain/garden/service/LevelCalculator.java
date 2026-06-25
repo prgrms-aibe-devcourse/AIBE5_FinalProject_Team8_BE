@@ -253,12 +253,30 @@ public class LevelCalculator {
             return 0;
         }
 
+        return calculateStreakFromDates(publishedTimes.stream()
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .toList());
+    }
+
+    /**
+     * [대시보드 전시용] 이미 날짜 단위로 축약된 발행 일자 목록을 기반으로 연속 작성일(스트릭)을 계산합니다.
+     * 대시보드/화분 상세처럼 많은 요청이 동시에 들어오는 조회 흐름에서는 DB에서 DISTINCT 날짜만 가져와
+     * 불필요한 LocalDateTime 객체 생성과 중복 Set 변환 비용을 줄입니다.
+     *
+     * @param publishedDates 유저가 작성한 TIL들의 발행 날짜 목록
+     * @return 오늘을 포함해 현재 유지되고 있는 연속 작성일 수 (최소 0)
+     */
+    public int calculateStreakFromDates(List<LocalDate> publishedDates) {
+        if (publishedDates == null || publishedDates.isEmpty()) {
+            return 0;
+        }
+
         LocalDate today = LocalDate.now();
 
         // 날짜 단위 조회를 빠르게 처리하기 위해 Set으로 변환하여 O(1) 검색 속도를 보장합니다.
-        Set<LocalDate> dateSet = publishedTimes.stream()
+        Set<LocalDate> dateSet = publishedDates.stream()
                 .filter(Objects::nonNull)
-                .map(LocalDateTime::toLocalDate)
                 .collect(Collectors.toSet());
 
         // 오늘 쓴 TIL이 존재한다면 오늘부터 역산하고, 없다면 어제부터 과거로 역산합니다.

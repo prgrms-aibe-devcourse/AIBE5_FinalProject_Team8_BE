@@ -4,6 +4,7 @@ import com.Rootin.domain.gamification.entity.PointLog;
 import com.Rootin.domain.gamification.entity.enums.PointLogReason;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +14,12 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 public interface PointLogRepository extends JpaRepository<PointLog, Long> {
+
+    interface PointSummaryProjection {
+        Integer getCurrentPoint();
+        Long getTotalEarned();
+        Long getTotalUsed();
+    }
 
     // 포인트 이력 목록 - 페이징
     Page<PointLog> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
@@ -38,13 +45,33 @@ public interface PointLogRepository extends JpaRepository<PointLog, Long> {
             @Param("questReasons") Set<PointLogReason> questReasons
     );
 
-    // MT-02 포인트 현황 - 총 적립 포인트 (양수 합산)
-    @Query("SELECT COALESCE(SUM(pl.amount), 0) FROM PointLog pl " +
-            "WHERE pl.user.id = :userId AND pl.amount > 0")
-    int sumEarnedByUserId(@Param("userId") Long userId);
+    // MT-01 오늘의 목표 - 동시 요청에서 유니크 제약 충돌을 실패로 만들지 않고 먼저 성공한 1건만 지급 처리
+    // MySQL 전용 쿼리입니다. INSERT IGNORE는 중복 키에서 0을 반환하므로 호출부가 첫 지급 여부를 안정적으로 구분할 수 있습니다.
+    // uk_point_log_user_reason_date 유니크 인덱스가 중복 지급의 DB 레벨 방어선입니다.
+    @Modifying
+    @Query(value = """
+        INSERT IGNORE INTO point_log (user_id, reason, amount, awarded_date, created_at)
+        VALUES (:userId, :reason, :amount, :awardedDate, NOW())
+    """, nativeQuery = true)
+    int insertQuestLogIfAbsent(
+            @Param("userId") Long userId,
+            @Param("reason") String reason,
+            @Param("amount") int amount,
+            @Param("awardedDate") LocalDate awardedDate
+    );
 
-    // MT-02 포인트 현황 - 총 적립 포인트 (음수 합산)
-    @Query("SELECT COALESCE(SUM(pl.amount), 0) FROM PointLog pl " +
-            "WHERE pl.user.id = :userId AND pl.amount < 0")
-    int sumUsedByUserId(@Param("userId") Long userId);
+    long countByUserIdAndReasonAndAwardedDate(Long userId, PointLogReason reason, LocalDate awardedDate);
+
+    // MT-02 포인트 현황 - 현재 포인트와 적립/사용 합계를 한 번에 조회
+    @Query(value = """
+        SELECT
+            u.point AS currentPoint,
+            COALESCE(SUM(CASE WHEN pl.amount > 0 THEN pl.amount ELSE 0 END), 0) AS totalEarned,
+            COALESCE(SUM(CASE WHEN pl.amount < 0 THEN -pl.amount ELSE 0 END), 0) AS totalUsed
+        FROM users u
+        LEFT JOIN point_log pl ON pl.user_id = u.id
+        WHERE u.id = :userId
+        GROUP BY u.id, u.point
+    """, nativeQuery = true)
+    java.util.Optional<PointSummaryProjection> summarizeByUserId(@Param("userId") Long userId);
 }

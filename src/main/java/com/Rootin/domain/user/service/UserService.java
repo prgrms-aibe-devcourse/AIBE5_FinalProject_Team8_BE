@@ -37,10 +37,19 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public UserMeResponse getUserMe(Long userId) {
-        User user = userRepository.findById(userId)
+        UserRepository.UserMeProjection user = userRepository.findUserMeById(userId, PostStatus.PUBLISHED.name())
                 .orElseThrow(() -> CustomException.notFound("사용자를 찾을 수 없습니다."));
-        long tilCount = tilRepository.countByUserIdAndStatus(userId, PostStatus.PUBLISHED);
-        return UserMeResponse.of(user, tilCount);
+        return UserMeResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .bio(user.getBio())
+                .point(user.getPoint() != null ? user.getPoint() : 0)
+                .provider(user.getProvider())
+                .tilCount(user.getTilCount() != null ? user.getTilCount() : 0)
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 
     /**

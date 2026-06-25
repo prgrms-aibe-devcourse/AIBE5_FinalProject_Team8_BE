@@ -4,7 +4,6 @@ import com.Rootin.domain.garden.dto.GardenInfoResponse;
 import com.Rootin.domain.garden.dto.PlantInfoResponse;
 import com.Rootin.domain.garden.entity.PlantItem;
 import com.Rootin.domain.garden.entity.Pot;
-import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PlantItemRepository;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
@@ -19,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -121,13 +121,16 @@ public class GardenDashboardService {
         long totalTilCount = tilRepository.countByUserIdAndPotIdAndStatus(userId, potId, PostStatus.PUBLISHED);
 
         // 10. 특정 유저가 해당 화분에 준 가장 최근 물주기 기록 1건을 조회합니다.
-        LocalDateTime lastWateredAt = wateringLogRepository.findFirstByUserIdAndPotIdOrderByWateredAtDesc(userId, potId)
-                .map(WateringLog::getWateredAt)
+        LocalDateTime lastWateredAt = wateringLogRepository.findLatestWateredAtByUserIdAndPotId(userId, potId)
                 .orElse(null);
 
-        // 11. 유저의 전체 TIL 발행 일자를 기준으로 현재 연속 작성일(스트릭)을 계산합니다.
-        List<LocalDateTime> publishedTimes = tilRepository.findPublishedAtByUserId(userId, PostStatus.PUBLISHED);
-        int streakDays = levelCalculator.calculateStreak(publishedTimes);
+        // 11. 유저의 TIL 발행 날짜만 조회해 현재 연속 작성일(스트릭)을 계산합니다.
+        // 같은 날짜에 여러 글을 작성해도 스트릭에는 날짜 하나만 필요하므로 DISTINCT 날짜 조회로 힙 사용량을 줄입니다.
+        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED.name())
+                .stream()
+                .map(java.sql.Date::toLocalDate)
+                .toList();
+        int streakDays = levelCalculator.calculateStreakFromDates(publishedDates);
 
         // 12. 복합 정보 DTO를 조립 반환합니다.
         return new GardenInfoResponse(
