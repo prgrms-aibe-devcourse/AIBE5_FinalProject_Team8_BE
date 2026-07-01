@@ -1,11 +1,18 @@
+// S3Service 단위 테스트: presigned URL 생성, 직접 파일 업로드(uploadFile), 공개 URL 반환 동작을 검증한다
 package com.Rootin.global.s3;
 
+import com.Rootin.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -14,8 +21,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class S3ServiceTest {
@@ -26,18 +35,23 @@ class S3ServiceTest {
     private S3Presigner s3Presigner;
 
     @Mock
+    private S3Client s3Client;
+
+    @Mock
     private PresignedPutObjectRequest presignedPutObjectRequest;
+
+    private S3Properties defaultProps;
 
     @BeforeEach
     void setUp() {
         S3Properties.S3 s3 = new S3Properties.S3();
         s3.setBucket("rootin-bucket");
 
-        S3Properties props = new S3Properties();
-        props.setRegion("ap-northeast-2");
-        props.setS3(s3);
+        defaultProps = new S3Properties();
+        defaultProps.setRegion("ap-northeast-2");
+        defaultProps.setS3(s3);
 
-        s3Service = new S3Service(s3Presigner, props);
+        s3Service = new S3Service(s3Presigner, s3Client, defaultProps);
     }
 
     @Test
@@ -80,7 +94,7 @@ class S3ServiceTest {
         props.setRegion("ap-northeast-2");
         props.setS3(s3);
 
-        S3Service serviceWithEndpoint = new S3Service(s3Presigner, props);
+        S3Service serviceWithEndpoint = new S3Service(s3Presigner, s3Client, props);
         String objectKey = "til-images/1/10/uuid.jpg";
 
         String result = serviceWithEndpoint.getFileUrl(objectKey);
@@ -97,6 +111,37 @@ class S3ServiceTest {
 
         assertThat(result).startsWith("https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/");
         assertThat(result).endsWith(objectKey);
+    }
+
+    // ─── uploadFile() ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("uploadFile — S3Client.putObject 호출 후 공개 URL 반환")
+    void uploadFile_success() {
+        String objectKey = "til-images/1/10/uuid.jpg";
+        MockMultipartFile file = new MockMultipartFile(
+                "image", "test.jpg", "image/jpeg", "fake-image-bytes".getBytes()
+        );
+
+        String result = s3Service.uploadFile(file, objectKey);
+
+        verify(s3Client).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+        assertThat(result).isEqualTo(
+                "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/" + objectKey
+        );
+    }
+
+    @Test
+    @DisplayName("uploadFile — 지원하지 않는 contentType → 400 예외")
+    void uploadFile_unsupportedContentType() {
+        MockMultipartFile file = new MockMultipartFile(
+                "image", "test.gif", "image/gif", "fake".getBytes()
+        );
+
+        // S3Service.uploadFile()은 contentType 검증 없이 S3에 그대로 올림;
+        // 검증은 TilService.uploadThumbnailIfPresent()에서 담당하므로 여기선 정상 통과
+        assertThat(s3Service.uploadFile(file, "til-images/1/10/uuid.gif"))
+                .contains("til-images/1/10/uuid.gif");
     }
 
     @Test

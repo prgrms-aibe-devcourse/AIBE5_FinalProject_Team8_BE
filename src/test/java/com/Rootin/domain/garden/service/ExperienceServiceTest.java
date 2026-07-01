@@ -237,11 +237,12 @@ class ExperienceServiceTest {
                 "이것은 자바 공부 내용입니다. 글자 수를 테스트하기 위한 긴 텍스트입니다. " +
                 "충분한 양의 텍스트가 채워져야 기본 경험치가 쌓이게 됩니다.", // 공백 포함 83글자 예상
                 testPot.getId(),
-                List.of("Java", "Programming")
+                List.of("Java", "Programming"),
+                null // [수정] imageUrls 필드 추가 (이미지 없음)
         );
 
         // when
-        TilResponse response = tilService.create(testUser.getId(), request);
+        TilResponse response = tilService.create(testUser.getId(), request, null);
 
         // then
         // 1. TIL이 정상 생성 확인 (레코드는 getId()가 아니라 tilId() 메소드를 제공함)
@@ -262,10 +263,10 @@ class ExperienceServiceTest {
     void tilCreateUsesVisibleTextLengthForExp() {
         // given: 가시 텍스트는 "오늘배운것"(5자)이지만 HTML 원문은 태그 때문에 훨씬 길다
         String html = "<p><strong>오늘</strong> <code>배운</code> 것</p>";
-        TilCreateRequest request = new TilCreateRequest("서식 TIL", html, testPot.getId(), List.of("Java"));
+        TilCreateRequest request = new TilCreateRequest("서식 TIL", html, testPot.getId(), List.of("Java"), null); // [수정] imageUrls 필드 추가
 
         // when
-        TilResponse response = tilService.create(testUser.getId(), request);
+        TilResponse response = tilService.create(testUser.getId(), request, null);
 
         em.flush();
         em.clear();
@@ -285,10 +286,10 @@ class ExperienceServiceTest {
     @DisplayName("가시 텍스트가 없는 본문(서식 태그만 존재)은 경험치/물주기 이력을 만들지 않는다")
     void tilCreateWithNoVisibleTextSkipsWatering() {
         // given: @NotBlank는 통과하지만 가시 글자 수가 0인 본문
-        TilCreateRequest request = new TilCreateRequest("빈 본문 TIL", "<p></p>", testPot.getId(), List.of());
+        TilCreateRequest request = new TilCreateRequest("빈 본문 TIL", "<p></p>", testPot.getId(), List.of(), null); // [수정] imageUrls 필드 추가
 
         // when
-        TilResponse response = tilService.create(testUser.getId(), request);
+        TilResponse response = tilService.create(testUser.getId(), request, null);
 
         em.flush();
         em.clear();
@@ -343,11 +344,12 @@ class ExperienceServiceTest {
                 "타인 화분 작성 시도",
                 "권한이 없어야 하는 내용",
                 testPot.getId(),
-                List.of("Security")
+                List.of("Security"),
+                null // [수정] imageUrls 필드 추가 (이미지 없음)
         );
 
         CustomException exception = assertThrows(CustomException.class, () ->
-                tilService.create(otherUser.getId(), request)
+                tilService.create(otherUser.getId(), request, null)
         );
 
         assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
@@ -361,11 +363,12 @@ class ExperienceServiceTest {
                 testPot.getId(),
                 "타인 화분 임시저장",
                 "권한이 없어야 하는 초안",
-                List.of("Draft")
+                List.of("Draft"),
+                null // [수정] imageUrls 필드 추가 (이미지 없음)
         );
 
         CustomException exception = assertThrows(CustomException.class, () ->
-                tilService.saveDraft(otherUser.getId(), request)
+                tilService.saveDraft(otherUser.getId(), request, null)
         );
 
         assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);

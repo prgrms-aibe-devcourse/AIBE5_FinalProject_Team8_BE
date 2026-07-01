@@ -69,7 +69,8 @@ dependencies {
 	testImplementation 'org.testcontainers:mysql'
 
 	// Metrics Collection (Prometheus)
-	implementation 'io.micrometer:micrometer-registry-prometheus'
+	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+	implementation 'io.github.mweirauch:micrometer-jvm-extras:0.2.2'
 
 	// HTML 파싱 (TIL 본문 경험치 산정 시 태그 제외 후 순수 텍스트 길이 계산)
 	implementation 'org.jsoup:jsoup:1.18.1'
