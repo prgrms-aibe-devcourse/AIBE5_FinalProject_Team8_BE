@@ -137,7 +137,7 @@ public interface WateringLogRepository extends JpaRepository<WateringLog, Long> 
           AND w.wateredAt >= :from
           AND w.wateredAt < :to
     """)
-    WateringLogAggregateProjection aggregateByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(
+    Optional<WateringLogAggregateProjection> aggregateByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(
             @Param("userId") Long userId,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to

@@ -57,7 +57,7 @@ public class DashboardService {
                 .sorted(Comparator.comparing(GrassCell::date))
                 .collect(Collectors.toList());
 
-        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED.name()).stream()
+        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED).stream()
                 .map(java.sql.Date::toLocalDate)
                 .toList();
         int currentStreak = levelCalculator.calculateStreakFromDates(publishedDates);
@@ -115,12 +115,12 @@ public class DashboardService {
                 .toList();
         int totalStudyDays = wateredDates.size();
 
-        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED.name()).stream()
+        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED).stream()
                 .map(java.sql.Date::toLocalDate)
                 .toList();
         int currentStreak = levelCalculator.calculateStreakFromDates(publishedDates);
 
-        int longestStreak = calculateMaxStreak(wateredDates);
+        int longestStreak = calculateMaxStreak(publishedDates);
 
         int currentPoints = Optional.ofNullable(overview.getCurrentPoints()).orElse(0);
 
@@ -181,18 +181,24 @@ public class DashboardService {
         // 반열린 구간 [todayStart, tomorrowStart) — datetime(6) microsecond 누락 방지
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
-        WateringLogAggregateProjection todayStats = wateringLogRepository
+        Optional<WateringLogAggregateProjection> todayStats = wateringLogRepository
                 .aggregateByUserIdAndWateredAtGreaterThanEqualAndWateredAtLessThan(userId, todayStart, tomorrowStart);
+        long todayTilCount = todayStats
+                .map(WateringLogAggregateProjection::getTilCount)
+                .orElse(0L);
+        long todayContentLength = todayStats
+                .map(WateringLogAggregateProjection::getContentLength)
+                .orElse(0L);
 
         // Q1: 오늘 TIL >= 1개
-        boolean q1 = todayStats.getTilCount() >= 1;
+        boolean q1 = todayTilCount >= 1;
 
         // Q2: 오늘 TIL에 태그 >= 1개
         long todayTagCount = tilTagRepository.countByUserTodayTil(userId, PostStatus.PUBLISHED, todayStart, tomorrowStart);
         boolean q2 = todayTagCount >= 1;
 
         // Q3: 오늘 총 글자 수 >= 200
-        boolean q3 = todayStats.getContentLength() >= 200;
+        boolean q3 = todayContentLength >= 200;
 
         // 달성된 퀘스트에 대해 오늘 첫 달성이면 포인트 지급
         awardQuestPoints(userId, q1, q2, q3, today);

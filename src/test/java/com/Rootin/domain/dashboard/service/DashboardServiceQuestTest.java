@@ -224,13 +224,16 @@ class DashboardServiceQuestTest {
     @DisplayName("현재 스트릭은 물주기 로그 날짜가 아니라 TIL 발행 날짜 기준으로 계산한다")
     void currentStreak_usesPublishedTilDates() {
         Til todayTil = tilRepository.save(Til.create(user, "오늘 발행 TIL", "내용", pot));
+        Til anotherTodayTil = tilRepository.save(Til.create(user, "오늘 발행 TIL 2", "내용", pot));
         saveWateringLogAt(todayTil.getId(), 50, LocalDate.now().minusDays(10));
+        saveWateringLogAt(anotherTodayTil.getId(), 50, LocalDate.now().minusDays(9));
 
         var grass = dashboardService.getGrassGraph(user.getId());
         var personalStats = dashboardService.getPersonalStats(user.getId());
 
         assertThat(grass.currentStreak()).isEqualTo(1);
         assertThat(personalStats.currentStreak()).isEqualTo(1);
+        // 물주기 로그 날짜 기준이면 2가 되지만, 개인 통계의 연속 기록은 TIL 발행 날짜 기준으로 통일한다.
         assertThat(personalStats.longestStreak()).isEqualTo(1);
     }
 

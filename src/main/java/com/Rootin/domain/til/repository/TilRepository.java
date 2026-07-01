@@ -40,6 +40,10 @@ public interface TilRepository extends JpaRepository<Til, Long> {
             @Param("status") String status
     );
 
+    default List<java.sql.Date> findDistinctPublishedDatesByUserId(Long userId, PostStatus status) {
+        return findDistinctPublishedDatesByUserId(userId, status.name());
+    }
+
     Optional<Til> findFirstByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
 
     @Query("""

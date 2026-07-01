@@ -126,7 +126,7 @@ public class GardenDashboardService {
 
         // 11. 유저의 TIL 발행 날짜만 조회해 현재 연속 작성일(스트릭)을 계산합니다.
         // 같은 날짜에 여러 글을 작성해도 스트릭에는 날짜 하나만 필요하므로 DISTINCT 날짜 조회로 힙 사용량을 줄입니다.
-        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED.name())
+        List<LocalDate> publishedDates = tilRepository.findDistinctPublishedDatesByUserId(userId, PostStatus.PUBLISHED)
                 .stream()
                 .map(java.sql.Date::toLocalDate)
                 .toList();
