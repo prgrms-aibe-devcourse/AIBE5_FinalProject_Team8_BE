@@ -2,6 +2,7 @@ package com.Rootin.global.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SecurityException;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -91,6 +92,13 @@ public class JwtTokenProvider {
      */
     public String getRole(String token) {
         return getClaims(token).get("role", String.class);
+    }
+
+    /**
+     * 토큰을 한 번만 파싱해 여러 클레임을 함께 사용할 때 호출한다.
+     */
+    public Claims parseClaims(String token) {
+        return getClaims(token);
     }
 
     // =====================================================================

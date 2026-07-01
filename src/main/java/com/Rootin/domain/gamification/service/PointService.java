@@ -3,7 +3,7 @@ package com.Rootin.domain.gamification.service;
 import com.Rootin.domain.gamification.dto.PointLogResponse;
 import com.Rootin.domain.gamification.dto.PointSummaryResponse;
 import com.Rootin.domain.gamification.repository.PointLogRepository;
-import com.Rootin.domain.user.repository.UserRepository;
+import com.Rootin.domain.gamification.repository.PointLogRepository.PointSummaryProjection;
 import com.Rootin.global.exception.CustomException;
 import com.Rootin.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -18,14 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PointService {
 
     private final PointLogRepository pointLogRepository;
-    private final UserRepository userRepository;
 
     public PointSummaryResponse getPointSummary(Long userId) {
-        int currentPoint = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND))
-                .getPoint();
-        int totalEarned = pointLogRepository.sumEarnedByUserId(userId);
-        int totalUsed = Math.abs(pointLogRepository.sumUsedByUserId(userId));
+        PointSummaryProjection summary = pointLogRepository.summarizeByUserId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        int currentPoint = summary.getCurrentPoint() != null ? summary.getCurrentPoint() : 0;
+        int totalEarned = toSafeInt(summary.getTotalEarned());
+        int totalUsed = toSafeInt(summary.getTotalUsed());
 
         return new PointSummaryResponse(currentPoint, totalEarned, totalUsed);
     }
@@ -33,5 +32,11 @@ public class PointService {
     public Page<PointLogResponse> getPointHistory(Long userId, Pageable pageable) {
         return pointLogRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
                 .map(PointLogResponse::from);
+    }
+
+    private int toSafeInt(long value) {
+        if (value > Integer.MAX_VALUE) return Integer.MAX_VALUE;
+        if (value < Integer.MIN_VALUE) return Integer.MIN_VALUE;
+        return (int) value;
     }
 }

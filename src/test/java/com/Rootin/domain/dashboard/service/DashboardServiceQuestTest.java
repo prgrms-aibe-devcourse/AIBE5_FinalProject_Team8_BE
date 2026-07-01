@@ -2,6 +2,8 @@ package com.Rootin.domain.dashboard.service;
 
 import com.Rootin.domain.dashboard.dto.QuestDto;
 import com.Rootin.domain.dashboard.dto.QuestResponse;
+import com.Rootin.domain.gamification.entity.enums.PointLogReason;
+import com.Rootin.domain.gamification.repository.PointLogRepository;
 import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.entity.WateringLog;
 import com.Rootin.domain.garden.repository.PotRepository;
@@ -24,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
+import java.time.LocalDate;
+import java.util.Set;
 
 @IntegrationTest
 @Transactional
@@ -36,6 +40,7 @@ class DashboardServiceQuestTest {
     @Autowired private TilTagRepository tilTagRepository;
     @Autowired private TagRepository tagRepository;
     @Autowired private WateringLogRepository wateringLogRepository;
+    @Autowired private PointLogRepository pointLogRepository;
     @Autowired private EntityManager em;
 
     private User user;
@@ -73,6 +78,30 @@ class DashboardServiceQuestTest {
                 .beforeTotalExp(0)
                 .afterTotalExp(10)
                 .build());
+    }
+
+    private void saveWateringLogAt(Long postId, int contentLength, LocalDate wateredDate) {
+        WateringLog log = wateringLogRepository.save(WateringLog.builder()
+                .userId(user.getId())
+                .potId(pot.getId())
+                .postId(postId)
+                .expGained(10)
+                .pointGained(5)
+                .contentLength(contentLength)
+                .streakDays(1)
+                .appliedMultiplier(1.0)
+                .beforePotLevel(1)
+                .afterPotLevel(1)
+                .beforeTotalExp(0)
+                .afterTotalExp(10)
+                .build());
+        em.flush();
+        em.createNativeQuery("UPDATE watering_log SET watered_at = :wateredAt WHERE id = :id")
+                .setParameter("wateredAt", wateredDate.atTime(9, 0))
+                .setParameter("id", log.getId())
+                .executeUpdate();
+        em.flush();
+        em.clear();
     }
 
     // ──────────────────────────────────────────────
@@ -171,6 +200,44 @@ class DashboardServiceQuestTest {
     // ──────────────────────────────────────────────
 
     @Test
+    @DisplayName("잔디 그래프 maxStreak는 그래프 조회 기간 안의 기록만 기준으로 계산한다")
+    void grassGraph_maxStreak_usesOnlyGraphRangeDates() {
+        LocalDate oldDay = LocalDate.now().minusYears(2);
+        LocalDate currentRangeDay = LocalDate.now().minusDays(1);
+
+        Til oldTil1 = tilRepository.save(Til.create(user, "오래된 TIL 1", "내용", pot));
+        Til oldTil2 = tilRepository.save(Til.create(user, "오래된 TIL 2", "내용", pot));
+        Til recentTil = tilRepository.save(Til.create(user, "최근 TIL", "내용", pot));
+
+        saveWateringLogAt(oldTil1.getId(), 50, oldDay);
+        saveWateringLogAt(oldTil2.getId(), 50, oldDay.plusDays(1));
+        saveWateringLogAt(recentTil.getId(), 50, currentRangeDay);
+
+        var response = dashboardService.getGrassGraph(user.getId());
+
+        assertThat(response.maxStreak()).isEqualTo(1);
+        assertThat(response.cells()).extracting(cell -> cell.date())
+                .containsExactly(currentRangeDay);
+    }
+
+    @Test
+    @DisplayName("현재 스트릭은 물주기 로그 날짜가 아니라 TIL 발행 날짜 기준으로 계산한다")
+    void currentStreak_usesPublishedTilDates() {
+        Til todayTil = tilRepository.save(Til.create(user, "오늘 발행 TIL", "내용", pot));
+        Til anotherTodayTil = tilRepository.save(Til.create(user, "오늘 발행 TIL 2", "내용", pot));
+        saveWateringLogAt(todayTil.getId(), 50, LocalDate.now().minusDays(10));
+        saveWateringLogAt(anotherTodayTil.getId(), 50, LocalDate.now().minusDays(9));
+
+        var grass = dashboardService.getGrassGraph(user.getId());
+        var personalStats = dashboardService.getPersonalStats(user.getId());
+
+        assertThat(grass.currentStreak()).isEqualTo(1);
+        assertThat(personalStats.currentStreak()).isEqualTo(1);
+        // 물주기 로그 날짜 기준이면 2가 되지만, 개인 통계의 연속 기록은 TIL 발행 날짜 기준으로 통일한다.
+        assertThat(personalStats.longestStreak()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("3개 퀘스트 모두 달성 시 earnedToday = totalToday = 100")
     void earnedPoints_allDone_is_100() {
         Til til = tilRepository.save(Til.create(user, "제목", "내용", pot));
@@ -223,6 +290,33 @@ class DashboardServiceQuestTest {
         em.clear();
         User updated = userRepository.findById(user.getId()).orElseThrow();
         assertThat(updated.getPoint()).isEqualTo(100); // 200이 아닌 100
+    }
+
+    @Test
+    @DisplayName("퀘스트 포인트 로그는 동일 user/reason/date에 대해 한 번만 삽입된다")
+    void questLogInsertIfAbsent_preventsDuplicateByUniqueKey() {
+        LocalDate today = LocalDate.now();
+
+        int firstInsert = pointLogRepository.insertQuestLogIfAbsent(
+                user.getId(), PointLogReason.QUEST_Q1.name(), 50, today);
+        int duplicateInsert = pointLogRepository.insertQuestLogIfAbsent(
+                user.getId(), PointLogReason.QUEST_Q1.name(), 50, today);
+
+        em.flush();
+        em.clear();
+
+        Set<PointLogReason> awardedToday = pointLogRepository.findQuestReasonsByUserIdAndAwardedDate(
+                user.getId(),
+                today,
+                Set.of(PointLogReason.QUEST_Q1, PointLogReason.QUEST_Q2, PointLogReason.QUEST_Q3)
+        );
+        long savedCount = pointLogRepository.countByUserIdAndReasonAndAwardedDate(
+                user.getId(), PointLogReason.QUEST_Q1, today);
+
+        assertThat(firstInsert).isEqualTo(1);
+        assertThat(duplicateInsert).isZero();
+        assertThat(awardedToday).containsExactly(PointLogReason.QUEST_Q1);
+        assertThat(savedCount).isEqualTo(1);
     }
 
     @Test

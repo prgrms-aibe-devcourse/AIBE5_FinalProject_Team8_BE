@@ -88,16 +88,18 @@ class UserServiceTest {
     @DisplayName("내 정보 조회 성공 — provider, tilCount 포함 반환")
     void getUserMe_success() {
         // given
-        User user = User.builder()
-                .email("test@rootin.com")
-                .nickname("루틴이")
-                .role(Role.USER)
-                .provider(Provider.LOCAL)
-                .point(100)
-                .build();
-
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(5L);
+        given(userRepository.findUserMeById(1L, PostStatus.PUBLISHED.name()))
+                .willReturn(Optional.of(userMeProjection(
+                        1L,
+                        "test@rootin.com",
+                        "루틴이",
+                        null,
+                        null,
+                        100,
+                        Provider.LOCAL.name(),
+                        null,
+                        5L
+                )));
 
         // when
         UserMeResponse response = userService.getUserMe(1L);
@@ -113,18 +115,19 @@ class UserServiceTest {
     @DisplayName("내 정보 조회 성공 — createdAt 포함 반환")
     void getUserMe_createdAt_included() {
         // given
-        User user = User.builder()
-                .email("test@rootin.com")
-                .nickname("루틴이")
-                .role(Role.USER)
-                .provider(Provider.LOCAL)
-                .build();
-
         LocalDateTime expectedCreatedAt = LocalDateTime.of(2025, 1, 1, 0, 0);
-        ReflectionTestUtils.setField(user, "createdAt", expectedCreatedAt);
-
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(0L);
+        given(userRepository.findUserMeById(1L, PostStatus.PUBLISHED.name()))
+                .willReturn(Optional.of(userMeProjection(
+                        1L,
+                        "test@rootin.com",
+                        "루틴이",
+                        null,
+                        null,
+                        0,
+                        Provider.LOCAL.name(),
+                        expectedCreatedAt,
+                        0L
+                )));
 
         // when
         UserMeResponse response = userService.getUserMe(1L);
@@ -137,7 +140,7 @@ class UserServiceTest {
     @DisplayName("내 정보 조회 — 존재하지 않는 userId → CustomException(404)")
     void getUserMe_userNotFound() {
         // given
-        given(userRepository.findById(99L)).willReturn(Optional.empty());
+        given(userRepository.findUserMeById(99L, PostStatus.PUBLISHED.name())).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> userService.getUserMe(99L))
@@ -148,15 +151,18 @@ class UserServiceTest {
     @DisplayName("내 정보 조회 — TIL 없는 경우 tilCount = 0")
     void getUserMe_noTil_tilCountZero() {
         // given
-        User user = User.builder()
-                .email("test@rootin.com")
-                .nickname("루틴이")
-                .role(Role.USER)
-                .provider(Provider.GOOGLE)
-                .build();
-
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(tilRepository.countByUserIdAndStatus(1L, PostStatus.PUBLISHED)).willReturn(0L);
+        given(userRepository.findUserMeById(1L, PostStatus.PUBLISHED.name()))
+                .willReturn(Optional.of(userMeProjection(
+                        1L,
+                        "test@rootin.com",
+                        "루틴이",
+                        null,
+                        null,
+                        0,
+                        Provider.GOOGLE.name(),
+                        null,
+                        0L
+                )));
 
         // when
         UserMeResponse response = userService.getUserMe(1L);
@@ -330,5 +336,64 @@ class UserServiceTest {
         // when & then
         assertThatThrownBy(() -> userService.updateUserMe(1L, request))
                 .isInstanceOf(CustomException.class);
+    }
+
+    private UserRepository.UserMeProjection userMeProjection(
+            Long id,
+            String email,
+            String nickname,
+            String profileImageUrl,
+            String bio,
+            Integer point,
+            String provider,
+            LocalDateTime createdAt,
+            Long tilCount
+    ) {
+        return new UserRepository.UserMeProjection() {
+            @Override
+            public Long getId() {
+                return id;
+            }
+
+            @Override
+            public String getEmail() {
+                return email;
+            }
+
+            @Override
+            public String getNickname() {
+                return nickname;
+            }
+
+            @Override
+            public String getProfileImageUrl() {
+                return profileImageUrl;
+            }
+
+            @Override
+            public String getBio() {
+                return bio;
+            }
+
+            @Override
+            public Integer getPoint() {
+                return point;
+            }
+
+            @Override
+            public String getProvider() {
+                return provider;
+            }
+
+            @Override
+            public LocalDateTime getCreatedAt() {
+                return createdAt;
+            }
+
+            @Override
+            public Long getTilCount() {
+                return tilCount;
+            }
+        };
     }
 }

@@ -1,6 +1,10 @@
 spring:
   application:
     name: Rootin
+  datasource:
+    hikari:
+      # 운영에서는 인스턴스 수와 DB max_connections에 맞춰 DB_MAX_POOL_SIZE로 조정합니다.
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:30}
   servlet:
     multipart:
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
@@ -69,7 +73,7 @@ spring:
     show-sql: true
     properties:
       hibernate:
-        format_sql: tr
+        format_sql: true
         jdbc:
           time_zone: Asia/Seoul
 

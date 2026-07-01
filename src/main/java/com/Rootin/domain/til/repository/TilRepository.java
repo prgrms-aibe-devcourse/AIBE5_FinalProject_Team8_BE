@@ -5,6 +5,7 @@ import com.Rootin.domain.til.entity.Til;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
@@ -25,7 +26,46 @@ public interface TilRepository extends JpaRepository<Til, Long> {
             @Param("status") PostStatus status
     );
 
+    @Query(value = """
+        SELECT DISTINCT DATE(t.published_at) AS published_date
+        FROM til t
+        JOIN posts p ON p.id = t.post_id
+        WHERE p.user_id = :userId
+          AND p.status = :status
+          AND t.published_at IS NOT NULL
+        ORDER BY published_date DESC
+    """, nativeQuery = true)
+    List<java.sql.Date> findDistinctPublishedDatesByUserId(
+            @Param("userId") Long userId,
+            @Param("status") String status
+    );
+
+    default List<java.sql.Date> findDistinctPublishedDatesByUserId(Long userId, PostStatus status) {
+        return findDistinctPublishedDatesByUserId(userId, status.name());
+    }
+
     Optional<Til> findFirstByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);
+
+    @Query("""
+        SELECT t.id
+        FROM Til t
+        WHERE t.user.id = :userId
+          AND t.pot.id = :potId
+          AND t.status = :status
+    """)
+    List<Long> findIdsByUserIdAndPotIdAndStatus(
+            @Param("userId") Long userId,
+            @Param("potId") Long potId,
+            @Param("status") PostStatus status
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM til WHERE post_id IN (:ids)", nativeQuery = true)
+    int deleteTilRowsByIds(@Param("ids") List<Long> ids);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM posts WHERE id IN (:ids)", nativeQuery = true)
+    int deletePostRowsByIds(@Param("ids") List<Long> ids);
 
     // AI 서비스 전용 - 화분 내 전체 TIL 합산용
     List<Til> findByUserIdAndPotIdAndStatus(Long userId, Long potId, PostStatus status);

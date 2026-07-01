@@ -283,19 +283,19 @@ class ExperienceServiceTest {
     }
 
     @Test
-    @DisplayName("가시 텍스트가 없는 본문(서식 태그만 존재)은 경험치/물주기 이력을 만들지 않는다")
-    void tilCreateWithNoVisibleTextSkipsWatering() {
+    @DisplayName("가시 텍스트가 없는 본문(서식 태그만 존재)은 발행을 거부한다")
+    void tilCreateWithNoVisibleTextFails() {
         // given: @NotBlank는 통과하지만 가시 글자 수가 0인 본문
         TilCreateRequest request = new TilCreateRequest("빈 본문 TIL", "<p></p>", testPot.getId(), List.of(), null); // [수정] imageUrls 필드 추가
 
-        // when
-        TilResponse response = tilService.create(testUser.getId(), request, null);
+        // when & then
+        CustomException exception = assertThrows(CustomException.class,
+                () -> tilService.create(testUser.getId(), request, null));
 
         em.flush();
         em.clear();
 
-        // then: TIL은 생성되지만 물주기 이력이 남지 않고(0-exp 로그가 post_id를 선점하지 않음) 화분 경험치도 그대로다
-        assertThat(response.tilId()).isNotNull();
+        assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST);
         assertThat(wateringLogRepository.findByPotId(testPot.getId())).isEmpty();
         Pot pot = potRepository.findById(testPot.getId()).orElseThrow();
         assertThat(pot.getTotalExp()).isZero();

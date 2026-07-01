@@ -8,6 +8,7 @@ import com.Rootin.domain.garden.entity.Pot;
 import com.Rootin.domain.garden.repository.PotRepository;
 import com.Rootin.domain.garden.repository.WateringLogRepository;
 import com.Rootin.domain.garden.service.ExperienceService;
+import com.Rootin.domain.til.dto.request.DraftSaveRequest;
 import com.Rootin.domain.til.dto.request.TilCreateRequest;
 import com.Rootin.domain.til.dto.request.TilUpdateRequest;
 import com.Rootin.domain.til.dto.response.TilResponse;
@@ -17,6 +18,7 @@ import com.Rootin.domain.til.entity.Til;
 import com.Rootin.domain.til.repository.PostImageRepository;
 import com.Rootin.domain.til.repository.TagRepository;
 import com.Rootin.domain.til.repository.TilRepository;
+import com.Rootin.domain.til.repository.TilTagRepository;
 import com.Rootin.domain.user.entity.User;
 import com.Rootin.domain.user.repository.UserRepository;
 import com.Rootin.global.exception.CustomException;
@@ -61,6 +63,7 @@ class TilServiceTest {
     @Mock private S3Service s3Service;
     // [S3 이미지 업로드 기능 추가] PostImageRepository 목 추가
     @Mock private PostImageRepository postImageRepository;
+    @Mock private TilTagRepository tilTagRepository;
 
     private User owner;
     private Pot pot;
@@ -88,6 +91,97 @@ class TilServiceTest {
         ReflectionTestUtils.setField(til, "tilTags", new ArrayList<>());
     }
 
+    // --- saveDraft() ---
+
+    @Test
+    @DisplayName("임시저장 저장 — 기존 초안을 벌크 삭제한 뒤 새 DRAFT를 저장한다")
+    void saveDraft_replacesExistingDraftWithBulkDelete() {
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
+        given(userRepository.getReferenceById(1L)).willReturn(owner);
+        given(potRepository.getReferenceById(10L)).willReturn(pot);
+        given(tilRepository.findIdsByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.DRAFT))
+                .willReturn(List.of(100L));
+        given(tilRepository.save(any(Til.class))).willAnswer(invocation -> {
+            Til saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 200L);
+            return saved;
+        });
+        given(postImageRepository.findByPostIdOrderByImageOrder(200L))
+                .willReturn(Collections.emptyList());
+
+        DraftSaveRequest request = new DraftSaveRequest(
+                10L,
+                "새 임시저장",
+                "기존 초안을 대체하는 본문",
+                List.of(),
+                List.of()
+        );
+
+        TilResponse response = tilService.saveDraft(1L, request, null);
+
+        assertThat(response.tilId()).isEqualTo(200L);
+
+        var inOrder = inOrder(postImageRepository, tilTagRepository, tilRepository);
+        inOrder.verify(postImageRepository).deleteByPostId(100L);
+        inOrder.verify(tilTagRepository).deleteByTilIdIn(List.of(100L));
+        inOrder.verify(tilRepository).deleteTilRowsByIds(List.of(100L));
+        inOrder.verify(tilRepository).deletePostRowsByIds(List.of(100L));
+        inOrder.verify(tilRepository).save(any(Til.class));
+        verify(tilRepository, never()).findFirstByUserIdAndPotIdAndStatus(anyLong(), anyLong(), any());
+    }
+
+    // --- deleteDraft() ---
+
+    @Test
+    @DisplayName("임시저장 삭제 — 같은 화분 쓰기 락 후 이미지, TilTag, Til, Post를 벌크 삭제한다")
+    void deleteDraft_success_bulkDeletesDraftRows() {
+        given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findIdsByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.DRAFT))
+                .willReturn(List.of(100L, 101L));
+        given(postImageRepository.findByPostIdOrderByImageOrder(100L))
+                .willReturn(Collections.emptyList());
+        given(postImageRepository.findByPostIdOrderByImageOrder(101L))
+                .willReturn(Collections.emptyList());
+
+        tilService.deleteDraft(1L, 10L);
+
+        var inOrder = inOrder(postImageRepository, tilTagRepository, tilRepository);
+        inOrder.verify(postImageRepository).deleteByPostId(100L);
+        inOrder.verify(postImageRepository).deleteByPostId(101L);
+        inOrder.verify(tilTagRepository).deleteByTilIdIn(List.of(100L, 101L));
+        inOrder.verify(tilRepository).deleteTilRowsByIds(List.of(100L, 101L));
+        inOrder.verify(tilRepository).deletePostRowsByIds(List.of(100L, 101L));
+    }
+
+    @Test
+    @DisplayName("임시저장 삭제 — 삭제할 초안이 없어도 멱등하게 성공한다")
+    void deleteDraft_noDraft_isNoop() {
+        given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
+        given(tilRepository.findIdsByUserIdAndPotIdAndStatus(1L, 10L, PostStatus.DRAFT))
+                .willReturn(List.of());
+
+        tilService.deleteDraft(1L, 10L);
+
+        verify(postImageRepository, never()).deleteByPostId(anyLong());
+        verify(tilTagRepository, never()).deleteByTilIdIn(anyList());
+        verify(tilRepository, never()).deleteTilRowsByIds(anyList());
+        verify(tilRepository, never()).deletePostRowsByIds(anyList());
+    }
+
+    @Test
+    @DisplayName("타인 화분 임시저장 삭제 시도 → 403")
+    void deleteDraft_forbidden_whenPotOwnerMismatch() {
+        given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
+
+        assertThatThrownBy(() -> tilService.deleteDraft(2L, 10L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+
+        verify(tilRepository, never()).findIdsByUserIdAndPotIdAndStatus(anyLong(), anyLong(), any());
+        verifyNoInteractions(tilTagRepository);
+    }
+
     // --- create() ---
 
     @Nested
@@ -100,7 +194,8 @@ class TilServiceTest {
             // [수정] TilCreateRequest 5번째 인자(imageUrls) null 추가 (기존 4인자 → 5인자)
             TilCreateRequest request = new TilCreateRequest("제목", "내용", 10L, List.of(), null);
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+            given(userRepository.existsById(1L)).willReturn(true);
+            given(userRepository.getReferenceById(1L)).willReturn(owner);
             given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
             given(tilRepository.save(any(Til.class))).willReturn(til);
             // [추가] create() 마지막에 이미지 조회 → 빈 목록 반환
@@ -122,7 +217,8 @@ class TilServiceTest {
                     "image", "thumb.jpg", "image/jpeg", "bytes".getBytes());
             String expectedUrl = "https://rootin-bucket.s3.ap-northeast-2.amazonaws.com/til-images/1/10/uuid.jpg";
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+            given(userRepository.existsById(1L)).willReturn(true);
+            given(userRepository.getReferenceById(1L)).willReturn(owner);
             given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
             given(s3Service.uploadFile(any(), any())).willReturn(expectedUrl);
             given(tilRepository.save(any(Til.class))).willReturn(til);
@@ -141,7 +237,8 @@ class TilServiceTest {
             MockMultipartFile image = new MockMultipartFile(
                     "image", "test.gif", "image/gif", "bytes".getBytes());
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+            given(userRepository.existsById(1L)).willReturn(true);
+            given(userRepository.getReferenceById(1L)).willReturn(owner);
             given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
 
             assertThatThrownBy(() -> tilService.create(1L, request, image))
@@ -161,7 +258,8 @@ class TilServiceTest {
             );
             TilCreateRequest request = new TilCreateRequest("제목", "내용", 10L, List.of(), urls);
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+            given(userRepository.existsById(1L)).willReturn(true);
+            given(userRepository.getReferenceById(1L)).willReturn(owner);
             given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
             given(tilRepository.save(any(Til.class))).willReturn(til);
             given(postImageRepository.findByPostIdOrderByImageOrder(100L))
@@ -180,7 +278,8 @@ class TilServiceTest {
         void create_withEmptyImageUrls_doesNotSaveImages() {
             TilCreateRequest request = new TilCreateRequest("제목", "내용", 10L, List.of(), List.of());
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(owner));
+            given(userRepository.existsById(1L)).willReturn(true);
+            given(userRepository.getReferenceById(1L)).willReturn(owner);
             given(potRepository.findByIdWithLock(10L)).willReturn(Optional.of(pot));
             given(tilRepository.save(any(Til.class))).willReturn(til);
             given(postImageRepository.findByPostIdOrderByImageOrder(100L))
